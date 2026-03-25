@@ -2,22 +2,83 @@
 
 import pytest
 
+from lakeflow_migration_validator.dimensions.secret_completeness import compute_secret_completeness
+from tests.unit.validation.conftest import make_notebook, make_secret, make_snapshot
+
 
 def test_all_secrets_defined_scores_1():
     """Every dbutils.secrets.get reference has a matching SecretInstruction."""
-    pytest.skip("TDD: implement dimension first")
+    snapshot = make_snapshot(
+        notebooks=[
+            make_notebook(
+                content=(
+                    'dbutils.secrets.get(scope="scope1", key="key1")\n'
+                    'dbutils.secrets.get(scope="scope2", key="key2")'
+                )
+            )
+        ],
+        secrets=[make_secret("scope1", "key1"), make_secret("scope2", "key2")],
+    )
+
+    score, details = compute_secret_completeness(snapshot)
+
+    assert score == 1.0
+    assert details["missing"] == []
 
 
 def test_missing_secret_lowers_score():
     """A notebook references (scope, key) not in secrets -> score < 1.0."""
-    pytest.skip("TDD: implement dimension first")
+    snapshot = make_snapshot(
+        notebooks=[
+            make_notebook(
+                content=(
+                    'dbutils.secrets.get(scope="scope1", key="key1")\n'
+                    'dbutils.secrets.get(scope="scope2", key="key2")'
+                )
+            )
+        ],
+        secrets=[make_secret("scope1", "key1")],
+    )
+
+    score, details = compute_secret_completeness(snapshot)
+
+    assert score == pytest.approx(0.5)
+    assert details["missing"] == [{"scope": "scope2", "key": "key2"}]
 
 
 def test_no_secret_references_scores_1():
     """A notebook with no dbutils.secrets.get calls scores 1.0."""
-    pytest.skip("TDD: implement dimension first")
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(content="x = 1")],
+        secrets=[make_secret("scope1", "key1")],
+    )
+
+    score, details = compute_secret_completeness(snapshot)
+
+    assert score == 1.0
+    assert details == {"defined": [{"scope": "scope1", "key": "key1"}], "referenced": [], "missing": []}
 
 
 def test_details_list_missing_scope_key_pairs():
     """The details dict lists the missing (scope, key) pairs."""
-    pytest.skip("TDD: implement dimension first")
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(content='dbutils.secrets.get(scope="sc", key="k")')],
+        secrets=[],
+    )
+
+    _score, details = compute_secret_completeness(snapshot)
+
+    assert details["missing"] == [{"scope": "sc", "key": "k"}]
+
+
+def test_secret_reference_detected_when_key_precedes_scope():
+    """dbutils.secrets.get(key=..., scope=...) is also recognized."""
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(content='dbutils.secrets.get(key="k", scope="sc")')],
+        secrets=[make_secret("sc", "k")],
+    )
+
+    score, details = compute_secret_completeness(snapshot)
+
+    assert score == 1.0
+    assert details["missing"] == []
