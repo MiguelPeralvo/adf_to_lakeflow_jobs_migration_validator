@@ -67,3 +67,16 @@ def test_details_list_error_file_paths():
     file_paths = [error["file_path"] for error in details["errors"]]
 
     assert file_paths == ["/nb/one.py", "/nb/two.py"]
+
+
+def test_value_error_notebook_is_reported():
+    """compile ValueError cases (e.g. null bytes) are captured as errors."""
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(file_path="/nb/null_byte.py", content="print('x')\x00")]
+    )
+
+    score, details = compute_notebook_validity(snapshot)
+
+    assert score == 0.0
+    assert len(details["errors"]) == 1
+    assert details["errors"][0]["file_path"] == "/nb/null_byte.py"

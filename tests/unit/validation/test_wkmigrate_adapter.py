@@ -134,6 +134,23 @@ def test_adapter_maps_parameters():
     assert snapshot.parameters == ("param1",)
 
 
+def test_adapter_filters_nameless_parameters():
+    """Parameters without a valid name are ignored."""
+    source = {"activities": []}
+    pipeline = Pipeline(
+        name="pipeline",
+        parameters=[{"name": "param1"}, {}, {"name": ""}],
+        schedule=None,
+        tasks=[],
+        tags={},
+    )
+    prepared = PreparedWorkflow(pipeline=pipeline, activities=[])
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    assert snapshot.parameters == ("param1",)
+
+
 def test_adapter_maps_dependencies():
     """IR Dependency objects become DependencyRef pairs."""
     source, prepared = _build_prepared_workflow()
@@ -171,6 +188,22 @@ def test_adapter_counts_source_dependencies():
     snapshot = from_wkmigrate(source, prepared)
 
     assert snapshot.total_source_dependencies == 1
+
+
+def test_adapter_counts_source_dependencies_with_camel_case_key():
+    """total_source_dependencies also supports ADF's dependsOn field."""
+    source = {
+        "activities": [
+            {"name": "a", "dependsOn": [{"activity": "b"}]},
+            {"name": "b", "dependsOn": [{"activity": "c"}, {"activity": "d"}]},
+        ]
+    }
+    pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
+    prepared = PreparedWorkflow(pipeline=pipeline, activities=[])
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    assert snapshot.total_source_dependencies == 3
 
 
 def test_adapter_handles_empty_pipeline():

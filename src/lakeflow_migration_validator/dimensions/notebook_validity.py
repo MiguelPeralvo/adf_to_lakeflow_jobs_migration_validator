@@ -14,7 +14,7 @@ def compute_notebook_validity(snapshot: ConversionSnapshot) -> tuple[float, dict
     for notebook in snapshot.notebooks:
         try:
             compile(notebook.content, notebook.file_path, "exec")
-        except SyntaxError as exc:
+        except (SyntaxError, ValueError) as exc:
             errors.append({"file_path": notebook.file_path, "error": str(exc)})
 
     valid = len(snapshot.notebooks) - len(errors)

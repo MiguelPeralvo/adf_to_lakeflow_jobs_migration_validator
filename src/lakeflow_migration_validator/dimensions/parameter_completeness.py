@@ -6,7 +6,7 @@ import re
 
 from lakeflow_migration_validator.contract import ConversionSnapshot
 
-_WIDGET_GET_PATTERN = re.compile(r"dbutils\.widgets\.get\(['\"](\w+)['\"]\)")
+_WIDGET_GET_PATTERN = re.compile(r"dbutils\.widgets\.get\(\s*['\"]([^'\"]+)['\"]\s*\)")
 
 
 def compute_parameter_completeness(snapshot: ConversionSnapshot) -> tuple[float, dict]:

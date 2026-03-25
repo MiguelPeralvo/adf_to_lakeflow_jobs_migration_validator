@@ -45,14 +45,22 @@ _DEFAULT_WEIGHTS = {
 }
 
 _DIMENSIONS = [
-    ProgrammaticCheck("activity_coverage", lambda _i, s: compute_activity_coverage(s)),
-    ProgrammaticCheck("expression_coverage", lambda _i, s: compute_expression_coverage(s)),
-    ProgrammaticCheck("dependency_preservation", lambda _i, s: compute_dependency_preservation(s)),
-    ProgrammaticCheck("notebook_validity", lambda _i, s: compute_notebook_validity(s)),
-    ProgrammaticCheck("parameter_completeness", lambda _i, s: compute_parameter_completeness(s)),
-    ProgrammaticCheck("secret_completeness", lambda _i, s: compute_secret_completeness(s)),
-    ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s)),
+    ProgrammaticCheck("activity_coverage", lambda _i, s: compute_activity_coverage(s), threshold=0.8),
+    ProgrammaticCheck("expression_coverage", lambda _i, s: compute_expression_coverage(s), threshold=0.75),
+    ProgrammaticCheck("dependency_preservation", lambda _i, s: compute_dependency_preservation(s), threshold=0.8),
+    ProgrammaticCheck("notebook_validity", lambda _i, s: compute_notebook_validity(s), threshold=1.0),
+    ProgrammaticCheck("parameter_completeness", lambda _i, s: compute_parameter_completeness(s), threshold=0.9),
+    ProgrammaticCheck("secret_completeness", lambda _i, s: compute_secret_completeness(s), threshold=0.9),
+    ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s), threshold=0.8),
 ]
+
+_DIMENSION_NAMES = {dimension.name for dimension in _DIMENSIONS}
+if _DIMENSION_NAMES != set(_DEFAULT_WEIGHTS):
+    raise ValueError(
+        "Dimension/weight configuration mismatch: "
+        f"dimensions={sorted(_DIMENSION_NAMES)} "
+        f"weights={sorted(_DEFAULT_WEIGHTS)}"
+    )
 
 
 def evaluate(snapshot: ConversionSnapshot) -> Scorecard:

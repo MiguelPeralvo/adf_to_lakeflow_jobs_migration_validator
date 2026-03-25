@@ -40,6 +40,22 @@ def test_unsupported_expressions_lower_score():
     assert len(details["unsupported"]) == 1
 
 
+def test_non_expression_unsupported_entries_are_ignored():
+    """Only not_translatable messages about expressions are counted."""
+    snapshot = make_snapshot(
+        resolved_expressions=[make_expression()],
+        not_translatable=[
+            {"message": "Unsupported activity type: WebActivity"},
+            {"message": "Unsupported expression in activity"},
+        ],
+    )
+
+    score, details = compute_expression_coverage(snapshot)
+
+    assert score == pytest.approx(0.5)
+    assert details["unsupported"] == [{"message": "Unsupported expression in activity"}]
+
+
 def test_no_expressions_scores_1():
     """A pipeline with no expression properties scores 1.0."""
     snapshot = make_snapshot()

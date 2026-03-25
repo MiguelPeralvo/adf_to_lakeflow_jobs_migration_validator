@@ -75,3 +75,16 @@ def test_multiple_notebooks_aggregate_references():
     assert score == pytest.approx(0.5)
     assert details["referenced"] == ["first", "second"]
     assert details["missing"] == ["second"]
+
+
+def test_widget_pattern_supports_hyphens_and_whitespace():
+    """Widget names with non-word chars and spacing are detected."""
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(content='dbutils.widgets.get( "my-param" )')],
+        parameters=("my-param",),
+    )
+
+    score, details = compute_parameter_completeness(snapshot)
+
+    assert score == 1.0
+    assert details["referenced"] == ["my-param"]

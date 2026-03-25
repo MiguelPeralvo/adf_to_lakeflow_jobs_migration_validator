@@ -43,7 +43,7 @@ def test_missing_secret_lowers_score():
     score, details = compute_secret_completeness(snapshot)
 
     assert score == pytest.approx(0.5)
-    assert details["missing"] == ["('scope2', 'key2')"]
+    assert details["missing"] == [{"scope": "scope2", "key": "key2"}]
 
 
 def test_no_secret_references_scores_1():
@@ -56,7 +56,7 @@ def test_no_secret_references_scores_1():
     score, details = compute_secret_completeness(snapshot)
 
     assert score == 1.0
-    assert details == {"defined": ["('scope1', 'key1')"], "referenced": [], "missing": []}
+    assert details == {"defined": [{"scope": "scope1", "key": "key1"}], "referenced": [], "missing": []}
 
 
 def test_details_list_missing_scope_key_pairs():
@@ -68,4 +68,17 @@ def test_details_list_missing_scope_key_pairs():
 
     _score, details = compute_secret_completeness(snapshot)
 
-    assert details["missing"] == ["('sc', 'k')"]
+    assert details["missing"] == [{"scope": "sc", "key": "k"}]
+
+
+def test_secret_reference_detected_when_key_precedes_scope():
+    """dbutils.secrets.get(key=..., scope=...) is also recognized."""
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(content='dbutils.secrets.get(key="k", scope="sc")')],
+        secrets=[make_secret("sc", "k")],
+    )
+
+    score, details = compute_secret_completeness(snapshot)
+
+    assert score == 1.0
+    assert details["missing"] == []
