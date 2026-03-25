@@ -4,6 +4,14 @@
 > **Scope:** Full technical design for the Lakeflow Migration Validator (System 1),
 > written so that every class is extractable into the Validator Factory (System 3).
 >
+> **Purpose:** Helps implementation teams validate, iterate, and parallel-test
+> ADF-to-Databricks Lakeflow Jobs migrations. Three capabilities:
+> 1. **Validate** — score wkmigrate conversions across 11 quality dimensions (CCS)
+> 2. **Harness** — orchestrate wkmigrate end-to-end: fetch ADF → translate → prepare → validate → suggest fixes → iterate
+> 3. **Parallel-test** — run the ADF pipeline and the converted Lakeflow Job with the same inputs, compare outputs
+>
+> Stress-tested via smart synthetic ADF pipeline generation with known-correct expected outputs.
+>
 > **LLM backend:** Databricks FMAPI
 > - **Opus 4.6** (`claude-opus-4-6`): semantic equivalence judge (calibration, nightly), fix suggestions, DSPy optimization
 > - **ChatGPT 5.4** (`chatgpt-5-4`): semantic equivalence judge (batch CI), synthetic test generation
@@ -23,14 +31,18 @@
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
 │  │ Databricks│  │   MCP    │  │ REST API │  │   CLI    │     │
 │  │    App    │  │  Server  │  │ (FastAPI)│  │ (Typer)  │     │
-│  │ (primary) │  │          │  │          │  │(secondary│     │
 │  └─────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
 │        └──────────────┴─────────────┴──────────────┘          │
 │                            │                                   │
-│                    ┌───────▼──────┐                            │
-│                    │  Python API  │ evaluate_pipeline()        │
-│                    │   (core)     │ evaluate_batch()           │
-│                    └───────┬──────┘ regression_check()         │
+│         ┌──────────────────┼──────────────────┐               │
+│         │                  │                  │               │
+│  ┌──────▼──────┐  ┌───────▼──────┐  ┌────────▼─────────┐    │
+│  │   evaluate  │  │   harness    │  │ parallel_test    │    │
+│  │  (score a   │  │ (end-to-end  │  │ (run ADF +       │    │
+│  │  conversion)│  │  conversion  │  │  Databricks,     │    │
+│  │             │  │  + iterate)  │  │  compare outputs)│    │
+│  └──────┬──────┘  └───────┬──────┘  └────────┬─────────┘    │
+│         └──────────────────┼──────────────────┘               │
 │                            │                                   │
 ├────────────────────────────┼───────────────────────────────────┤
 │                    DIMENSION LAYER (scoring logic)             │
@@ -39,12 +51,28 @@
 │  │ Tiers 1-2: Programmatic + Structural (8 dims)     │        │
 │  │ Tier 3:    LLM Judge — FMAPI (Opus 4.6/GPT 5.4)  │        │
 │  │ Tier 4:    Execution — Databricks Jobs API        │        │
+│  │ Tier 5:    Parallel equivalence — ADF vs Databricks│        │
 │  └───────────────────────────────────────────────────┘        │
+│                                                               │
+├────────────────────────────┼───────────────────────────────────┤
+│                    CONTRACT LAYER                              │
+│                            │                                   │
+│  ┌─────────────────────────▼─────────────────────────┐        │
+│  │ ConversionSnapshot (tool-agnostic)                 │        │
+│  │ + expected_outputs (for synthetic pipelines)       │        │
+│  │ + adf_run_outputs  (for parallel testing)          │        │
+│  └───────────────────────────────────────────────────┘        │
+│                            │                                   │
+│           ┌────────────────┼────────────────┐                 │
+│           ▼                ▼                ▼                 │
+│    wkmigrate_adapter  adf_runner     synthetic_generator      │
+│    (only wkmigrate    (ADF REST     (LLM-generated ADF        │
+│     import)            API)          pipelines)               │
 │                                                               │
 ├───────────────────────────────────────────────────────────────┤
 │                    INFRASTRUCTURE LAYER                        │
 │                                                               │
-│  MLflow (tracking)  │  FMAPI (LLM)  │  Databricks (execution)│
+│  MLflow │ FMAPI (LLM) │ Databricks (exec) │ ADF (exec/fetch) │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -70,6 +98,7 @@ src/lakeflow_migration_validator/
     control_flow_fidelity.py            # compute_control_flow_fidelity(snapshot)
     semantic_equivalence.py             # LLMJudge: ADF expr ↔ Python semantic comparison
     runtime_success.py                  # ExecutionDimension: Databricks job run
+    parallel_equivalence.py             # ParallelTestDimension: ADF output vs Databricks output
   adapters/                             # ADAPTER BOUNDARY — only layer that imports tool types
     __init__.py
     wkmigrate_adapter.py                # from_wkmigrate(source, PreparedWorkflow) -> ConversionSnapshot
@@ -86,6 +115,21 @@ src/lakeflow_migration_validator/
   golden_set.py                         # GoldenSet loader (GENERIC)
   report.py                             # Report + regression checking (GENERIC)
   tracking.py                           # MLflow integration (GENERIC)
+  harness/                              # wkmigrate orchestration for implementation teams
+    __init__.py
+    harness_runner.py                   # HarnessRunner: fetch ADF → translate → prepare → validate → iterate
+    adf_connector.py                    # Connect to ADF factory, list/fetch pipelines
+    fix_loop.py                         # FixLoop: score → judge → suggest fixes → re-translate → re-score
+  synthetic/                            # Smart ADF pipeline generation for stress testing
+    __init__.py
+    pipeline_generator.py               # Generate parameterized ADF pipeline JSON with known-correct outputs
+    expression_generator.py             # Generate ADF expressions + expected Python translations
+    ground_truth.py                     # GroundTruthSuite: (ADF pipeline, expected ConversionSnapshot) pairs
+  parallel/                             # Side-by-side ADF vs Databricks execution comparison
+    __init__.py
+    adf_runner.py                       # ADFExecutionRunner: trigger ADF pipeline, collect activity outputs
+    comparator.py                       # OutputComparator: diff ADF outputs vs Databricks task values
+    parallel_test_runner.py             # ParallelTestRunner: orchestrate both, score equivalence
 
 apps/lmv/                              # Databricks App (primary surface)
   backend/
@@ -283,6 +327,13 @@ class ConversionSnapshot:
     resolved_expressions: tuple[ExpressionPair, ...] = ()  # for semantic judge
     source_pipeline: dict = field(default_factory=dict)    # raw ADF JSON (for dep check)
     total_source_dependencies: int = 0               # total depends_on in ADF (for scoring)
+    # --- Fields for parallel testing and synthetic stress testing ---
+    expected_outputs: dict[str, str] = field(default_factory=dict)
+        # For synthetic pipelines: task_key → expected output value (ground truth)
+        # Empty for real conversions; populated by synthetic/ground_truth.py
+    adf_run_outputs: dict[str, str] = field(default_factory=dict)
+        # For parallel testing: task_key → output collected from the real ADF pipeline run
+        # Empty until parallel/adf_runner.py populates it after execution
 ```
 
 ### 2.4 wkmigrate adapter
@@ -779,6 +830,309 @@ def evaluate_from_wkmigrate(source_pipeline: dict, prepared_workflow) -> Scoreca
     return evaluate(snapshot)
 ```
 
+### 2.9 HarnessRunner — end-to-end orchestration for implementation teams
+
+The harness is what implementation teams actually use day-to-day. Instead of running
+wkmigrate manually, passing the output to lmv, reading the scorecard, and figuring out
+what to fix — the harness does it all:
+
+```python
+# harness/harness_runner.py
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(frozen=True, slots=True)
+class HarnessResult:
+    """Result of a full harness run — conversion + validation + optional fixes."""
+    pipeline_name: str
+    scorecard: Scorecard
+    snapshot: ConversionSnapshot
+    fix_suggestions: list[dict[str, Any]] = field(default_factory=list)
+    iterations: int = 1                   # how many fix-iterate cycles ran
+
+
+class HarnessRunner:
+    """Orchestrates: fetch ADF → translate → prepare → validate → suggest fixes → iterate.
+
+    This is the primary interface for implementation teams.
+    """
+
+    def __init__(
+        self,
+        adf_connector: ADFConnector,      # connects to ADF factory
+        wkmigrate_adapter,                 # from_wkmigrate function
+        judge_provider: JudgeProvider | None = None,  # for semantic + fix suggestions
+        max_iterations: int = 1,           # how many fix-iterate cycles (1 = no fixes)
+    ): ...
+
+    def run(self, pipeline_name: str) -> HarnessResult:
+        """Fetch → translate → prepare → validate → (optionally iterate with fixes)."""
+        ...
+
+    def run_all(self, pipeline_names: list[str] | None = None) -> list[HarnessResult]:
+        """Run harness on multiple (or all) pipelines in the ADF factory."""
+        ...
+```
+
+```python
+# harness/adf_connector.py
+
+class ADFConnector:
+    """Connects to an ADF factory via FactoryClient credentials.
+
+    Wraps the ADF connection config so the harness can fetch pipelines
+    without the user managing FactoryClient directly.
+    """
+
+    def __init__(
+        self,
+        tenant_id: str,
+        client_id: str,
+        client_secret: str,
+        subscription_id: str,
+        resource_group: str,
+        factory_name: str,
+    ): ...
+
+    def list_pipelines(self) -> list[str]: ...
+    def fetch_pipeline(self, name: str) -> dict: ...
+    def translate_and_prepare(self, pipeline_json: dict) -> tuple[dict, Any]:
+        """Returns (source_pipeline, PreparedWorkflow)."""
+        ...
+```
+
+```python
+# harness/fix_loop.py
+
+class FixLoop:
+    """Score → judge failures → suggest fixes → re-translate → re-score.
+
+    Uses dspy.Refine internally to iteratively improve fix suggestions.
+    Each iteration: identify the lowest-scoring dimension, generate a fix
+    suggestion, apply it (if applicable), re-run wkmigrate, re-score.
+    """
+
+    def __init__(self, judge_provider: JudgeProvider, max_iterations: int = 3): ...
+
+    def iterate(self, snapshot: ConversionSnapshot, scorecard: Scorecard) -> tuple[ConversionSnapshot, Scorecard, list[dict]]:
+        """Run one fix-iterate cycle. Returns updated snapshot, scorecard, and suggestions."""
+        ...
+```
+
+### 2.10 Synthetic pipeline generation
+
+Smart synthetic generation produces ADF pipelines with **known-correct expected outputs**,
+enabling automated stress testing of both the converter and the validator.
+
+```python
+# synthetic/pipeline_generator.py
+
+@dataclass(frozen=True, slots=True)
+class SyntheticPipeline:
+    """A generated ADF pipeline with ground truth."""
+    adf_json: dict                          # valid ADF pipeline JSON
+    expected_snapshot: ConversionSnapshot    # what a perfect conversion should produce
+    description: str                        # human-readable description
+    difficulty: str                         # "simple", "medium", "complex", "adversarial"
+
+
+class PipelineGenerator:
+    """Generates parameterized ADF pipelines for stress testing.
+
+    Modes:
+    - "template": fill in parameterized templates (deterministic, fast)
+    - "llm": use FMAPI to generate novel pipelines (creative, slower)
+    - "adversarial": generate pipelines designed to break the converter
+    """
+
+    def __init__(self, mode: str = "template", judge_provider: JudgeProvider | None = None): ...
+
+    def generate(
+        self,
+        count: int = 10,
+        difficulty: str = "medium",
+        activity_types: list[str] | None = None,     # filter by activity type
+        expression_complexity: str = "mixed",         # "simple", "nested", "mixed"
+        max_activities: int = 20,
+    ) -> list[SyntheticPipeline]: ...
+```
+
+```python
+# synthetic/expression_generator.py
+
+@dataclass(frozen=True, slots=True)
+class ExpressionTestCase:
+    """An ADF expression with its expected Python translation."""
+    adf_expression: str
+    expected_python: str
+    category: str                  # "string", "math", "datetime", "logical", "collection", "nested"
+
+
+class ExpressionGenerator:
+    """Generates ADF expression + expected Python pairs for semantic judge calibration."""
+
+    def generate(self, count: int = 50, categories: list[str] | None = None) -> list[ExpressionTestCase]: ...
+```
+
+```python
+# synthetic/ground_truth.py
+
+class GroundTruthSuite:
+    """A suite of synthetic pipelines with known-correct expected outputs.
+
+    Used for:
+    - Calibrating the semantic equivalence judge
+    - Stress testing the converter at scale
+    - Regression testing: CCS distribution should not shift after converter changes
+    """
+
+    pipelines: list[SyntheticPipeline]
+
+    @classmethod
+    def generate(cls, count: int = 50, **kwargs) -> GroundTruthSuite: ...
+
+    @classmethod
+    def from_json(cls, path: str) -> GroundTruthSuite: ...
+
+    def to_json(self, path: str) -> None: ...
+
+    def evaluate_converter(self, convert_fn) -> Report:
+        """Run the converter on all pipelines, score each, return aggregate report."""
+        ...
+```
+
+### 2.11 Parallel testing — ADF vs Databricks side-by-side
+
+The parallel test runner executes the same pipeline on both ADF and Databricks, collects
+outputs, and compares them. This is the ultimate migration validation: not "does the code
+look right" but "does it produce the same result."
+
+```python
+# parallel/adf_runner.py
+
+class ADFExecutionRunner:
+    """Trigger an ADF pipeline run and collect per-activity outputs.
+
+    Uses the ADF REST API to trigger a pipeline run, poll until completion,
+    and collect activity output values (firstRow, value, etc.).
+    """
+
+    def __init__(self, adf_connector: ADFConnector): ...
+
+    def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, str]:
+        """Returns {activity_name: output_value_json}."""
+        ...
+```
+
+```python
+# parallel/comparator.py
+
+@dataclass(frozen=True, slots=True)
+class ComparisonResult:
+    """Per-activity comparison between ADF and Databricks outputs."""
+    activity_name: str
+    adf_output: str | None
+    databricks_output: str | None
+    match: bool                    # True if outputs are equivalent
+    diff: str | None               # human-readable diff if not matching
+
+
+class OutputComparator:
+    """Compare ADF activity outputs with Databricks task values.
+
+    Handles type normalization (ADF returns XML-ish types, Databricks returns
+    Python repr strings), floating-point tolerance, date format differences, etc.
+    """
+
+    def compare(self, adf_outputs: dict[str, str], databricks_outputs: dict[str, str]) -> list[ComparisonResult]: ...
+
+    def score(self, results: list[ComparisonResult]) -> float:
+        """Fraction of activities with matching outputs."""
+        ...
+```
+
+```python
+# parallel/parallel_test_runner.py
+
+@dataclass(frozen=True, slots=True)
+class ParallelTestResult:
+    """Full result of a parallel test run."""
+    pipeline_name: str
+    adf_outputs: dict[str, str]
+    databricks_outputs: dict[str, str]
+    comparisons: list[ComparisonResult]
+    equivalence_score: float               # 0.0-1.0
+    scorecard: Scorecard                   # includes parallel_equivalence dimension
+
+
+class ParallelTestRunner:
+    """Run ADF pipeline + Databricks job, compare outputs, score equivalence."""
+
+    def __init__(
+        self,
+        adf_runner: ADFExecutionRunner,
+        databricks_runner: ExecutionRunner,
+        comparator: OutputComparator | None = None,
+    ): ...
+
+    def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> ParallelTestResult:
+        """Execute on both platforms, compare, return result with equivalence score."""
+        ...
+```
+
+### 2.12 Dimension 11: Parallel equivalence
+
+```python
+# dimensions/parallel_equivalence.py
+
+from __future__ import annotations
+from lakeflow_migration_validator.contract import ConversionSnapshot
+
+
+def compute_parallel_equivalence(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Fraction of activities where ADF output matches Databricks output.
+
+    Requires snapshot.adf_run_outputs to be populated (by parallel/adf_runner.py).
+    If adf_run_outputs is empty, returns 1.0 (vacuously true — no comparison possible).
+    """
+    if not snapshot.adf_run_outputs:
+        return 1.0, {"status": "no_adf_outputs", "compared": 0}
+
+    # Compare against expected_outputs (synthetic) or databricks outputs
+    # This is a placeholder — the actual comparison uses OutputComparator
+    compared = 0
+    matched = 0
+    mismatches = []
+
+    for activity_name, adf_output in snapshot.adf_run_outputs.items():
+        expected = snapshot.expected_outputs.get(activity_name)
+        if expected is not None:
+            compared += 1
+            if _outputs_equivalent(adf_output, expected):
+                matched += 1
+            else:
+                mismatches.append({"activity": activity_name, "adf": adf_output, "expected": expected})
+
+    if compared == 0:
+        return 1.0, {"status": "no_comparable_activities", "compared": 0}
+
+    score = matched / compared
+    return score, {"compared": compared, "matched": matched, "mismatches": mismatches}
+
+
+def _outputs_equivalent(a: str, b: str, tolerance: float = 1e-6) -> bool:
+    """Compare two output strings with type-aware normalization."""
+    if a == b:
+        return True
+    try:
+        return abs(float(a) - float(b)) < tolerance
+    except (ValueError, TypeError):
+        return a.strip() == b.strip()
+```
+
 ---
 
 ## 3. Test Suite (TDD)
@@ -1163,10 +1517,33 @@ def test_regression_check_exits_1_on_regression():
 | 14 | Build React frontend: `ScorecardCard`, `DimensionDrilldown`, `Validate` page, `History` page. |
 | 15 | Deploy as Databricks App (`app.yaml`). Test end-to-end: upload ADF JSON in UI → see scorecard. Verify MCP tools work from Claude. Verify CLI works locally. |
 
+### Week 4: Harness + synthetic generation
+
+| Day | Task |
+|---|---|
+| 16 | Implement `harness/adf_connector.py` (wraps `FactoryClient` + `FactoryDefinitionStore`). Implement `harness/harness_runner.py` (`HarnessRunner.run` — fetch → translate → prepare → adapter → evaluate). Write `test_harness_runner.py`. |
+| 17 | Implement `harness/fix_loop.py` (`FixLoop.iterate` — identify lowest dimension, call judge for failure diagnosis, generate fix suggestion via FMAPI). Wire into `HarnessRunner` with `max_iterations > 1`. Write `test_fix_loop.py`. |
+| 18 | Implement `synthetic/expression_generator.py` — template-based ADF expression + expected Python pairs for calibration. Implement `synthetic/pipeline_generator.py` — parameterized ADF pipeline templates (vary activity count, expression complexity, nesting depth). Write `test_pipeline_generator.py`. |
+| 19 | Implement `synthetic/ground_truth.py` (`GroundTruthSuite.generate`, `evaluate_converter`). Generate a suite of 50 synthetic pipelines, run the converter, compute CCS distribution. Write `test_ground_truth.py`. |
+| 20 | Add harness endpoints to surfaces: `/api/harness/run` (API), `harness_pipeline` (MCP tool), `lmv harness` (CLI). Update App frontend with "Harness" page. |
+
+### Week 5: Parallel testing
+
+| Day | Task |
+|---|---|
+| 21 | Implement `parallel/adf_runner.py` (`ADFExecutionRunner` — trigger ADF pipeline via REST API, poll until done, collect per-activity outputs). Write `test_adf_runner.py` (mock ADF API). |
+| 22 | Implement `parallel/comparator.py` (`OutputComparator` — type normalization, floating-point tolerance, date format alignment). Write `test_comparator.py` with edge cases. |
+| 23 | Implement `parallel/parallel_test_runner.py` (`ParallelTestRunner.run` — execute both, compare, return `ParallelTestResult`). Implement `dimensions/parallel_equivalence.py` (`compute_parallel_equivalence`). Write `test_parallel_equivalence.py`. |
+| 24 | Wire parallel equivalence as dimension 11 into evaluate(). Add parallel endpoints to surfaces: `/api/parallel-test` (API), `parallel_test` (MCP tool), `lmv parallel-test` (CLI). |
+| 25 | End-to-end test: run a real ADF pipeline, run the converted Lakeflow Job, compare outputs. Write `test_parallel_integration.py` (requires live ADF + Databricks). |
+
+---
+
 ### Post-implementation: Extract into factory (Phase 2)
 
-After Week 3, the lakeflow migration validator is complete with all four surfaces. The
-following classes are ready for extraction into `validator-factory`:
+After Week 5, the lakeflow migration validator is complete with all four surfaces, harness,
+synthetic generation, and parallel testing. The following classes are ready for extraction
+into `validator-factory`:
 
 | Class | Extracts as |
 |---|---|
@@ -1186,14 +1563,17 @@ The surface layer code (FastAPI routes, MCP tools, CLI commands, React component
 **reference implementations** that the factory can optionally scaffold for new validators.
 
 What stays in this repo (lmv-specific):
-- Concrete dimension functions (`compute_activity_coverage`, etc.) — they depend on
-  `ConversionSnapshot`, not wkmigrate, but their logic is migration-validation-specific.
-- `adapters/wkmigrate_adapter.py` — the only file that imports wkmigrate.
-- `contract.py` (`ConversionSnapshot`) — could be extracted if other validators share a
-  similar "tasks + notebooks + secrets + params" shape, but it's lmv-specific for now.
+- Concrete dimension functions (`compute_activity_coverage`, etc.)
+- `adapters/wkmigrate_adapter.py` — the only file that imports wkmigrate
+- `contract.py` (`ConversionSnapshot`) — includes migration-specific fields
+  (`expected_outputs`, `adf_run_outputs`) that other validators wouldn't need
+- `harness/` — wkmigrate-specific orchestration
+- `synthetic/` — ADF-specific pipeline generation
+- `parallel/` — ADF-vs-Databricks comparison
 
 What moves to the factory:
-- All framework classes listed above.
-- The adapter pattern itself: the factory documents that every validator should define a
-  `contract.py` with its own snapshot type and an `adapters/` directory with tool-specific
-  mappings.
+- All framework classes listed above
+- The adapter pattern: every validator defines a `contract.py` + `adapters/`
+- The harness pattern: every validator can have a `harness/` that orchestrates its tool
+- The parallel testing pattern: every migration validator can have a `parallel/` that
+  compares source-vs-target execution

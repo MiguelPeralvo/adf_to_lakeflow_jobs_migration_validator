@@ -67,3 +67,10 @@ class ConversionSnapshot:
     resolved_expressions: tuple[ExpressionPair, ...] = ()
     source_pipeline: dict = field(default_factory=dict)
     total_source_dependencies: int = 0
+    # --- Fields for parallel testing and synthetic stress testing ---
+    expected_outputs: dict[str, str] = field(default_factory=dict)
+    """For synthetic pipelines: task_key → expected output value (ground truth).
+    Empty for real conversions; populated by synthetic/ground_truth.py."""
+    adf_run_outputs: dict[str, str] = field(default_factory=dict)
+    """For parallel testing: task_key → output collected from the real ADF pipeline run.
+    Empty until parallel/adf_runner.py populates it after execution."""
