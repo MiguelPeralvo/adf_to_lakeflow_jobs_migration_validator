@@ -42,8 +42,7 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
         )
 
     notebooks = tuple(
-        NotebookSnapshot(file_path=notebook.file_path, content=notebook.content)
-        for notebook in prepared.all_notebooks
+        NotebookSnapshot(file_path=notebook.file_path, content=notebook.content) for notebook in prepared.all_notebooks
     )
 
     secrets = tuple(SecretRef(scope=secret.scope, key=secret.key) for secret in prepared.all_secrets)
@@ -64,7 +63,10 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
                     )
                 )
 
-    adf_activities = source_pipeline.get("activities") or source_pipeline.get("properties", {}).get("activities", [])
+    activities_top = source_pipeline.get("activities")
+    adf_activities = (
+        activities_top if activities_top is not None else source_pipeline.get("properties", {}).get("activities", [])
+    )
     total_source_dependencies = sum(len(activity.get("depends_on", [])) for activity in adf_activities)
 
     expressions = []

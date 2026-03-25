@@ -6,9 +6,7 @@ import re
 
 from lakeflow_migration_validator.contract import ConversionSnapshot
 
-_SECRET_GET_PATTERN = re.compile(
-    r'dbutils\.secrets\.get\(\s*scope=["\']([^"\']+)["\'],\s*key=["\']([^"\']+)["\']\)'
-)
+_SECRET_GET_PATTERN = re.compile(r'dbutils\.secrets\.get\(\s*scope=["\']([^"\']+)["\'],\s*key=["\']([^"\']+)["\']\)')
 
 
 def compute_secret_completeness(snapshot: ConversionSnapshot) -> tuple[float, dict]:
@@ -20,7 +18,7 @@ def compute_secret_completeness(snapshot: ConversionSnapshot) -> tuple[float, di
             referenced.add((match.group(1), match.group(2)))
 
     if not referenced:
-        return 1.0, {"defined": [], "referenced": [], "missing": []}
+        return 1.0, {"defined": sorted(str(secret_ref) for secret_ref in defined), "referenced": [], "missing": []}
 
     missing = referenced - defined
     score = (len(referenced) - len(missing)) / len(referenced)

@@ -56,7 +56,7 @@ def test_no_secret_references_scores_1():
     score, details = compute_secret_completeness(snapshot)
 
     assert score == 1.0
-    assert details == {"defined": [], "referenced": [], "missing": []}
+    assert details == {"defined": ["('scope1', 'key1')"], "referenced": [], "missing": []}
 
 
 def test_details_list_missing_scope_key_pairs():
