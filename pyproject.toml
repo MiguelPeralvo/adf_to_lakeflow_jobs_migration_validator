@@ -1,0 +1,60 @@
+[tool.poetry]
+name = "lakeflow-migration-validator"
+version = "0.1.0"
+description = "Evaluates the fidelity, correctness, and completeness of ADF-to-Databricks Lakeflow Jobs conversions"
+authors = ["Miguel Peralvo <miguel.peralvo@hotmail.com>"]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: Pytest",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+packages = [
+    { include = "lakeflow_migration_validator", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+wkmigrate = { path = "../wkmigrate_codex", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+black = "^24.0"
+ruff = "^0.4"
+
+[tool.poetry.group.api.dependencies]
+fastapi = ">=0.100"
+uvicorn = ">=0.20"
+
+[tool.poetry.group.mcp.dependencies]
+mcp = ">=1.0"
+
+[tool.poetry.group.cli.dependencies]
+typer = ">=0.9"
+
+[tool.poetry.group.llm.dependencies]
+dspy = ">=3.0"
+
+[tool.poetry.scripts]
+lmv = "lakeflow_migration_validator.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require live Azure/Databricks resources",
+    "databricks: marks tests that require a Databricks workspace",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
