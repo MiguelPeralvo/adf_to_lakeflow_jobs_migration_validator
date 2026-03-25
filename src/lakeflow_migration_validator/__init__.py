@@ -22,9 +22,37 @@ Example::
 
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions import DimensionResult
+from lakeflow_migration_validator.dimensions.activity_coverage import compute_activity_coverage
+from lakeflow_migration_validator.dimensions.dependency_preservation import compute_dependency_preservation
+from lakeflow_migration_validator.dimensions.expression_coverage import compute_expression_coverage
+from lakeflow_migration_validator.dimensions.not_translatable_ratio import compute_not_translatable_ratio
+from lakeflow_migration_validator.dimensions.notebook_validity import compute_notebook_validity
+from lakeflow_migration_validator.dimensions.parameter_completeness import compute_parameter_completeness
+from lakeflow_migration_validator.dimensions.programmatic import ProgrammaticCheck
+from lakeflow_migration_validator.dimensions.secret_completeness import compute_secret_completeness
 from lakeflow_migration_validator.scorecard import Scorecard
 
 __all__ = ["evaluate", "evaluate_from_wkmigrate", "ConversionSnapshot", "Scorecard", "DimensionResult"]
+
+_DEFAULT_WEIGHTS = {
+    "activity_coverage": 0.25,
+    "expression_coverage": 0.20,
+    "dependency_preservation": 0.15,
+    "notebook_validity": 0.15,
+    "parameter_completeness": 0.10,
+    "secret_completeness": 0.10,
+    "not_translatable_ratio": 0.05,
+}
+
+_DIMENSIONS = [
+    ProgrammaticCheck("activity_coverage", lambda _i, s: compute_activity_coverage(s)),
+    ProgrammaticCheck("expression_coverage", lambda _i, s: compute_expression_coverage(s)),
+    ProgrammaticCheck("dependency_preservation", lambda _i, s: compute_dependency_preservation(s)),
+    ProgrammaticCheck("notebook_validity", lambda _i, s: compute_notebook_validity(s)),
+    ProgrammaticCheck("parameter_completeness", lambda _i, s: compute_parameter_completeness(s)),
+    ProgrammaticCheck("secret_completeness", lambda _i, s: compute_secret_completeness(s)),
+    ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s)),
+]
 
 
 def evaluate(snapshot: ConversionSnapshot) -> Scorecard:
@@ -33,7 +61,10 @@ def evaluate(snapshot: ConversionSnapshot) -> Scorecard:
     This is the generic entry point — takes a ConversionSnapshot built by any
     adapter (wkmigrate, or a future tool). No wkmigrate imports.
     """
-    raise NotImplementedError("Week 1 Day 5 — implement after dimensions are done")
+    results: dict[str, DimensionResult] = {}
+    for dimension in _DIMENSIONS:
+        results[dimension.name] = dimension.evaluate(None, snapshot)
+    return Scorecard.compute(_DEFAULT_WEIGHTS, results)
 
 
 def evaluate_from_wkmigrate(source_pipeline: dict, prepared_workflow) -> Scorecard:
