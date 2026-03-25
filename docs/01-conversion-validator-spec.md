@@ -51,40 +51,41 @@
 ### Module layout
 
 ```
-src/wkmigrate/
-  validation/                           # Core library (Python API)
-    __init__.py                         # Public API: evaluate_pipeline, ConversionScorecard
-    dimensions/
-      __init__.py                       # Dimension protocol + DimensionResult
-      programmatic.py                   # ProgrammaticCheck base class
-      llm_judge.py                      # LLMJudge base class + JudgeProvider protocol
-      execution.py                      # ExecutionDimension base class + ExecutionRunner protocol
-      # --- Concrete dimensions (deterministic, Tiers 1-2) ---
-      activity_coverage.py              # compute_activity_coverage()
-      expression_coverage.py            # compute_expression_coverage()
-      dependency_preservation.py        # compute_dependency_preservation()
-      notebook_validity.py              # compute_notebook_validity()
-      parameter_completeness.py         # compute_parameter_completeness()
-      secret_completeness.py            # compute_secret_completeness()
-      not_translatable_ratio.py         # compute_not_translatable_ratio()
-      control_flow_fidelity.py          # compute_control_flow_fidelity()
-      # --- Agentic dimensions (LLM-powered, Tier 3) ---
-      semantic_equivalence.py           # LLMJudge: ADF expr ↔ Python semantic comparison
-      # --- Execution dimensions (Tier 4) ---
-      runtime_success.py                # ExecutionDimension: Databricks job run
-    providers/
-      __init__.py                       # Provider protocols
-      fmapi.py                          # FMAPIJudgeProvider (Opus 4.6 + ChatGPT 5.4)
-      databricks_runner.py              # DatabricksJobRunner (ExecutionRunner impl)
-    optimization/                       # DSPy-powered components (opt-in)
-      __init__.py
-      judge_optimizer.py                # DSPy MIPROv2/SIMBA judge prompt optimization
-      synthetic_generator.py            # LLM-based ADF expression generation
-      fix_suggester.py                  # dspy.Refine fix suggestion agent
-    scorecard.py                        # Scorecard + CCS computation
-    golden_set.py                       # GoldenSet loader
-    report.py                           # Report + regression checking
-    tracking.py                         # MLflow integration
+src/lakeflow_migration_validator/
+  __init__.py                           # Public API: evaluate, evaluate_from_wkmigrate
+  contract.py                           # ConversionSnapshot + child dataclasses (GENERIC)
+  dimensions/
+    __init__.py                         # Dimension protocol + DimensionResult (GENERIC)
+    programmatic.py                     # ProgrammaticCheck base class (GENERIC)
+    llm_judge.py                        # LLMJudge base + JudgeProvider protocol (GENERIC)
+    execution.py                        # ExecutionDimension base + ExecutionRunner protocol (GENERIC)
+    # --- Concrete dimensions operate on ConversionSnapshot, NOT wkmigrate types ---
+    activity_coverage.py                # compute_activity_coverage(snapshot)
+    expression_coverage.py              # compute_expression_coverage(snapshot)
+    dependency_preservation.py          # compute_dependency_preservation(snapshot)
+    notebook_validity.py                # compute_notebook_validity(snapshot)
+    parameter_completeness.py           # compute_parameter_completeness(snapshot)
+    secret_completeness.py              # compute_secret_completeness(snapshot)
+    not_translatable_ratio.py           # compute_not_translatable_ratio(snapshot)
+    control_flow_fidelity.py            # compute_control_flow_fidelity(snapshot)
+    semantic_equivalence.py             # LLMJudge: ADF expr ↔ Python semantic comparison
+    runtime_success.py                  # ExecutionDimension: Databricks job run
+  adapters/                             # ADAPTER BOUNDARY — only layer that imports tool types
+    __init__.py
+    wkmigrate_adapter.py                # from_wkmigrate(source, PreparedWorkflow) -> ConversionSnapshot
+  providers/
+    __init__.py                         # Provider protocols
+    fmapi.py                            # FMAPIJudgeProvider (Opus 4.6 + ChatGPT 5.4)
+    databricks_runner.py                # DatabricksJobRunner (ExecutionRunner impl)
+  optimization/                         # DSPy-powered components (opt-in)
+    __init__.py
+    judge_optimizer.py                  # DSPy MIPROv2/SIMBA judge prompt optimization
+    synthetic_generator.py              # LLM-based ADF expression generation
+    fix_suggester.py                    # dspy.Refine fix suggestion agent
+  scorecard.py                          # Scorecard + CCS computation (GENERIC)
+  golden_set.py                         # GoldenSet loader (GENERIC)
+  report.py                             # Report + regression checking (GENERIC)
+  tracking.py                           # MLflow integration (GENERIC)
 
 apps/lmv/                              # Databricks App (primary surface)
   backend/
@@ -104,26 +105,57 @@ apps/lmv/                              # Databricks App (primary surface)
 
   mcp_server.py                         # MCP surface: validate_pipeline, judge_expression, etc.
   cli.py                                # CLI surface: lmv evaluate, lmv judge-expression, etc.
+
+tests/
+  unit/validation/
+    test_activity_coverage.py           # Tests against ConversionSnapshot fixtures (NO wkmigrate)
+    test_notebook_validity.py           # Tests against ConversionSnapshot fixtures (NO wkmigrate)
+    ...                                 # All dimension tests use generic fixtures
+    test_scorecard.py                   # Pure Scorecard tests
+    test_evaluate_pipeline.py           # End-to-end with ConversionSnapshot fixtures
+    test_wkmigrate_adapter.py           # ADAPTER TESTS — imports wkmigrate, verifies mapping
+    test_api.py, test_mcp_server.py, test_cli.py  # Surface tests
 ```
 
-### Design constraints (factory-extractable)
+### Design constraints
 
-Every class in `validation/` must follow these rules:
+#### Adapter boundary — the core rule
 
-1. **No wkmigrate-specific imports in the base protocols.** `Dimension`, `DimensionResult`,
-   `Scorecard`, `GoldenSet`, `Report` must be generic. wkmigrate-specific logic lives only
-   in the concrete dimension implementations (e.g., `activity_coverage.py`).
+**No wkmigrate imports anywhere except `adapters/wkmigrate_adapter.py`.**
 
-2. **Dependency injection for externals.** LLM calls go through a `JudgeProvider` protocol.
+All dimensions, protocols, scorecard, golden set, and report operate on
+`ConversionSnapshot` — a flat, frozen dataclass defined in `contract.py` that is
+the validator's own model of a conversion. The adapter is the only file that imports
+wkmigrate types (`PreparedWorkflow`, `Pipeline`, `NotebookArtifact`,
+`SecretInstruction`). If wkmigrate renames a field or restructures a class, only
+the adapter breaks — no dimension, no test, no surface.
+
+```
+wkmigrate types ──→ [ wkmigrate_adapter.py ] ──→ ConversionSnapshot ──→ dimensions
+                     (ONLY coupling point)
+```
+
+This also means:
+- **Core tests** (`test_activity_coverage.py`, etc.) build `ConversionSnapshot` fixtures
+  by hand — no wkmigrate import, no wkmigrate install needed.
+- **Adapter tests** (`test_wkmigrate_adapter.py`) import real wkmigrate types, convert,
+  and assert the snapshot is correct. These tests are the contract boundary.
+- The `lakeflow-migration-validator` package can be installed without wkmigrate
+  (`pip install lmv`). The adapter is available as an extra (`pip install lmv[wkmigrate]`).
+
+#### Other constraints
+
+1. **Dependency injection for externals.** LLM calls go through a `JudgeProvider` protocol.
    MLflow tracking goes through a `TrackingBackend` protocol. Databricks execution goes
    through an `ExecutionRunner` protocol. No direct imports of `mlflow`, `databricks.sdk`,
    or LLM SDKs in the dimension implementations.
 
-3. **Frozen dataclasses for results.** `DimensionResult`, `Scorecard`, `Report` are
-   `@dataclass(frozen=True, slots=True)` — immutable, serializable, testable.
+2. **Frozen dataclasses for results.** `DimensionResult`, `Scorecard`, `Report`,
+   `ConversionSnapshot` are `@dataclass(frozen=True, slots=True)` — immutable, serializable,
+   testable.
 
-4. **Pure functions for checks.** Each programmatic dimension exposes a top-level function
-   `compute_<dimension>(source_pipeline, prepared_workflow) -> float` that can be tested
+3. **Pure functions for checks.** Each programmatic dimension exposes a top-level function
+   `compute_<dimension>(snapshot: ConversionSnapshot) -> float` that can be tested
    independently of the validator framework.
 
 ---
@@ -189,229 +221,317 @@ class ProgrammaticCheck:
         )
 ```
 
-### 2.3 Concrete programmatic dimensions
+### 2.3 ConversionSnapshot — the adapter contract
 
-Each dimension is a module with a single public function:
+All dimensions operate on this generic dataclass. **No wkmigrate imports.**
 
 ```python
-# validation/dimensions/activity_coverage.py
+# contract.py
 
 from __future__ import annotations
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True, slots=True)
+class TaskSnapshot:
+    """The validator's view of a single task in the converted workflow."""
+    task_key: str
+    is_placeholder: bool               # True if this is a /UNSUPPORTED_ADF_ACTIVITY task
+
+
+@dataclass(frozen=True, slots=True)
+class NotebookSnapshot:
+    """The validator's view of a generated notebook."""
+    file_path: str
+    content: str                        # Full Python source code
+
+
+@dataclass(frozen=True, slots=True)
+class SecretRef:
+    """A (scope, key) pair declared in the conversion's secret instructions."""
+    scope: str
+    key: str
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyRef:
+    """A preserved task dependency in the converted workflow."""
+    source_task: str                    # task_key of the upstream task
+    target_task: str                    # task_key of the downstream task
+
+
+@dataclass(frozen=True, slots=True)
+class ExpressionPair:
+    """An ADF expression and its generated Python translation (for semantic judging)."""
+    adf_expression: str
+    python_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class ConversionSnapshot:
+    """The validator's complete, tool-agnostic view of a conversion.
+
+    Built by an adapter (e.g., wkmigrate_adapter.from_wkmigrate). Dimensions
+    only import this — never the conversion tool's own types.
+    """
+    tasks: tuple[TaskSnapshot, ...]
+    notebooks: tuple[NotebookSnapshot, ...]
+    secrets: tuple[SecretRef, ...]
+    parameters: tuple[str, ...]                     # defined parameter names
+    dependencies: tuple[DependencyRef, ...]          # preserved deps
+    not_translatable: tuple[dict, ...] = ()          # warning entries
+    resolved_expressions: tuple[ExpressionPair, ...] = ()  # for semantic judge
+    source_pipeline: dict = field(default_factory=dict)    # raw ADF JSON (for dep check)
+    total_source_dependencies: int = 0               # total depends_on in ADF (for scoring)
+```
+
+### 2.4 wkmigrate adapter
+
+The **only file** that imports wkmigrate types. If wkmigrate changes, only this file breaks.
+
+```python
+# adapters/wkmigrate_adapter.py
+
+from __future__ import annotations
+import re
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from lakeflow_migration_validator.contract import (
+    ConversionSnapshot, TaskSnapshot, NotebookSnapshot,
+    SecretRef, DependencyRef, ExpressionPair,
+)
 
 _PLACEHOLDER_PATH = "/UNSUPPORTED_ADF_ACTIVITY"
+_WIDGET_PATTERN = re.compile(r"dbutils\.widgets\.get\(['\"](\w+)['\"]\)")
 
 
-def compute_activity_coverage(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
+def from_wkmigrate(source_pipeline: dict, prepared: PreparedWorkflow) -> ConversionSnapshot:
+    """Convert wkmigrate types into the validator's generic contract."""
+
+    # Tasks
+    tasks = []
+    for activity in prepared.activities:
+        nb_path = activity.task.get("notebook_task", {}).get("notebook_path", "")
+        tasks.append(TaskSnapshot(
+            task_key=activity.task.get("task_key", "unknown"),
+            is_placeholder=(nb_path == _PLACEHOLDER_PATH),
+        ))
+
+    # Notebooks
+    notebooks = [
+        NotebookSnapshot(file_path=nb.file_path, content=nb.content)
+        for nb in prepared.all_notebooks
+    ]
+
+    # Secrets
+    secrets = [SecretRef(scope=s.scope, key=s.key) for s in prepared.all_secrets]
+
+    # Parameters
+    params = []
+    if prepared.pipeline.parameters:
+        for p in prepared.pipeline.parameters:
+            params.append(p.get("name", ""))
+
+    # Dependencies
+    deps = []
+    for task in prepared.pipeline.tasks:
+        if task.depends_on:
+            for dep in task.depends_on:
+                deps.append(DependencyRef(source_task=dep.task_key, target_task=task.task_key))
+
+    # Count total ADF dependencies for scoring
+    adf_activities = source_pipeline.get("activities") or source_pipeline.get("properties", {}).get("activities", [])
+    total_source_deps = sum(
+        len(a.get("depends_on", []))
+        for a in adf_activities
+    )
+
+    # Not-translatable
+    not_translatable = tuple(prepared.pipeline.not_translatable)
+
+    # Expression pairs (from SetVariable activities)
+    expressions = []
+    for task in prepared.pipeline.tasks:
+        if hasattr(task, "variable_value") and hasattr(task, "variable_name"):
+            expressions.append(ExpressionPair(
+                adf_expression=f"@variables('{task.variable_name}')",
+                python_code=task.variable_value,
+            ))
+
+    return ConversionSnapshot(
+        tasks=tuple(tasks),
+        notebooks=tuple(notebooks),
+        secrets=tuple(secrets),
+        parameters=tuple(params),
+        dependencies=tuple(deps),
+        not_translatable=not_translatable,
+        resolved_expressions=tuple(expressions),
+        source_pipeline=source_pipeline,
+        total_source_dependencies=total_source_deps,
+    )
+```
+
+### 2.5 Concrete programmatic dimensions
+
+Each dimension operates on `ConversionSnapshot`. **No wkmigrate imports.**
+
+```python
+# dimensions/activity_coverage.py
+
+from __future__ import annotations
+from lakeflow_migration_validator.contract import ConversionSnapshot
+
+
+def compute_activity_coverage(snapshot: ConversionSnapshot) -> tuple[float, dict]:
     """Fraction of tasks that are not placeholder activities."""
-    total = len(prepared.activities)
+    total = len(snapshot.tasks)
     if total == 0:
         return 1.0, {"total": 0, "covered": 0, "placeholders": []}
 
-    placeholders = []
-    for activity in prepared.activities:
-        notebook_task = activity.task.get("notebook_task", {})
-        if notebook_task.get("notebook_path") == _PLACEHOLDER_PATH:
-            placeholders.append(activity.task.get("task_key", "unknown"))
-
+    placeholders = [t.task_key for t in snapshot.tasks if t.is_placeholder]
     covered = total - len(placeholders)
-    return covered / total, {
-        "total": total,
-        "covered": covered,
-        "placeholders": placeholders,
-    }
+    return covered / total, {"total": total, "covered": covered, "placeholders": placeholders}
 ```
 
 ```python
-# validation/dimensions/notebook_validity.py
+# dimensions/notebook_validity.py
 
 from __future__ import annotations
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 
-def compute_notebook_validity(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
+def compute_notebook_validity(snapshot: ConversionSnapshot) -> tuple[float, dict]:
     """Fraction of generated notebooks that compile without SyntaxError."""
-    notebooks = list(prepared.all_notebooks)
-    if not notebooks:
+    if not snapshot.notebooks:
         return 1.0, {"total": 0, "valid": 0, "errors": []}
 
     errors = []
-    for nb in notebooks:
+    for nb in snapshot.notebooks:
         try:
             compile(nb.content, nb.file_path, "exec")
         except SyntaxError as e:
             errors.append({"file_path": nb.file_path, "error": str(e)})
 
-    valid = len(notebooks) - len(errors)
-    return valid / len(notebooks), {
-        "total": len(notebooks),
-        "valid": valid,
-        "errors": errors,
-    }
+    valid = len(snapshot.notebooks) - len(errors)
+    return valid / len(snapshot.notebooks), {"total": len(snapshot.notebooks), "valid": valid, "errors": errors}
 ```
 
 ```python
-# validation/dimensions/parameter_completeness.py
+# dimensions/parameter_completeness.py
 
 from __future__ import annotations
 import re
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
-from wkmigrate.models.ir.pipeline import Pipeline
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 _WIDGET_GET_PATTERN = re.compile(r"dbutils\.widgets\.get\(['\"](\w+)['\"]\)")
 
 
-def compute_parameter_completeness(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
-    """Fraction of dbutils.widgets.get references that have matching job parameters."""
-    pipeline: Pipeline = prepared.pipeline
-    defined_params = set()
-    if pipeline.parameters:
-        for param in pipeline.parameters:
-            defined_params.add(param.get("name", ""))
-
-    referenced_params = set()
-    for nb in prepared.all_notebooks:
+def compute_parameter_completeness(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Fraction of dbutils.widgets.get references that have matching parameters."""
+    defined = set(snapshot.parameters)
+    referenced = set()
+    for nb in snapshot.notebooks:
         for match in _WIDGET_GET_PATTERN.finditer(nb.content):
-            referenced_params.add(match.group(1))
+            referenced.add(match.group(1))
 
-    if not referenced_params:
-        return 1.0, {"defined": sorted(defined_params), "referenced": [], "missing": []}
+    if not referenced:
+        return 1.0, {"defined": sorted(defined), "referenced": [], "missing": []}
 
-    missing = referenced_params - defined_params
-    score = (len(referenced_params) - len(missing)) / len(referenced_params)
-    return score, {
-        "defined": sorted(defined_params),
-        "referenced": sorted(referenced_params),
-        "missing": sorted(missing),
-    }
+    missing = referenced - defined
+    score = (len(referenced) - len(missing)) / len(referenced)
+    return score, {"defined": sorted(defined), "referenced": sorted(referenced), "missing": sorted(missing)}
 ```
 
 ```python
-# validation/dimensions/secret_completeness.py
+# dimensions/secret_completeness.py
 
 from __future__ import annotations
 import re
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 _SECRET_GET_PATTERN = re.compile(
     r'dbutils\.secrets\.get\(\s*scope=["\']([^"\']+)["\'],\s*key=["\']([^"\']+)["\']\)'
 )
 
 
-def compute_secret_completeness(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
-    """Fraction of dbutils.secrets.get references that have matching SecretInstructions."""
-    secret_instructions = {(s.scope, s.key) for s in prepared.all_secrets}
-
-    referenced_secrets = set()
-    for nb in prepared.all_notebooks:
+def compute_secret_completeness(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Fraction of dbutils.secrets.get references that have matching SecretRefs."""
+    defined = {(s.scope, s.key) for s in snapshot.secrets}
+    referenced = set()
+    for nb in snapshot.notebooks:
         for match in _SECRET_GET_PATTERN.finditer(nb.content):
-            referenced_secrets.add((match.group(1), match.group(2)))
+            referenced.add((match.group(1), match.group(2)))
 
-    if not referenced_secrets:
+    if not referenced:
         return 1.0, {"defined": [], "referenced": [], "missing": []}
 
-    missing = referenced_secrets - secret_instructions
-    score = (len(referenced_secrets) - len(missing)) / len(referenced_secrets)
+    missing = referenced - defined
+    score = (len(referenced) - len(missing)) / len(referenced)
     return score, {
-        "defined": sorted(str(s) for s in secret_instructions),
-        "referenced": sorted(str(s) for s in referenced_secrets),
+        "defined": sorted(str(s) for s in defined),
+        "referenced": sorted(str(s) for s in referenced),
         "missing": sorted(str(s) for s in missing),
     }
 ```
 
 ```python
-# validation/dimensions/dependency_preservation.py
+# dimensions/dependency_preservation.py
 
 from __future__ import annotations
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 
-def compute_dependency_preservation(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
-    """Fraction of ADF depends_on entries that have corresponding Databricks task dependencies."""
-    adf_activities = source.get("activities") or source.get("properties", {}).get("activities", [])
-    total_deps = 0
-    preserved_deps = 0
-    missing = []
+def compute_dependency_preservation(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Fraction of source dependencies that were preserved in the conversion."""
+    if snapshot.total_source_dependencies == 0:
+        return 1.0, {"total": 0, "preserved": 0}
 
-    ir_task_keys = {task.task_key for task in prepared.pipeline.tasks}
-
-    for adf_activity in adf_activities:
-        for dep in adf_activity.get("depends_on", []):
-            dep_name = dep.get("activity")
-            if dep_name:
-                total_deps += 1
-                if dep_name in ir_task_keys:
-                    preserved_deps += 1
-                else:
-                    missing.append({"activity": adf_activity.get("name"), "depends_on": dep_name})
-
-    if total_deps == 0:
-        return 1.0, {"total": 0, "preserved": 0, "missing": []}
-
-    return preserved_deps / total_deps, {
-        "total": total_deps,
-        "preserved": preserved_deps,
-        "missing": missing,
+    preserved = len(snapshot.dependencies)
+    score = preserved / snapshot.total_source_dependencies
+    return min(score, 1.0), {
+        "total": snapshot.total_source_dependencies,
+        "preserved": preserved,
     }
 ```
 
 ```python
-# validation/dimensions/expression_coverage.py
+# dimensions/expression_coverage.py
 
 from __future__ import annotations
-from wkmigrate.models.ir.pipeline import Pipeline
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 
-def compute_expression_coverage(source: dict, prepared) -> tuple[float, dict]:
-    """Fraction of ADF expression properties that were successfully resolved."""
-    pipeline: Pipeline = prepared.pipeline
-    total_expressions = 0
-    resolved_expressions = 0
-    unsupported = []
+def compute_expression_coverage(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Fraction of expression properties that were successfully resolved."""
+    unsupported = [
+        e for e in snapshot.not_translatable
+        if "expression" in e.get("message", "").lower()
+        or "unsupported" in e.get("message", "").lower()
+    ]
+    resolved = len(snapshot.resolved_expressions)
+    total = resolved + len(unsupported)
 
-    # Count not_translatable entries related to expressions
-    for entry in pipeline.not_translatable:
-        if "expression" in entry.get("message", "").lower() or "unsupported" in entry.get("message", "").lower():
-            total_expressions += 1
-            unsupported.append(entry)
-
-    # Count resolved expressions (activities that are NOT placeholders)
-    for task in pipeline.tasks:
-        if hasattr(task, "variable_value"):
-            total_expressions += 1
-            resolved_expressions += 1
-
-    total = total_expressions + resolved_expressions if total_expressions > 0 else resolved_expressions
     if total == 0:
         return 1.0, {"total": 0, "resolved": 0, "unsupported": []}
 
-    score = resolved_expressions / total if total > 0 else 1.0
-    return score, {
-        "total": total,
-        "resolved": resolved_expressions,
-        "unsupported": unsupported,
-    }
+    return resolved / total, {"total": total, "resolved": resolved, "unsupported": unsupported}
 ```
 
 ```python
-# validation/dimensions/not_translatable_ratio.py
+# dimensions/not_translatable_ratio.py
 
 from __future__ import annotations
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from lakeflow_migration_validator.contract import ConversionSnapshot
 
 
-def compute_not_translatable_ratio(source: dict, prepared: PreparedWorkflow) -> tuple[float, dict]:
-    """Inverse ratio of not-translatable warnings to total properties."""
-    count = len(prepared.pipeline.not_translatable)
-    # Estimate total properties from activity count * average properties per activity
-    total_tasks = len(prepared.pipeline.tasks)
-    estimated_properties = max(total_tasks * 5, 1)  # rough estimate
-    ratio = count / estimated_properties
-    score = max(0.0, 1.0 - ratio)
-    return score, {
+def compute_not_translatable_ratio(snapshot: ConversionSnapshot) -> tuple[float, dict]:
+    """Inverse ratio of not-translatable warnings to estimated total properties."""
+    count = len(snapshot.not_translatable)
+    estimated_props = max(len(snapshot.tasks) * 5, 1)
+    ratio = count / estimated_props
+    return max(0.0, 1.0 - ratio), {
         "not_translatable_count": count,
-        "estimated_total_properties": estimated_properties,
-        "entries": prepared.pipeline.not_translatable,
+        "estimated_total_properties": estimated_props,
+        "entries": list(snapshot.not_translatable),
     }
 ```
 
@@ -593,25 +713,23 @@ class Scorecard:
         }
 ```
 
-### 2.7 ConversionScorecard (wkmigrate-specific entry point)
+### 2.8 Entry points
 
 ```python
-# validation/__init__.py
+# __init__.py
 
 from __future__ import annotations
-from typing import Any
-from wkmigrate.models.ir.pipeline import Pipeline
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
-from wkmigrate.validation.dimensions import DimensionResult
-from wkmigrate.validation.dimensions.programmatic import ProgrammaticCheck
-from wkmigrate.validation.dimensions.activity_coverage import compute_activity_coverage
-from wkmigrate.validation.dimensions.notebook_validity import compute_notebook_validity
-from wkmigrate.validation.dimensions.parameter_completeness import compute_parameter_completeness
-from wkmigrate.validation.dimensions.secret_completeness import compute_secret_completeness
-from wkmigrate.validation.dimensions.dependency_preservation import compute_dependency_preservation
-from wkmigrate.validation.dimensions.expression_coverage import compute_expression_coverage
-from wkmigrate.validation.dimensions.not_translatable_ratio import compute_not_translatable_ratio
-from wkmigrate.validation.scorecard import Scorecard
+from lakeflow_migration_validator.contract import ConversionSnapshot
+from lakeflow_migration_validator.dimensions import DimensionResult
+from lakeflow_migration_validator.dimensions.programmatic import ProgrammaticCheck
+from lakeflow_migration_validator.dimensions.activity_coverage import compute_activity_coverage
+from lakeflow_migration_validator.dimensions.notebook_validity import compute_notebook_validity
+from lakeflow_migration_validator.dimensions.parameter_completeness import compute_parameter_completeness
+from lakeflow_migration_validator.dimensions.secret_completeness import compute_secret_completeness
+from lakeflow_migration_validator.dimensions.dependency_preservation import compute_dependency_preservation
+from lakeflow_migration_validator.dimensions.expression_coverage import compute_expression_coverage
+from lakeflow_migration_validator.dimensions.not_translatable_ratio import compute_not_translatable_ratio
+from lakeflow_migration_validator.scorecard import Scorecard
 
 _DEFAULT_WEIGHTS = {
     "activity_coverage": 0.25,
@@ -623,23 +741,42 @@ _DEFAULT_WEIGHTS = {
     "not_translatable_ratio": 0.05,
 }
 
+# Note: each check_fn takes (input, output) where input is ignored and output
+# is a ConversionSnapshot. The ProgrammaticCheck passes (input, output) to the
+# fn; we use a lambda to discard input and call the dimension function.
 _DIMENSIONS = [
-    ProgrammaticCheck("activity_coverage", compute_activity_coverage),
-    ProgrammaticCheck("expression_coverage", compute_expression_coverage),
-    ProgrammaticCheck("dependency_preservation", compute_dependency_preservation),
-    ProgrammaticCheck("notebook_validity", compute_notebook_validity),
-    ProgrammaticCheck("parameter_completeness", compute_parameter_completeness),
-    ProgrammaticCheck("secret_completeness", compute_secret_completeness),
-    ProgrammaticCheck("not_translatable_ratio", compute_not_translatable_ratio),
+    ProgrammaticCheck("activity_coverage", lambda _i, s: compute_activity_coverage(s)),
+    ProgrammaticCheck("expression_coverage", lambda _i, s: compute_expression_coverage(s)),
+    ProgrammaticCheck("dependency_preservation", lambda _i, s: compute_dependency_preservation(s)),
+    ProgrammaticCheck("notebook_validity", lambda _i, s: compute_notebook_validity(s)),
+    ProgrammaticCheck("parameter_completeness", lambda _i, s: compute_parameter_completeness(s)),
+    ProgrammaticCheck("secret_completeness", lambda _i, s: compute_secret_completeness(s)),
+    ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s)),
 ]
 
 
-def evaluate_pipeline(source_pipeline: dict, prepared_workflow: PreparedWorkflow) -> Scorecard:
-    """Evaluate a conversion and return a Scorecard with the Conversion Confidence Score."""
+def evaluate(snapshot: ConversionSnapshot) -> Scorecard:
+    """Evaluate a conversion snapshot and return a Scorecard with the CCS.
+
+    This is the generic entry point — takes a ConversionSnapshot built by any
+    adapter (wkmigrate, or a future tool). No wkmigrate imports.
+    """
     results: dict[str, DimensionResult] = {}
     for dim in _DIMENSIONS:
-        results[dim.name] = dim.evaluate(source_pipeline, prepared_workflow)
+        results[dim.name] = dim.evaluate(None, snapshot)
     return Scorecard.compute(_DEFAULT_WEIGHTS, results)
+
+
+def evaluate_from_wkmigrate(source_pipeline: dict, prepared_workflow) -> Scorecard:
+    """Convenience entry point for wkmigrate users.
+
+    Imports the wkmigrate adapter, converts to ConversionSnapshot, then calls
+    evaluate(). Requires the 'wkmigrate' extra to be installed.
+    """
+    from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
+
+    snapshot = from_wkmigrate(source_pipeline, prepared_workflow)
+    return evaluate(snapshot)
 ```
 
 ---
@@ -654,6 +791,8 @@ component. All tests use pytest and follow wkmigrate's existing patterns.
 ```
 tests/unit/validation/
     __init__.py
+    conftest.py                          # ConversionSnapshot fixture builders (NO wkmigrate)
+    # --- Core dimension tests (generic, NO wkmigrate imports) ---
     test_activity_coverage.py
     test_expression_coverage.py
     test_dependency_preservation.py
@@ -663,6 +802,52 @@ tests/unit/validation/
     test_not_translatable_ratio.py
     test_scorecard.py
     test_evaluate_pipeline.py
+    # --- Adapter boundary tests (IMPORTS wkmigrate) ---
+    test_wkmigrate_adapter.py
+    # --- Surface tests ---
+    test_api.py
+    test_mcp_server.py
+    test_cli.py
+```
+
+### 3.1a Test fixtures (ConversionSnapshot builders)
+
+```python
+# tests/unit/validation/conftest.py
+"""Fixture builders for ConversionSnapshot — NO wkmigrate imports."""
+
+from lakeflow_migration_validator.contract import (
+    ConversionSnapshot, TaskSnapshot, NotebookSnapshot, SecretRef, DependencyRef,
+)
+
+def make_snapshot(
+    tasks=(), notebooks=(), secrets=(), parameters=(), dependencies=(),
+    not_translatable=(), resolved_expressions=(), source_pipeline=None,
+    total_source_dependencies=0,
+) -> ConversionSnapshot:
+    return ConversionSnapshot(
+        tasks=tuple(tasks),
+        notebooks=tuple(notebooks),
+        secrets=tuple(secrets),
+        parameters=tuple(parameters),
+        dependencies=tuple(dependencies),
+        not_translatable=tuple(not_translatable),
+        resolved_expressions=tuple(resolved_expressions),
+        source_pipeline=source_pipeline or {},
+        total_source_dependencies=total_source_dependencies,
+    )
+
+def make_task(task_key="task_1", is_placeholder=False):
+    return TaskSnapshot(task_key=task_key, is_placeholder=is_placeholder)
+
+def make_notebook(file_path="/notebooks/nb.py", content="# valid python\nx = 1"):
+    return NotebookSnapshot(file_path=file_path, content=content)
+
+def make_secret(scope="default", key="secret_key"):
+    return SecretRef(scope=scope, key=key)
+
+def make_dep(source="upstream", target="downstream"):
+    return DependencyRef(source_task=source, target_task=target)
 ```
 
 ### 3.2 Test specifications
@@ -832,22 +1017,59 @@ def test_to_dict_is_serializable():
 #### `test_evaluate_pipeline.py`
 
 ```python
-"""TDD tests for the top-level evaluate_pipeline function."""
+"""TDD tests for the top-level evaluate() function. Uses ConversionSnapshot fixtures."""
 
 def test_evaluate_returns_scorecard():
-    """evaluate_pipeline returns a Scorecard instance."""
+    """evaluate(snapshot) returns a Scorecard instance."""
 
 def test_evaluate_includes_all_7_dimensions():
     """The scorecard has results for all 7 programmatic dimensions."""
 
-def test_evaluate_perfect_pipeline_scores_above_90():
-    """A well-translated pipeline (no placeholders, valid notebooks, complete params) scores >= 90."""
+def test_evaluate_perfect_snapshot_scores_above_90():
+    """A snapshot with no placeholders, valid notebooks, complete params scores >= 90."""
 
-def test_evaluate_degraded_pipeline_scores_below_70():
-    """A pipeline with mostly placeholders and missing params scores < 70."""
+def test_evaluate_degraded_snapshot_scores_below_70():
+    """A snapshot with mostly placeholders and missing params scores < 70."""
+```
 
-def test_evaluate_works_with_real_fixtures():
-    """Run evaluate_pipeline against the existing test_pipeline_integration fixtures."""
+#### `test_wkmigrate_adapter.py`
+
+```python
+"""Adapter boundary tests — IMPORTS wkmigrate. Verifies the from_wkmigrate mapping.
+
+These tests are the contract boundary. If wkmigrate changes a field name or
+restructures a class, these tests break first (and only these tests break).
+"""
+
+def test_adapter_maps_tasks_with_placeholder_detection():
+    """Tasks pointing to /UNSUPPORTED_ADF_ACTIVITY get is_placeholder=True."""
+
+def test_adapter_maps_notebooks():
+    """All NotebookArtifacts become NotebookSnapshots with file_path and content."""
+
+def test_adapter_maps_secrets():
+    """All SecretInstructions become SecretRefs."""
+
+def test_adapter_maps_parameters():
+    """Pipeline parameters become a tuple of name strings."""
+
+def test_adapter_maps_dependencies():
+    """IR Dependency objects become DependencyRef pairs."""
+
+def test_adapter_maps_not_translatable():
+    """Pipeline.not_translatable list is preserved."""
+
+def test_adapter_maps_expression_pairs():
+    """SetVariableActivity tasks produce ExpressionPair entries."""
+
+def test_adapter_counts_source_dependencies():
+    """total_source_dependencies matches the ADF JSON depends_on count."""
+
+def test_adapter_handles_empty_pipeline():
+    """A pipeline with no activities produces an empty snapshot."""
+
+def test_roundtrip_evaluate_from_wkmigrate():
+    """evaluate_from_wkmigrate() produces the same score as evaluate(from_wkmigrate(...))."""
 ```
 
 #### `test_api.py`
@@ -911,15 +1133,15 @@ def test_regression_check_exits_1_on_regression():
 
 ## 4. Implementation Plan
 
-### Week 1: Core library — programmatic dimensions + Scorecard
+### Week 1: Contract, adapter, programmatic dimensions + Scorecard
 
 | Day | Task |
 |---|---|
-| 1 | Write all TDD test files (empty test functions with docstrings). Confirm all tests fail. |
-| 2 | Implement `DimensionResult`, `Dimension` protocol, `ProgrammaticCheck` class. |
-| 3 | Implement `activity_coverage`, `notebook_validity`, `parameter_completeness`, `secret_completeness`. Run tests — 4 dimension test files should pass. |
+| 1 | Write all TDD test files (empty test functions with docstrings). Write `conftest.py` with `ConversionSnapshot` fixture builders. Confirm all tests fail/skip. |
+| 2 | Implement `contract.py` (`ConversionSnapshot`, `TaskSnapshot`, `NotebookSnapshot`, `SecretRef`, `DependencyRef`, `ExpressionPair`). Implement `DimensionResult`, `Dimension` protocol, `ProgrammaticCheck` class. |
+| 3 | Implement `activity_coverage`, `notebook_validity`, `parameter_completeness`, `secret_completeness` — all operating on `ConversionSnapshot`. Run tests — 4 dimension test files should pass. |
 | 4 | Implement `dependency_preservation`, `expression_coverage`, `not_translatable_ratio`. Run tests — all 7 dimension test files should pass. |
-| 5 | Implement `Scorecard`, `evaluate_pipeline`. Run all tests. Wire scorecard assertion into one existing integration test as a smoke test. |
+| 5 | Implement `Scorecard`, `evaluate()`. Implement `adapters/wkmigrate_adapter.py` (`from_wkmigrate`). Implement `evaluate_from_wkmigrate()`. Write and run `test_wkmigrate_adapter.py`. Run all tests. |
 
 ### Week 2: Agentic dimensions + CI integration
 
@@ -962,5 +1184,16 @@ following classes are ready for extraction into `validator-factory`:
 
 The surface layer code (FastAPI routes, MCP tools, CLI commands, React components) provides
 **reference implementations** that the factory can optionally scaffold for new validators.
-The concrete dimension functions (`compute_activity_coverage`, etc.) stay in wkmigrate —
-they are wkmigrate-specific. The framework classes move to the factory.
+
+What stays in this repo (lmv-specific):
+- Concrete dimension functions (`compute_activity_coverage`, etc.) — they depend on
+  `ConversionSnapshot`, not wkmigrate, but their logic is migration-validation-specific.
+- `adapters/wkmigrate_adapter.py` — the only file that imports wkmigrate.
+- `contract.py` (`ConversionSnapshot`) — could be extracted if other validators share a
+  similar "tasks + notebooks + secrets + params" shape, but it's lmv-specific for now.
+
+What moves to the factory:
+- All framework classes listed above.
+- The adapter pattern itself: the factory documents that every validator should define a
+  `contract.py` with its own snapshot type and an `adapters/` directory with tool-specific
+  mappings.
