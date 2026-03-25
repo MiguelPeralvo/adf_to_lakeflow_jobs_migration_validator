@@ -80,3 +80,16 @@ def test_value_error_notebook_is_reported():
     assert score == 0.0
     assert len(details["errors"]) == 1
     assert details["errors"][0]["file_path"] == "/nb/null_byte.py"
+
+
+def test_type_error_notebook_is_reported():
+    """compile TypeError cases (e.g. non-string content) are captured as errors."""
+    snapshot = make_snapshot(
+        notebooks=[make_notebook(file_path="/nb/non_string.py", content=None)]
+    )
+
+    score, details = compute_notebook_validity(snapshot)
+
+    assert score == 0.0
+    assert len(details["errors"]) == 1
+    assert details["errors"][0]["file_path"] == "/nb/non_string.py"

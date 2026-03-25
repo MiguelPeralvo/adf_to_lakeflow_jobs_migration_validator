@@ -34,9 +34,12 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
     tasks = []
     for activity in prepared.activities:
         notebook_path = activity.task.get("notebook_task", {}).get("notebook_path", "")
+        task_key = activity.task.get("task_key")
+        if not isinstance(task_key, str) or not task_key:
+            raise ValueError("Missing or invalid task_key in prepared activity task.")
         tasks.append(
             TaskSnapshot(
-                task_key=activity.task.get("task_key", "unknown"),
+                task_key=task_key,
                 is_placeholder=(notebook_path == _PLACEHOLDER_PATH),
             )
         )
@@ -76,11 +79,18 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
 
     expressions = []
     for task in prepared.pipeline.tasks:
-        if hasattr(task, "variable_value") and hasattr(task, "variable_name"):
+        variable_name = getattr(task, "variable_name", None)
+        variable_value = getattr(task, "variable_value", None)
+        if (
+            isinstance(variable_name, str)
+            and variable_name
+            and isinstance(variable_value, str)
+            and variable_value
+        ):
             expressions.append(
                 ExpressionPair(
-                    adf_expression=f"@variables('{task.variable_name}')",
-                    python_code=task.variable_value,
+                    adf_expression=f"@variables('{variable_name}')",
+                    python_code=variable_value,
                 )
             )
 

@@ -5,6 +5,8 @@ ConversionSnapshot. If wkmigrate changes a field name or restructures a class,
 these tests break first (and only these tests break).
 """
 
+import pytest
+
 from lakeflow_migration_validator import evaluate, evaluate_from_wkmigrate
 from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
 from lakeflow_migration_validator.contract import DependencyRef
@@ -103,6 +105,23 @@ def test_adapter_maps_tasks_with_placeholder_detection():
     assert by_key["task_placeholder"].is_placeholder is True
 
 
+def test_adapter_raises_when_task_key_is_missing():
+    """Adapter fails fast when a prepared task has no task_key."""
+    source = {"activities": []}
+    pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
+    prepared = PreparedWorkflow(
+        pipeline=pipeline,
+        activities=[
+            PreparedActivity(
+                task={"notebook_task": {"notebook_path": "/Shared/real_notebook"}},
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="task_key"):
+        from_wkmigrate(source, prepared)
+
+
 def test_adapter_maps_notebooks():
     """All NotebookArtifacts become NotebookSnapshots with file_path and content."""
     source, prepared = _build_prepared_workflow(include_placeholder=False)
@@ -179,6 +198,27 @@ def test_adapter_maps_expression_pairs():
     pair = snapshot.resolved_expressions[0]
     assert pair.adf_expression == "@variables('x')"
     assert pair.python_code == "1 + 1"
+
+
+def test_adapter_ignores_invalid_expression_pairs():
+    """Only non-empty string variable_name/value pairs are converted."""
+    source = {"activities": []}
+    pipeline = Pipeline(
+        name="pipeline",
+        parameters=None,
+        schedule=None,
+        tasks=[
+            SetVariableActivity(name="ok", task_key="ok", variable_name="x", variable_value="1 + 1"),
+            SetVariableActivity(name="bad", task_key="bad", variable_name="", variable_value=""),
+        ],
+        tags={},
+    )
+    prepared = PreparedWorkflow(pipeline=pipeline, activities=[])
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    assert len(snapshot.resolved_expressions) == 1
+    assert snapshot.resolved_expressions[0].adf_expression == "@variables('x')"
 
 
 def test_adapter_counts_source_dependencies():
