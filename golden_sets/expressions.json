@@ -4,22 +4,22 @@
     {
       "adf_expression": "@concat('hello', 'world')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('hello') + str('world')"
     },
     {
       "adf_expression": "@add(1, 2)",
       "category": "math",
-      "expected_python": "1 + 2"
+      "expected_python": "(1 + 2)"
     },
     {
       "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
       "adf_expression": "@equals(1, 1)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "(1 == 1)"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -29,87 +29,177 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
-      "adf_expression": "@toUpper('abc')",
+      "adf_expression": "@replace('abc', 'a', 'z')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "str('abc').replace('a', 'z')"
     },
     {
       "adf_expression": "@sub(10, 4)",
       "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "(10 - 4)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "adf_expression": "@greater(3, 2)",
       "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
+      "expected_python": "(3 > 2)"
     },
     {
       "adf_expression": "@first(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][0]"
+      "expected_python": "(['a', 'b'])[0]"
     },
     {
       "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
       "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
     },
     {
-      "adf_expression": "@substring('abcdef', 1, 3)",
+      "adf_expression": "@toUpper('abc')",
       "category": "string",
-      "expected_python": "'abcdef'[1:4]"
+      "expected_python": "str('abc').upper()"
     },
     {
       "adf_expression": "@mul(3, 7)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(3 * 7)"
     },
     {
       "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "adf_expression": "@less(2, 3)",
       "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
+      "expected_python": "(2 < 3)"
     },
     {
       "adf_expression": "@last(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
+      "expected_python": "(['a', 'b'])[-1]"
     },
     {
       "adf_expression": "@string(length(split('a-b-c', '-')))",
       "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(len(str('a-b-c').split('-')))"
     },
     {
-      "adf_expression": "@concat('hello', 'world')",
+      "adf_expression": "@toLower('ABC')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('ABC').lower()"
     },
     {
       "adf_expression": "@div(9, 2)",
       "category": "math",
-      "expected_python": "9 / 2"
+      "expected_python": "int(9 / 2)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@equals(1, 1)",
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "expected_python": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@trim('  hi  ')",
+      "category": "string",
+      "expected_python": "str('  hi  ').strip()"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "expected_python": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "expected_python": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "expected_python": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@substring('abcdef', 1, 3)",
+      "category": "string",
+      "expected_python": "str('abcdef')[1:1 + 3]"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "expected_python": "int('42')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "expected_python": "(not False)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "expected_python": "str(42)"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "expected_python": "str('abcd').find('bc')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "expected_python": "float('3.14')"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "expected_python": "bool(1)"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -119,177 +209,177 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
-      "adf_expression": "@toUpper('abc')",
+      "adf_expression": "@startsWith('abcd', 'ab')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "str('abcd').startswith('ab')"
     },
     {
       "adf_expression": "@add(1, 2)",
       "category": "math",
-      "expected_python": "1 + 2"
+      "expected_python": "(1 + 2)"
     },
     {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
       "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
+      "expected_python": "('yes' if (1 == 1) else 'no')"
     },
     {
       "adf_expression": "@first(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][0]"
+      "expected_python": "(['a', 'b'])[0]"
     },
     {
       "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
       "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
     },
     {
-      "adf_expression": "@substring('abcdef', 1, 3)",
+      "adf_expression": "@endsWith('abcd', 'cd')",
       "category": "string",
-      "expected_python": "'abcdef'[1:4]"
+      "expected_python": "str('abcd').endswith('cd')"
     },
     {
       "adf_expression": "@sub(10, 4)",
       "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "(10 - 4)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "adf_expression": "@equals(1, 1)",
       "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
+      "expected_python": "(1 == 1)"
     },
     {
       "adf_expression": "@last(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
+      "expected_python": "(['a', 'b'])[-1]"
     },
     {
       "adf_expression": "@string(length(split('a-b-c', '-')))",
       "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(len(str('a-b-c').split('-')))"
     },
     {
-      "adf_expression": "@concat('hello', 'world')",
+      "adf_expression": "@contains('abcd', 'bc')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "('bc' in str('abcd'))"
     },
     {
       "adf_expression": "@mul(3, 7)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(3 * 7)"
     },
     {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@equals(1, 1)",
+      "adf_expression": "@greater(3, 2)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "(3 > 2)"
     },
     {
-      "adf_expression": "@length(createArray(1, 2, 3))",
+      "adf_expression": "@coalesce(null, 'x')",
       "category": "collection",
-      "expected_python": "len([1, 2, 3])"
+      "expected_python": "next((v for v in [None, 'x'] if v is not None), None)"
     },
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
-    },
-    {
-      "adf_expression": "@toUpper('abc')",
-      "category": "string",
-      "expected_python": "'abc'.upper()"
-    },
-    {
-      "adf_expression": "@div(9, 2)",
-      "category": "math",
-      "expected_python": "9 / 2"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
       "adf_expression": "@concat('hello', 'world')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('hello') + str('world')"
     },
     {
-      "adf_expression": "@sub(10, 4)",
+      "adf_expression": "@div(9, 2)",
       "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "int(9 / 2)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
-      "adf_expression": "@equals(1, 1)",
+      "adf_expression": "@less(2, 3)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "(2 < 3)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "expected_python": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "expected_python": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "expected_python": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "expected_python": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "expected_python": "str(42)"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "expected_python": "str('abc').upper()"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "expected_python": "int('42')"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "expected_python": "((1 < 0) or ('x' == 'x'))"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -299,87 +389,177 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
-      "adf_expression": "@toUpper('abc')",
+      "adf_expression": "@toLower('ABC')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "str('ABC').lower()"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "expected_python": "float('3.14')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "expected_python": "(not False)"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "expected_python": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@trim('  hi  ')",
+      "category": "string",
+      "expected_python": "str('  hi  ').strip()"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "expected_python": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "expected_python": "bool(1)"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "expected_python": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@substring('abcdef', 1, 3)",
+      "category": "string",
+      "expected_python": "str('abcdef')[1:1 + 3]"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "expected_python": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "category": "logical",
+      "expected_python": "('yes' if (1 == 1) else 'no')"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "expected_python": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "expected_python": "str('abcd').find('bc')"
     },
     {
       "adf_expression": "@mul(3, 7)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(3 * 7)"
     },
     {
       "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@div(9, 2)",
-      "category": "math",
-      "expected_python": "9 / 2"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
-    },
-    {
-      "adf_expression": "@concat('hello', 'world')",
-      "category": "string",
-      "expected_python": "'hello' + 'world'"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
       "adf_expression": "@equals(1, 1)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "expected_python": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@startsWith('abcd', 'ab')",
+      "category": "string",
+      "expected_python": "str('abcd').startswith('ab')"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "expected_python": "int(9 / 2)"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@greater(3, 2)",
+      "category": "logical",
+      "expected_python": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "expected_python": "str(42)"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@endsWith('abcd', 'cd')",
+      "category": "string",
+      "expected_python": "str('abcd').endswith('cd')"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "expected_python": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "expected_python": "(2 < 3)"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -389,87 +569,177 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
-      "adf_expression": "@toUpper('abc')",
+      "adf_expression": "@contains('abcd', 'bc')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "('bc' in str('abcd'))"
     },
     {
-      "adf_expression": "@sub(10, 4)",
+      "adf_expression": "@int('42')",
       "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "int('42')"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
       "adf_expression": "@and(equals(1, 1), greater(3, 2))",
       "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
+      "expected_python": "((1 == 1) and (3 > 2))"
     },
     {
       "adf_expression": "@first(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][0]"
+      "expected_python": "(['a', 'b'])[0]"
     },
     {
       "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
       "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
     },
     {
-      "adf_expression": "@substring('abcdef', 1, 3)",
+      "adf_expression": "@concat('hello', 'world')",
       "category": "string",
-      "expected_python": "'abcdef'[1:4]"
+      "expected_python": "str('hello') + str('world')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "expected_python": "float('3.14')"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "expected_python": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "expected_python": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "expected_python": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "expected_python": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "expected_python": "(not False)"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "expected_python": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "expected_python": "str('abc').upper()"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "expected_python": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "expected_python": "bool(1)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "expected_python": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@toLower('ABC')",
+      "category": "string",
+      "expected_python": "str('ABC').lower()"
     },
     {
       "adf_expression": "@mul(3, 7)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(3 * 7)"
     },
     {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
       "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
+      "expected_python": "('yes' if (1 == 1) else 'no')"
     },
     {
-      "adf_expression": "@last(createArray('a', 'b'))",
+      "adf_expression": "@string(42)",
       "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
+      "expected_python": "str(42)"
     },
     {
       "adf_expression": "@string(length(split('a-b-c', '-')))",
       "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(len(str('a-b-c').split('-')))"
     },
     {
-      "adf_expression": "@concat('hello', 'world')",
+      "adf_expression": "@trim('  hi  ')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('  hi  ').strip()"
     },
     {
       "adf_expression": "@div(9, 2)",
       "category": "math",
-      "expected_python": "9 / 2"
+      "expected_python": "int(9 / 2)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
       "adf_expression": "@equals(1, 1)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "(1 == 1)"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -479,87 +749,177 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
-    },
-    {
-      "adf_expression": "@toUpper('abc')",
-      "category": "string",
-      "expected_python": "'abc'.upper()"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
       "adf_expression": "@substring('abcdef', 1, 3)",
       "category": "string",
-      "expected_python": "'abcdef'[1:4]"
+      "expected_python": "str('abcdef')[1:1 + 3]"
     },
     {
-      "adf_expression": "@sub(10, 4)",
+      "adf_expression": "@mod(9, 2)",
       "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "(9 % 2)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "adf_expression": "@greater(3, 2)",
       "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
+      "expected_python": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "expected_python": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "expected_python": "str('abcd').find('bc')"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "expected_python": "int('42')"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "expected_python": "(2 < 3)"
     },
     {
       "adf_expression": "@last(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
+      "expected_python": "(['a', 'b'])[-1]"
     },
     {
       "adf_expression": "@string(length(split('a-b-c', '-')))",
       "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@startsWith('abcd', 'ab')",
+      "category": "string",
+      "expected_python": "str('abcd').startswith('ab')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "expected_python": "float('3.14')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "expected_python": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "expected_python": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@endsWith('abcd', 'cd')",
+      "category": "string",
+      "expected_python": "str('abcd').endswith('cd')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "expected_python": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "expected_python": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "expected_python": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@contains('abcd', 'bc')",
+      "category": "string",
+      "expected_python": "('bc' in str('abcd'))"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "expected_python": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "expected_python": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "expected_python": "(not False)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "expected_python": "str(42)"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "expected_python": "str(len(str('a-b-c').split('-')))"
     },
     {
       "adf_expression": "@concat('hello', 'world')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('hello') + str('world')"
     },
     {
       "adf_expression": "@mul(3, 7)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(3 * 7)"
     },
     {
       "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
-      "adf_expression": "@equals(1, 1)",
+      "adf_expression": "@bool(1)",
       "category": "logical",
-      "expected_python": "1 == 1"
+      "expected_python": "bool(1)"
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
@@ -569,437 +929,77 @@
     {
       "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
       "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "str(str('x').upper()) + str(str((1 + 2)))"
     },
     {
-      "adf_expression": "@toUpper('abc')",
+      "adf_expression": "@replace('abc', 'a', 'z')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "str('abc').replace('a', 'z')"
     },
     {
       "adf_expression": "@div(9, 2)",
       "category": "math",
-      "expected_python": "9 / 2"
+      "expected_python": "int(9 / 2)"
     },
     {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
+      "adf_expression": "@utcNow()",
       "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
+      "expected_python": "_wkmigrate_utc_now()"
     },
     {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
       "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
+      "expected_python": "('yes' if (1 == 1) else 'no')"
     },
     {
       "adf_expression": "@first(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][0]"
+      "expected_python": "(['a', 'b'])[0]"
     },
     {
       "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
       "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
-    },
-    {
-      "adf_expression": "@concat('hello', 'world')",
-      "category": "string",
-      "expected_python": "'hello' + 'world'"
-    },
-    {
-      "adf_expression": "@sub(10, 4)",
-      "category": "math",
-      "expected_python": "10 - 4"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@equals(1, 1)",
-      "category": "logical",
-      "expected_python": "1 == 1"
-    },
-    {
-      "adf_expression": "@length(createArray(1, 2, 3))",
-      "category": "collection",
-      "expected_python": "len([1, 2, 3])"
-    },
-    {
-      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
-      "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
+      "expected_python": "('odd' if ((5 % 2) == 1) else 'even')"
     },
     {
       "adf_expression": "@toUpper('abc')",
       "category": "string",
-      "expected_python": "'abc'.upper()"
+      "expected_python": "str('abc').upper()"
     },
     {
-      "adf_expression": "@mul(3, 7)",
+      "adf_expression": "@mod(9, 2)",
       "category": "math",
-      "expected_python": "3 * 7"
+      "expected_python": "(9 % 2)"
     },
     {
       "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
       "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@div(9, 2)",
-      "category": "math",
-      "expected_python": "9 / 2"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
-    },
-    {
-      "adf_expression": "@concat('hello', 'world')",
-      "category": "string",
-      "expected_python": "'hello' + 'world'"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+      "expected_python": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
     },
     {
       "adf_expression": "@equals(1, 1)",
       "category": "logical",
-      "expected_python": "1 == 1"
-    },
-    {
-      "adf_expression": "@length(createArray(1, 2, 3))",
-      "category": "collection",
-      "expected_python": "len([1, 2, 3])"
-    },
-    {
-      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
-      "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
-    },
-    {
-      "adf_expression": "@toUpper('abc')",
-      "category": "string",
-      "expected_python": "'abc'.upper()"
-    },
-    {
-      "adf_expression": "@sub(10, 4)",
-      "category": "math",
-      "expected_python": "10 - 4"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@mul(3, 7)",
-      "category": "math",
-      "expected_python": "3 * 7"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
+      "expected_python": "(1 == 1)"
     },
     {
       "adf_expression": "@last(createArray('a', 'b'))",
       "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
+      "expected_python": "(['a', 'b'])[-1]"
     },
     {
       "adf_expression": "@string(length(split('a-b-c', '-')))",
       "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
+      "expected_python": "str(len(str('a-b-c').split('-')))"
     },
     {
-      "adf_expression": "@concat('hello', 'world')",
+      "adf_expression": "@toLower('ABC')",
       "category": "string",
-      "expected_python": "'hello' + 'world'"
+      "expected_python": "str('ABC').lower()"
     },
     {
-      "adf_expression": "@div(9, 2)",
+      "adf_expression": "@int('42')",
       "category": "math",
-      "expected_python": "9 / 2"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@equals(1, 1)",
-      "category": "logical",
-      "expected_python": "1 == 1"
-    },
-    {
-      "adf_expression": "@length(createArray(1, 2, 3))",
-      "category": "collection",
-      "expected_python": "len([1, 2, 3])"
-    },
-    {
-      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
-      "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
-    },
-    {
-      "adf_expression": "@toUpper('abc')",
-      "category": "string",
-      "expected_python": "'abc'.upper()"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@sub(10, 4)",
-      "category": "math",
-      "expected_python": "10 - 4"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
-    },
-    {
-      "adf_expression": "@concat('hello', 'world')",
-      "category": "string",
-      "expected_python": "'hello' + 'world'"
-    },
-    {
-      "adf_expression": "@mul(3, 7)",
-      "category": "math",
-      "expected_python": "3 * 7"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@equals(1, 1)",
-      "category": "logical",
-      "expected_python": "1 == 1"
-    },
-    {
-      "adf_expression": "@length(createArray(1, 2, 3))",
-      "category": "collection",
-      "expected_python": "len([1, 2, 3])"
-    },
-    {
-      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
-      "category": "nested",
-      "expected_python": "'x'.upper() + str(1 + 2)"
-    },
-    {
-      "adf_expression": "@toUpper('abc')",
-      "category": "string",
-      "expected_python": "'abc'.upper()"
-    },
-    {
-      "adf_expression": "@div(9, 2)",
-      "category": "math",
-      "expected_python": "9 / 2"
-    },
-    {
-      "adf_expression": "@dayOfMonth('2024-01-15T00:00:00Z')",
-      "category": "datetime",
-      "expected_python": "day_of_month('2024-01-15T00:00:00Z')"
-    },
-    {
-      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
-      "category": "logical",
-      "expected_python": "(1 == 1) and (3 > 2)"
-    },
-    {
-      "adf_expression": "@first(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][0]"
-    },
-    {
-      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
-      "category": "nested",
-      "expected_python": "'odd' if ((5 % 2) == 1) else 'even'"
-    },
-    {
-      "adf_expression": "@substring('abcdef', 1, 3)",
-      "category": "string",
-      "expected_python": "'abcdef'[1:4]"
-    },
-    {
-      "adf_expression": "@add(1, 2)",
-      "category": "math",
-      "expected_python": "1 + 2"
-    },
-    {
-      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
-      "category": "datetime",
-      "expected_python": "format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
-    },
-    {
-      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
-      "category": "logical",
-      "expected_python": "(1 < 0) or ('x' == 'x')"
-    },
-    {
-      "adf_expression": "@last(createArray('a', 'b'))",
-      "category": "collection",
-      "expected_python": "['a', 'b'][-1]"
-    },
-    {
-      "adf_expression": "@string(length(split('a-b-c', '-')))",
-      "category": "nested",
-      "expected_python": "str(len('a-b-c'.split('-')))"
-    },
-    {
-      "adf_expression": "@concat('hello', 'world')",
-      "category": "string",
-      "expected_python": "'hello' + 'world'"
-    },
-    {
-      "adf_expression": "@sub(10, 4)",
-      "category": "math",
-      "expected_python": "10 - 4"
+      "expected_python": "int('42')"
     }
   ],
   "version": 1
