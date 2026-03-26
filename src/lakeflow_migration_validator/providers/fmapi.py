@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from typing import Any, Callable
 from urllib import request
@@ -99,6 +100,9 @@ def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:
         score = float(raw["score"])
     except (TypeError, ValueError) as exc:
         raise ValueError("FMAPI response score must be numeric") from exc
+
+    if math.isnan(score):
+        raise ValueError("FMAPI response score must be numeric") from None
 
     return {
         "score": max(0.0, min(1.0, score)),

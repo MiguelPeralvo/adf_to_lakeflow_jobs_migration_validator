@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -65,5 +66,7 @@ def _normalize_score(value: Any) -> float:
     try:
         score = float(value)
     except (TypeError, ValueError):
+        return 0.0
+    if math.isnan(score):
         return 0.0
     return max(0.0, min(1.0, score))
