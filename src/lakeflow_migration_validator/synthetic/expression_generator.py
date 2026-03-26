@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 _CATEGORIES = ("string", "math", "datetime", "logical", "collection", "nested")
 
@@ -69,6 +70,51 @@ _TEMPLATES: dict[str, tuple[tuple[str, str], ...]] = {
         ("@string(length(split('a-b-c', '-')))", "str(len(str('a-b-c').split('-')))"),
     ),
 }
+
+
+def _wkmigrate_utc_now() -> datetime:
+    """Mirror wkmigrate's inline datetime helper for utcNow()."""
+    return datetime.now(timezone.utc)
+
+
+def _wkmigrate_format_datetime(dt: datetime, adf_format: str) -> str:
+    """Minimal formatter compatible with common ADF tokens used in synthetic tests."""
+    format_mapping = {
+        "yyyy": "%Y",
+        "MM": "%m",
+        "dd": "%d",
+        "HH": "%H",
+        "mm": "%M",
+        "ss": "%S",
+    }
+    python_format = adf_format
+    for adf_token, py_token in format_mapping.items():
+        python_format = python_format.replace(adf_token, py_token)
+    return dt.strftime(python_format)
+
+
+_EVAL_GLOBALS = {
+    "__builtins__": {},
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "len": len,
+    "next": next,
+    "list": list,
+    "dict": dict,
+    "set": set,
+    "None": None,
+    "True": True,
+    "False": False,
+    "_wkmigrate_utc_now": _wkmigrate_utc_now,
+    "_wkmigrate_format_datetime": _wkmigrate_format_datetime,
+}
+
+
+def evaluate_expected_python(expected_python: str) -> object:
+    """Evaluate generated expected Python with synthetic-safe globals."""
+    return eval(expected_python, _EVAL_GLOBALS, {})
 
 
 class ExpressionGenerator:
