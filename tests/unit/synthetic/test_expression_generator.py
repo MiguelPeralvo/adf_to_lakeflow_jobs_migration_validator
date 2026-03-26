@@ -5,8 +5,32 @@ import pytest
 from lakeflow_migration_validator.synthetic.expression_generator import (
     ExpressionGenerator,
     _TEMPLATES,
-    evaluate_expected_python,
+    _wkmigrate_format_datetime,
+    _wkmigrate_utc_now,
 )
+
+_EVAL_GLOBALS = {
+    "__builtins__": {},
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "len": len,
+    "next": next,
+    "list": list,
+    "dict": dict,
+    "set": set,
+    "None": None,
+    "True": True,
+    "False": False,
+    "_wkmigrate_utc_now": _wkmigrate_utc_now,
+    "_wkmigrate_format_datetime": _wkmigrate_format_datetime,
+}
+
+
+def evaluate_expected_python(expected_python: str) -> object:
+    """Evaluate trusted synthetic template output (test-only helper)."""
+    return eval(expected_python, _EVAL_GLOBALS, {})  # noqa: S307
 
 
 @pytest.mark.parametrize(

@@ -95,35 +95,6 @@ def _wkmigrate_format_datetime(dt: datetime | str, adf_format: str) -> str:
     return dt.strftime(python_format)
 
 
-_EVAL_GLOBALS = {
-    "__builtins__": {},
-    "str": str,
-    "int": int,
-    "float": float,
-    "bool": bool,
-    "len": len,
-    "next": next,
-    "list": list,
-    "dict": dict,
-    "set": set,
-    "None": None,
-    "True": True,
-    "False": False,
-    "_wkmigrate_utc_now": _wkmigrate_utc_now,
-    "_wkmigrate_format_datetime": _wkmigrate_format_datetime,
-}
-
-
-def _evaluate_expected_python(expected_python: str) -> object:
-    """Evaluate trusted synthetic template output only (never user input)."""
-    return eval(expected_python, _EVAL_GLOBALS, {})
-
-
-def evaluate_expected_python(expected_python: str) -> object:
-    """Backward-compatible alias for test-only template evaluation."""
-    return _evaluate_expected_python(expected_python)
-
-
 class ExpressionGenerator:
     """Generates deterministic ADF expression test cases by category."""
 
