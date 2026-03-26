@@ -24,7 +24,7 @@ def load_expression_calibration_examples(
     sample_size: int = 20,
 ) -> tuple[dict, ...]:
     """Load deterministic expression calibration examples from Week 2 golden set."""
-    if sample_size <= 0:
+    if sample_size <= 0 or not path:
         return ()
 
     payload = json.loads(Path(path).read_text(encoding="utf-8"))

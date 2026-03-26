@@ -94,23 +94,42 @@ def evaluate_full(
     *,
     judge_provider: JudgeProvider | None = None,
     execution_runner: ExecutionRunner | None = None,
+    weights: dict[str, float] | None = None,
+    calibration_path: str | None = None,
+    calibration_sample_size: int = 20,
 ) -> Scorecard:
     """Evaluate snapshot with optional agentic dimensions.
 
     Programmatic dimensions are always executed. Agentic dimensions are added only
     when the relevant provider/runner is supplied.
+
+    Args:
+        snapshot: The conversion snapshot to evaluate.
+        judge_provider: Optional LLM provider for semantic equivalence judging.
+        execution_runner: Optional runner for runtime success validation.
+        weights: Optional custom weights dict. If not provided, uses default weights.
+            To give agentic dimensions non-zero weight, supply a dict with
+            'semantic_equivalence' and/or 'runtime_success' keys set > 0.
+        calibration_path: Path to calibration examples JSON for semantic equivalence.
+            If None, calibration is skipped.
+        calibration_sample_size: Number of calibration examples to load (default 20).
     """
     results = _evaluate_programmatic_dimensions(snapshot)
 
     if judge_provider is not None:
-        semantic_judge = create_semantic_equivalence_judge(judge_provider)
+        semantic_judge = create_semantic_equivalence_judge(
+            judge_provider,
+            calibration_path=calibration_path if calibration_path is not None else "",
+            calibration_sample_size=calibration_sample_size if calibration_path is not None else 0,
+        )
         results["semantic_equivalence"] = _evaluate_semantic_equivalence(snapshot, semantic_judge)
 
     if execution_runner is not None:
         runtime_dimension = create_runtime_success_dimension(execution_runner)
         results["runtime_success"] = runtime_dimension.evaluate(None, snapshot)
 
-    return Scorecard.compute(_DEFAULT_WEIGHTS, results)
+    effective_weights = weights if weights is not None else _DEFAULT_WEIGHTS
+    return Scorecard.compute(effective_weights, results)
 
 
 def evaluate_from_wkmigrate(source_pipeline: dict, prepared_workflow) -> Scorecard:
