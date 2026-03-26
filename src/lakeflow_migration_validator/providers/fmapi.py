@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Callable
 from urllib import request
 from urllib.error import URLError
@@ -18,6 +19,7 @@ class FMAPIJudgeProvider:
         batch_model: str = "chatgpt-5-4",
         timeout_seconds: int = 30,
         max_retries: int = 2,
+        token: str | None = None,
         transport: Callable[[str, dict[str, Any], int], dict[str, Any]] | None = None,
     ):
         self.endpoint = endpoint
@@ -25,30 +27,71 @@ class FMAPIJudgeProvider:
         self.batch_model = batch_model
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
-        self._transport = transport or _default_transport
+        if transport is None:
+            self._transport = lambda endpoint, payload, timeout: _default_transport(
+                endpoint,
+                payload,
+                timeout,
+                token=token,
+            )
+        else:
+            self._transport = transport
 
     def judge(self, prompt: str, model: str | None = None) -> dict[str, Any]:
         """Score prompt output with retry and strict response parsing."""
         selected_model = model or self.batch_model
-        payload = {"model": selected_model, "prompt": prompt}
+        payload = {
+            "model": selected_model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
         last_error: Exception | None = None
 
-        for _ in range(self.max_retries + 1):
+        for attempt in range(self.max_retries + 1):
             try:
                 raw = self._transport(self.endpoint, payload, self.timeout_seconds)
                 parsed = _parse_judge_response(raw)
                 return {"score": parsed["score"], "reasoning": parsed["reasoning"]}
             except (URLError, TimeoutError, ValueError) as exc:
                 last_error = exc
+                if attempt < self.max_retries:
+                    backoff = min(0.5 * (2 ** attempt), 8.0)
+                    time.sleep(backoff)
                 continue
 
         raise RuntimeError(f"FMAPI judge request failed after retries: {last_error}") from last_error
+
+    def judge_high_stakes(self, prompt: str) -> dict[str, Any]:
+        """Convenience method that always routes to the high-stakes model."""
+        return self.judge(prompt, model=self.high_stakes_model)
 
 
 def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:
     """Parse and validate FMAPI judge payload."""
     if not isinstance(raw, dict):
         raise ValueError("FMAPI response must be a dict")
+
+    # Databricks FMAPI chat-completions shape:
+    # {"choices": [{"message": {"content": "{\"score\": 0.9, \"reasoning\": \"...\"}"}}]}
+    if "choices" in raw:
+        choices = raw.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ValueError("FMAPI choices must be a non-empty list")
+        first = choices[0]
+        if not isinstance(first, dict):
+            raise ValueError("FMAPI choice must be an object")
+        message = first.get("message", {})
+        if not isinstance(message, dict):
+            raise ValueError("FMAPI message must be an object")
+        content = message.get("content")
+        if not isinstance(content, str):
+            raise ValueError("FMAPI message content must be a JSON string")
+        try:
+            raw = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ValueError("FMAPI message content must be valid JSON") from exc
+        if not isinstance(raw, dict):
+            raise ValueError("FMAPI message content JSON must be an object")
+
     if "score" not in raw or "reasoning" not in raw:
         raise ValueError("FMAPI response must contain score and reasoning")
 
@@ -63,13 +106,22 @@ def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _default_transport(endpoint: str, payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+def _default_transport(
+    endpoint: str,
+    payload: dict[str, Any],
+    timeout_seconds: int,
+    *,
+    token: str | None = None,
+) -> dict[str, Any]:
     """POST JSON payload and return JSON dict response."""
     body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     req = request.Request(
         endpoint,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     with request.urlopen(req, timeout=timeout_seconds) as resp:

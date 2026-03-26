@@ -26,16 +26,21 @@ from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions import DimensionResult
 from lakeflow_migration_validator.dimensions.activity_coverage import compute_activity_coverage
 from lakeflow_migration_validator.dimensions.dependency_preservation import compute_dependency_preservation
+from lakeflow_migration_validator.dimensions.execution import ExecutionRunner
 from lakeflow_migration_validator.dimensions.expression_coverage import compute_expression_coverage
+from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
 from lakeflow_migration_validator.dimensions.not_translatable_ratio import compute_not_translatable_ratio
 from lakeflow_migration_validator.dimensions.notebook_validity import compute_notebook_validity
 from lakeflow_migration_validator.dimensions.parameter_completeness import compute_parameter_completeness
 from lakeflow_migration_validator.dimensions.programmatic import ProgrammaticCheck
+from lakeflow_migration_validator.dimensions.runtime_success import create_runtime_success_dimension
+from lakeflow_migration_validator.dimensions.semantic_equivalence import create_semantic_equivalence_judge
 from lakeflow_migration_validator.dimensions.secret_completeness import compute_secret_completeness
 from lakeflow_migration_validator.scorecard import Scorecard
 
 __all__ = [
     "evaluate",
+    "evaluate_full",
     "evaluate_batch",
     "evaluate_from_wkmigrate",
     "ConversionSnapshot",
@@ -51,6 +56,8 @@ _DEFAULT_WEIGHTS = {
     "parameter_completeness": 0.10,
     "secret_completeness": 0.10,
     "not_translatable_ratio": 0.05,
+    "semantic_equivalence": 0.0,
+    "runtime_success": 0.0,
 }
 
 _DIMENSIONS = [
@@ -63,11 +70,11 @@ _DIMENSIONS = [
     ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s), threshold=0.8),
 ]
 
-_DIMENSION_NAMES = {dimension.name for dimension in _DIMENSIONS}
-if _DIMENSION_NAMES != set(_DEFAULT_WEIGHTS):
+_PROGRAMMATIC_DIMENSION_NAMES = {dimension.name for dimension in _DIMENSIONS}
+if not _PROGRAMMATIC_DIMENSION_NAMES.issubset(set(_DEFAULT_WEIGHTS)):
     raise ValueError(
         "Dimension/weight configuration mismatch: "
-        f"dimensions={sorted(_DIMENSION_NAMES)} "
+        f"dimensions={sorted(_PROGRAMMATIC_DIMENSION_NAMES)} "
         f"weights={sorted(_DEFAULT_WEIGHTS)}"
     )
 
@@ -78,9 +85,31 @@ def evaluate(snapshot: ConversionSnapshot) -> Scorecard:
     This is the generic entry point — takes a ConversionSnapshot built by any
     adapter (wkmigrate, or a future tool). No wkmigrate imports.
     """
-    results: dict[str, DimensionResult] = {}
-    for dimension in _DIMENSIONS:
-        results[dimension.name] = dimension.evaluate(None, snapshot)
+    results = _evaluate_programmatic_dimensions(snapshot)
+    return Scorecard.compute(_DEFAULT_WEIGHTS, results)
+
+
+def evaluate_full(
+    snapshot: ConversionSnapshot,
+    *,
+    judge_provider: JudgeProvider | None = None,
+    execution_runner: ExecutionRunner | None = None,
+) -> Scorecard:
+    """Evaluate snapshot with optional agentic dimensions.
+
+    Programmatic dimensions are always executed. Agentic dimensions are added only
+    when the relevant provider/runner is supplied.
+    """
+    results = _evaluate_programmatic_dimensions(snapshot)
+
+    if judge_provider is not None:
+        semantic_judge = create_semantic_equivalence_judge(judge_provider)
+        results["semantic_equivalence"] = _evaluate_semantic_equivalence(snapshot, semantic_judge)
+
+    if execution_runner is not None:
+        runtime_dimension = create_runtime_success_dimension(execution_runner)
+        results["runtime_success"] = runtime_dimension.evaluate(None, snapshot)
+
     return Scorecard.compute(_DEFAULT_WEIGHTS, results)
 
 
@@ -113,3 +142,34 @@ def evaluate_batch(
     else:
         raise TypeError("golden_set must be GroundTruthSuite or GoldenSet")
     return suite.evaluate_converter(convert_fn, threshold=threshold)
+
+
+def _evaluate_programmatic_dimensions(snapshot: ConversionSnapshot) -> dict[str, DimensionResult]:
+    results: dict[str, DimensionResult] = {}
+    for dimension in _DIMENSIONS:
+        results[dimension.name] = dimension.evaluate(None, snapshot)
+    return results
+
+
+def _evaluate_semantic_equivalence(snapshot: ConversionSnapshot, judge) -> DimensionResult:
+    pairs = snapshot.resolved_expressions
+    if not pairs:
+        return DimensionResult(
+            name="semantic_equivalence",
+            score=1.0,
+            passed=True,
+            details={"evaluated": 0, "reasoning": []},
+        )
+
+    per_pair = [judge.evaluate(pair.adf_expression, pair.python_code) for pair in pairs]
+    mean_score = sum(result.score for result in per_pair) / len(per_pair)
+    return DimensionResult(
+        name="semantic_equivalence",
+        score=mean_score,
+        passed=mean_score >= judge.threshold,
+        details={
+            "evaluated": len(per_pair),
+            "reasoning": [result.details.get("reasoning", "") for result in per_pair],
+            "model": judge.model,
+        },
+    )

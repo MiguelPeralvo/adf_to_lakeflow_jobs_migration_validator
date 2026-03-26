@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lakeflow_migration_validator.dimensions.llm_judge import LLMJudge
 
 
@@ -85,3 +87,19 @@ def test_llm_judge_clamps_out_of_range_score():
 
     assert result.score == 1.0
     assert result.passed is True
+
+
+def test_llm_judge_propagates_provider_errors():
+    class _FailingProvider:
+        def judge(self, _prompt: str, model: str | None = None):
+            raise RuntimeError("provider failed")
+
+    judge = LLMJudge(
+        name="semantic_equivalence",
+        criteria="equivalent",
+        input_template="Input={input}; Output={output}",
+        provider=_FailingProvider(),
+    )
+
+    with pytest.raises(RuntimeError, match="provider failed"):
+        judge.evaluate("I", "O")

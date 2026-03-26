@@ -2,7 +2,7 @@
 
 import pytest
 
-from lakeflow_migration_validator import evaluate
+from lakeflow_migration_validator import evaluate, evaluate_full
 from lakeflow_migration_validator.scorecard import Scorecard
 from tests.unit.validation.conftest import (
     make_expression,
@@ -98,3 +98,50 @@ def test_evaluate_works_with_real_fixtures():
     as_dict = scorecard.to_dict()
     assert "score" in as_dict
     assert "dimensions" in as_dict
+
+
+class _JudgeProvider:
+    def __init__(self):
+        self.calls = []
+
+    def judge(self, prompt: str, model: str | None = None):
+        self.calls.append((prompt, model))
+        return {"score": 0.9, "reasoning": "equivalent"}
+
+
+class _ExecutionRunner:
+    def run(self, _output, params):
+        return {"task1": {"success": True, "error": None}}
+
+
+def test_evaluate_full_without_agentic_providers_matches_evaluate():
+    snapshot = make_snapshot(tasks=[make_task("one")])
+
+    scorecard_basic = evaluate(snapshot)
+    scorecard_full = evaluate_full(snapshot)
+
+    assert scorecard_full.score == scorecard_basic.score
+    assert set(scorecard_full.results.keys()) == set(scorecard_basic.results.keys())
+
+
+def test_evaluate_full_adds_semantic_equivalence_when_provider_supplied():
+    snapshot = make_snapshot(
+        tasks=[make_task("one")],
+        resolved_expressions=[make_expression(adf="@add(1,2)", python="(1 + 2)")],
+    )
+    provider = _JudgeProvider()
+
+    scorecard = evaluate_full(snapshot, judge_provider=provider)
+
+    assert "semantic_equivalence" in scorecard.results
+    assert scorecard.results["semantic_equivalence"].score == 0.9
+    assert provider.calls
+
+
+def test_evaluate_full_adds_runtime_success_when_runner_supplied():
+    snapshot = make_snapshot(tasks=[make_task("one")])
+
+    scorecard = evaluate_full(snapshot, execution_runner=_ExecutionRunner())
+
+    assert "runtime_success" in scorecard.results
+    assert scorecard.results["runtime_success"].score == 1.0

@@ -42,6 +42,15 @@ def test_load_expression_calibration_examples_uses_stable_order(tmp_path):
     )
 
 
+def test_load_expression_calibration_examples_returns_empty_for_zero_sample_size(tmp_path):
+    path = tmp_path / "expressions.json"
+    path.write_text(json.dumps({"expressions": [{"adf_expression": "@x", "expected_python": "x", "category": "x"}]}))
+
+    examples = load_expression_calibration_examples(path=str(path), sample_size=0)
+
+    assert examples == ()
+
+
 def test_create_semantic_equivalence_judge_builds_configured_judge(tmp_path):
     path = tmp_path / "expressions.json"
     path.write_text(

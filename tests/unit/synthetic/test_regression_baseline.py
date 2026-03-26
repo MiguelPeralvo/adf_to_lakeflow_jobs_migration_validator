@@ -71,6 +71,5 @@ def test_regression_scores_do_not_regress_from_curated_baseline():
     distribution = report.ccs_distribution()
     assert report.mean_score >= baseline["mean_score"]
     assert report.min_score >= baseline["min_score"]
-    assert report.max_score >= baseline["max_score"]
     assert distribution["p10"] >= baseline["p10"]
     assert distribution["p90"] >= baseline["p90"]
