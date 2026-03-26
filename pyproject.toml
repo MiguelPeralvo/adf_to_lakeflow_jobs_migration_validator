@@ -45,6 +45,7 @@ testpaths = ["tests"]
 markers = [
     "integration: marks tests that require live Azure/Databricks resources",
     "databricks: marks tests that require a Databricks workspace",
+    "parallel: marks tests for parallel ADF-vs-Databricks execution",
 ]
 
 [tool.ruff]
