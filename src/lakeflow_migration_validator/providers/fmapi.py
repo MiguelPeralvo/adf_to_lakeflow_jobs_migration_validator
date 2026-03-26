@@ -8,6 +8,7 @@ import time
 from typing import Any, Callable
 from urllib import request
 from urllib.error import URLError
+from urllib.parse import urlparse
 
 
 class FMAPIJudgeProvider:
@@ -118,6 +119,10 @@ def _default_transport(
     token: str | None = None,
 ) -> dict[str, Any]:
     """POST JSON payload and return JSON dict response."""
+    scheme = urlparse(endpoint).scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ValueError("FMAPI endpoint must use http or https")
+
     body = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if token:

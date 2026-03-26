@@ -60,3 +60,15 @@ def test_databricks_runner_propagates_callable_errors():
 
     with pytest.raises(RuntimeError, match="job submission failed"):
         runner.run(output={"prepared": True}, params={})
+
+
+def test_databricks_runner_requires_boolean_success_flag():
+    def run_job_and_wait(_output, _params):
+        return {
+            "task_a": {"success": "false", "error": None},
+        }
+
+    runner = DatabricksJobRunner(run_job_and_wait=run_job_and_wait)
+
+    with pytest.raises(ValueError, match="boolean 'success' flag"):
+        runner.run(output={"prepared": True}, params={})

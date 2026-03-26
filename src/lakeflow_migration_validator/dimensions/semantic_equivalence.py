@@ -16,18 +16,27 @@ _DEFAULT_TEMPLATE = (
     "Output Python code:\n{output}\n\n"
     "Score semantic equivalence."
 )
+_DEFAULT_CALIBRATION_PATH = Path(__file__).resolve().parents[3] / "golden_sets" / "expressions.json"
 
 
 def load_expression_calibration_examples(
     *,
-    path: str = "golden_sets/expressions.json",
+    path: str | Path = _DEFAULT_CALIBRATION_PATH,
     sample_size: int = 20,
 ) -> tuple[dict, ...]:
     """Load deterministic expression calibration examples from Week 2 golden set."""
-    if sample_size <= 0 or not path:
+    if sample_size <= 0:
         return ()
 
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    calibration_path = Path(path)
+    if not calibration_path.is_file():
+        return ()
+
+    try:
+        payload = json.loads(calibration_path.read_text(encoding="utf-8"))
+    except OSError:
+        return ()
+
     expressions = payload.get("expressions", [])
 
     examples: list[dict] = []
@@ -47,7 +56,7 @@ def create_semantic_equivalence_judge(
     *,
     threshold: float = 0.7,
     model: str = "claude-opus-4-6",
-    calibration_path: str = "golden_sets/expressions.json",
+    calibration_path: str | Path = _DEFAULT_CALIBRATION_PATH,
     calibration_sample_size: int = 20,
 ) -> LLMJudge:
     """Construct a ready-to-use semantic equivalence judge dimension."""

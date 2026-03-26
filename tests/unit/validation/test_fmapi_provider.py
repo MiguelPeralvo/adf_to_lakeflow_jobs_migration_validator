@@ -173,3 +173,15 @@ def test_fmapi_provider_judge_high_stakes_uses_high_stakes_model():
 
     assert captured["model"] == "claude-opus-4-6"
     assert result["score"] == 0.81
+
+
+def test_fmapi_provider_rejects_non_http_endpoint(monkeypatch):
+    def fake_urlopen(_req, _timeout):
+        raise AssertionError("urlopen should not be called for invalid endpoint scheme")
+
+    monkeypatch.setattr("lakeflow_migration_validator.providers.fmapi.request.urlopen", fake_urlopen)
+
+    provider = FMAPIJudgeProvider(endpoint="file:///tmp/fmapi.json")
+
+    with pytest.raises(RuntimeError, match="FMAPI endpoint must use http or https"):
+        provider.judge("hello")

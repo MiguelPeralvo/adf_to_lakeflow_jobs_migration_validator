@@ -128,7 +128,7 @@ def evaluate_full(
         runtime_dimension = create_runtime_success_dimension(execution_runner)
         results["runtime_success"] = runtime_dimension.evaluate(None, snapshot)
 
-    effective_weights = weights if weights is not None else _DEFAULT_WEIGHTS
+    effective_weights = {**_DEFAULT_WEIGHTS, **(weights or {})}
     return Scorecard.compute(effective_weights, results)
 
 

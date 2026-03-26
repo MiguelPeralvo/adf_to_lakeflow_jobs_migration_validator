@@ -51,6 +51,14 @@ def test_load_expression_calibration_examples_returns_empty_for_zero_sample_size
     assert examples == ()
 
 
+def test_load_expression_calibration_examples_returns_empty_when_file_missing(tmp_path):
+    missing_path = tmp_path / "does_not_exist.json"
+
+    examples = load_expression_calibration_examples(path=missing_path, sample_size=5)
+
+    assert examples == ()
+
+
 def test_create_semantic_equivalence_judge_builds_configured_judge(tmp_path):
     path = tmp_path / "expressions.json"
     path.write_text(

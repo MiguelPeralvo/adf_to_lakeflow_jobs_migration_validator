@@ -40,7 +40,9 @@ def _normalize_task_results(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
     for task_key, value in raw.items():
         if not isinstance(value, dict):
             raise ValueError(f"Task result for {task_key} must be a dict")
-        success = bool(value.get("success", False))
+        success = value.get("success")
+        if not isinstance(success, bool):
+            raise ValueError(f"Task result for {task_key} must include a boolean 'success' flag")
         normalized[str(task_key)] = {
             "success": success,
             "error": value.get("error"),
