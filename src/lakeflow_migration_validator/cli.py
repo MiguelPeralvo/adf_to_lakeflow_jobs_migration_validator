@@ -17,17 +17,20 @@ app = typer.Typer(no_args_is_help=True, help="Lakeflow Migration Validator CLI")
 
 _CONVERT_FN: Callable[[dict], ConversionSnapshot] = snapshot_from_adf_payload
 _HARNESS_RUNNER = None
+_PARALLEL_RUNNER = None
 
 
 def configure_cli(
     *,
     convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
     harness_runner=None,
+    parallel_runner=None,
 ) -> None:
     """Inject runtime dependencies for commands (primarily in tests)."""
-    global _CONVERT_FN, _HARNESS_RUNNER
+    global _CONVERT_FN, _HARNESS_RUNNER, _PARALLEL_RUNNER
     _CONVERT_FN = convert_fn or snapshot_from_adf_payload
     _HARNESS_RUNNER = harness_runner
+    _PARALLEL_RUNNER = parallel_runner
 
 
 @app.command("evaluate")
@@ -36,7 +39,7 @@ def evaluate_command(
     output: Path = typer.Option(..., "--output"),
 ) -> None:
     """Score one pipeline payload and write a JSON scorecard file."""
-    payload = _read_json(adf_json)
+    payload = _read_json(adf_json, "--adf-json")
     snapshot = _CONVERT_FN(payload)
     scorecard = evaluate(snapshot)
     rendered = json.dumps(scorecard.to_dict(), sort_keys=True, indent=2)
@@ -113,9 +116,34 @@ def regression_check_command(
     raise typer.Exit(code=1)
 
 
-def _read_json(path: Path) -> dict:
+@app.command("parallel-test")
+def parallel_test_command(
+    pipeline_name: str = typer.Option(..., "--pipeline-name"),
+    parameters_json: Path | None = typer.Option(None, "--parameters-json", exists=True, readable=True),
+    snapshot_json: Path | None = typer.Option(None, "--snapshot-json", exists=True, readable=True),
+) -> None:
+    """Run ADF-vs-Databricks parallel output validation."""
+    if _PARALLEL_RUNNER is None:
+        typer.echo(json.dumps({"error": "parallel runner is not configured"}, sort_keys=True))
+        raise typer.Exit(code=2)
+
+    parameters = (
+        _read_json(parameters_json, "--parameters-json")
+        if parameters_json is not None
+        else {}
+    )
+
+    snapshot = None
+    if snapshot_json is not None:
+        snapshot = _CONVERT_FN(_read_json(snapshot_json, "--snapshot-json"))
+
+    result = _PARALLEL_RUNNER.run(pipeline_name, parameters=parameters, snapshot=snapshot)
+    typer.echo(json.dumps(result.to_dict(), sort_keys=True))
+
+
+def _read_json(path: Path, option_name: str = "--adf-json") -> dict:
     raw = path.read_text(encoding="utf-8")
     payload = json.loads(raw)
     if not isinstance(payload, dict):
-        raise typer.BadParameter("adf-json must contain a JSON object")
+        raise typer.BadParameter(f"{option_name} must contain a JSON object")
     return payload

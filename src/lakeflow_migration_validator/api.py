@@ -81,12 +81,21 @@ class SyntheticGenerateRequest(BaseModel):
     output_path: str | None = None
 
 
+class ParallelRunRequest(BaseModel):
+    """Request payload for /api/parallel/run."""
+
+    pipeline_name: str = Field(min_length=1)
+    parameters: dict[str, str] = Field(default_factory=dict)
+    snapshot: dict[str, Any] | None = None
+
+
 def create_app(
     *,
     convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
     judge_provider: JudgeProvider | None = None,
     history_store: InMemoryHistoryStore | None = None,
     harness_runner=None,
+    parallel_runner=None,
 ) -> FastAPI:
     """Create the FastAPI app with injectable dependencies for tests and runtime."""
 
@@ -166,6 +175,18 @@ def create_app(
             "pipelines": [pipeline.adf_json.get("name", "<unknown>") for pipeline in suite.pipelines],
             "output_path": request.output_path,
         }
+
+    @app.post("/api/parallel/run")
+    def post_parallel_run(request: ParallelRunRequest) -> dict[str, Any]:
+        if parallel_runner is None:
+            raise HTTPException(status_code=503, detail="parallel_runner is not configured")
+        snapshot = convert(request.snapshot) if request.snapshot is not None else None
+        result = parallel_runner.run(
+            request.pipeline_name,
+            parameters=request.parameters,
+            snapshot=snapshot,
+        )
+        return result.to_dict()
 
     return app
 

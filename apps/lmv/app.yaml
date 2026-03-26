@@ -1,0 +1,5 @@
+name: lakeflow-migration-validator
+entrypoint: apps/lmv/backend/main.py
+runtime: python
+description: Databricks App scaffold for validation and parallel comparison workflows.
+command: "uvicorn apps.lmv.backend.main:app --host 0.0.0.0 --port 8000"

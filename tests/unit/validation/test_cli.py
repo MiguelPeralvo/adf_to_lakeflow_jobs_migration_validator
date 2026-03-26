@@ -9,6 +9,8 @@ from typer.testing import CliRunner
 from lakeflow_migration_validator.cli import app, configure_cli
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.harness.harness_runner import HarnessResult
+from lakeflow_migration_validator.parallel.comparator import ComparisonResult
+from lakeflow_migration_validator.parallel.parallel_test_runner import ParallelTestResult
 from lakeflow_migration_validator.serialization import snapshot_to_dict
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 from lakeflow_migration_validator import evaluate
@@ -155,3 +157,69 @@ def test_synthetic_command_generates_pipelines(tmp_path):
     assert output_path.exists()
     suite = GroundTruthSuite.from_json(str(output_path))
     assert len(suite.pipelines) == 3
+
+
+def test_parallel_test_command_not_configured_exits_2():
+    configure_cli(parallel_runner=None)
+
+    result = runner.invoke(app, ["parallel-test", "--pipeline-name", "pipe_a"])
+
+    assert result.exit_code == 2
+    assert json.loads(result.stdout.strip()) == {"error": "parallel runner is not configured"}
+
+
+def test_parallel_test_command_returns_result():
+    class _Runner:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None, *, snapshot=None):
+            scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
+            return ParallelTestResult(
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(
+                    ComparisonResult(
+                        activity_name="a",
+                        adf_output="1",
+                        databricks_output="1",
+                        match=True,
+                        diff=None,
+                    ),
+                ),
+                equivalence_score=1.0,
+                scorecard=scorecard,
+            )
+
+    configure_cli(parallel_runner=_Runner())
+    result = runner.invoke(app, ["parallel-test", "--pipeline-name", "pipe_a"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout.strip())
+    assert payload["pipeline_name"] == "pipe_a"
+    assert payload["equivalence_score"] == 1.0
+    assert payload["comparisons"][0]["match"] is True
+
+
+def test_parallel_test_command_invalid_parameters_json_reports_correct_flag(tmp_path):
+    class _Runner:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None, *, snapshot=None):
+            scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
+            return ParallelTestResult(
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(),
+                equivalence_score=1.0,
+                scorecard=scorecard,
+            )
+
+    params_path = tmp_path / "params.json"
+    params_path.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+
+    configure_cli(parallel_runner=_Runner())
+    result = runner.invoke(
+        app,
+        ["parallel-test", "--pipeline-name", "pipe_a", "--parameters-json", str(params_path)],
+    )
+
+    assert result.exit_code != 0
+    assert "--parameters-json must contain a JSON object" in result.output

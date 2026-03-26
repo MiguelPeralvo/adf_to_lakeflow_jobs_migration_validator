@@ -58,6 +58,7 @@ _DEFAULT_WEIGHTS = {
     "not_translatable_ratio": 0.05,
     "semantic_equivalence": 0.0,
     "runtime_success": 0.0,
+    "parallel_equivalence": 0.0,
 }
 
 _DIMENSIONS = [
@@ -127,6 +128,19 @@ def evaluate_full(
     if execution_runner is not None:
         runtime_dimension = create_runtime_success_dimension(execution_runner)
         results["runtime_success"] = runtime_dimension.evaluate(None, snapshot)
+
+    if snapshot.adf_run_outputs:
+        from lakeflow_migration_validator.dimensions.parallel_equivalence import (
+            compute_parallel_equivalence,
+        )
+
+        parallel_score, parallel_details = compute_parallel_equivalence(snapshot)
+        results["parallel_equivalence"] = DimensionResult(
+            name="parallel_equivalence",
+            score=parallel_score,
+            passed=parallel_score >= 0.95,
+            details=parallel_details,
+        )
 
     effective_weights = {**_DEFAULT_WEIGHTS, **(weights or {})}
     return Scorecard.compute(effective_weights, results)
