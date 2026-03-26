@@ -131,20 +131,21 @@ def _normalize_recursive(value: Any) -> Any:
     if isinstance(value, list):
         return [_normalize_recursive(item) for item in value]
     if isinstance(value, str):
-        parsed_dt = _try_parse_datetime(value.strip())
-        if parsed_dt is not None:
-            return parsed_dt
-        parsed_num = _try_parse_number(value.strip())
+        stripped = value.strip()
+        parsed_num = _try_parse_number(stripped)
         if parsed_num is not None:
             return parsed_num
-        lowered = value.strip().lower()
+        parsed_dt = _try_parse_datetime(stripped)
+        if parsed_dt is not None:
+            return parsed_dt
+        lowered = stripped.lower()
         if lowered == "true":
             return True
         if lowered == "false":
             return False
         if lowered in {"null", "none"}:
             return None
-        return value.strip()
+        return stripped
     return value
 
 
