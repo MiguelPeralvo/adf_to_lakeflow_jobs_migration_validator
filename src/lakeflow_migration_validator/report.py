@@ -31,7 +31,7 @@ class Report:
     expression_mismatch_cases: int
     cases: tuple[CaseReport, ...]
 
-    def ccs_distribution(self) -> dict[str, float]:
+    def ccs_distribution(self) -> dict[str, int | float]:
         """Return CCS distribution stats from case scores."""
         scores = sorted(case.score for case in self.cases)
         if not scores:

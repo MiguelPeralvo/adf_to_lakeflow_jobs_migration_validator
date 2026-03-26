@@ -56,9 +56,22 @@ def test_invalid_expression_complexity_raises_value_error():
         generator.generate(count=1, expression_complexity="impossible")
 
 
+def test_max_activities_zero_raises_value_error():
+    generator = PipelineGenerator()
+
+    with pytest.raises(ValueError, match="max_activities must be >= 1"):
+        generator.generate(count=1, max_activities=0)
+
+
 def test_adversarial_mode_marks_difficulty_as_adversarial():
-    generator = PipelineGenerator(mode="adversarial")
+    generator = PipelineGenerator(mode="adversarial", judge_provider=object())
 
     pipelines = generator.generate(count=2)
 
     assert {pipeline.difficulty for pipeline in pipelines} == {"adversarial"}
+
+
+@pytest.mark.parametrize("mode", ["llm", "adversarial"])
+def test_llm_and_adversarial_modes_require_judge_provider(mode):
+    with pytest.raises(NotImplementedError, match="LLM mode requires a judge_provider"):
+        PipelineGenerator(mode=mode)

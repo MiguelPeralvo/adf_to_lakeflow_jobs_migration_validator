@@ -1,4 +1,9 @@
-"""Template-driven synthetic ADF pipeline generation."""
+"""Template-driven synthetic ADF pipeline generation.
+
+Generated activities intentionally follow the Azure SDK-normalized shape used by
+wkmigrate translators (snake_case keys such as ``depends_on`` and top-level
+activity fields like ``IfCondition.expression``).
+"""
 
 from __future__ import annotations
 
@@ -17,7 +22,7 @@ from lakeflow_migration_validator.synthetic.expression_generator import Expressi
 
 _SUPPORTED_MODES = {"template", "llm", "adversarial"}
 _SUPPORTED_COMPLEXITIES = {"simple", "nested", "mixed"}
-_DEFAULT_ACTIVITY_TYPES = ("SetVariable", "AppendVariable", "IfCondition")
+_DEFAULT_ACTIVITY_TYPES = ("SetVariable", "IfCondition", "DatabricksNotebook", "Copy", "Lookup", "WebActivity", "ForEach")
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +41,8 @@ class PipelineGenerator:
     def __init__(self, mode: str = "template", judge_provider=None):
         if mode not in _SUPPORTED_MODES:
             raise ValueError(f"Unsupported generator mode: {mode}")
+        if mode in {"llm", "adversarial"} and judge_provider is None:
+            raise NotImplementedError("LLM mode requires a judge_provider")
         self.mode = mode
         self.judge_provider = judge_provider
         self.expression_generator = ExpressionGenerator()
@@ -123,30 +130,144 @@ class PipelineGenerator:
             depends_on = (
                 []
                 if activity_idx == 0
-                else [{"activity": f"task_{index}_{activity_idx - 1}", "dependencyConditions": ["Succeeded"]}]
+                else [{"activity": f"task_{index}_{activity_idx - 1}", "dependency_conditions": ["Succeeded"]}]
             )
             activity: dict[str, Any] = {
                 "name": activity_name,
                 "type": activity_type,
-                "dependsOn": depends_on,
+                "depends_on": depends_on,
             }
-            activity["typeProperties"] = self._type_properties(activity_type, expression_case.adf_expression)
+            # Keep normalized keys at the activity top level; wkmigrate activity
+            # translators read from these fields directly.
+            activity.update(self._type_properties(activity_name, activity_type, expression_case.adf_expression))
             activities.append(activity)
         return activities
 
     @staticmethod
-    def _type_properties(activity_type: str, adf_expression: str) -> dict[str, Any]:
+    def _type_properties(activity_name: str, activity_type: str, adf_expression: str) -> dict[str, Any]:
         if activity_type == "SetVariable":
-            return {"variableName": "result", "value": {"type": "Expression", "value": adf_expression}}
-        if activity_type == "AppendVariable":
-            return {"variableName": "items", "value": {"type": "Expression", "value": adf_expression}}
+            return {"variable_name": f"{activity_name}_result", "value": {"type": "Expression", "value": adf_expression}}
         if activity_type == "IfCondition":
             return {
+                # wkmigrate reads activity.get("expression") at top level.
                 "expression": {"type": "Expression", "value": "@equals(1,1)"},
-                "ifTrueActivities": [],
-                "ifFalseActivities": [],
+                "if_true_activities": [
+                    {
+                        "name": f"{activity_name}_if_true",
+                        "type": "DatabricksNotebook",
+                        "depends_on": [],
+                        "notebook_path": "/Workspace/notebooks/if_true",
+                    }
+                ],
+                "if_false_activities": [
+                    {
+                        "name": f"{activity_name}_if_false",
+                        "type": "DatabricksNotebook",
+                        "depends_on": [],
+                        "notebook_path": "/Workspace/notebooks/if_false",
+                    }
+                ],
             }
-        return {"value": {"type": "Expression", "value": adf_expression}}
+        if activity_type == "DatabricksNotebook":
+            return {
+                "notebook_path": f"/Workspace/notebooks/{activity_name}",
+                "base_parameters": {
+                    "run_id": {"type": "Expression", "value": "@pipeline().RunId"},
+                },
+            }
+        if activity_type == "Copy":
+            return {
+                "source": {
+                    "type": "DelimitedTextSource",
+                    "store_settings": {"type": "AzureBlobFSReadSettings"},
+                    "format_settings": {"type": "DelimitedTextReadSettings"},
+                },
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+                "input_dataset_definitions": [
+                    {
+                        "name": "source_csv_dataset",
+                        "properties": {
+                            "type": "DelimitedText",
+                            "location": {
+                                "type": "AzureBlobFSLocation",
+                                "file_name": "input.csv",
+                                "folder_path": "incoming",
+                                "file_system": "raw",
+                            },
+                        },
+                        "linked_service_definition": {
+                            "name": "adls_source",
+                            "properties": {"type": "AzureBlobFS"},
+                        },
+                    }
+                ],
+                "output_dataset_definitions": [
+                    {
+                        "name": "sink_delta_dataset",
+                        "properties": {
+                            "type": "AzureDatabricksDeltaLakeDataset",
+                            "location": {
+                                "type": "AzureBlobFSLocation",
+                                "folder_path": "processed",
+                                "file_system": "silver",
+                            },
+                            "table": "target_table",
+                        },
+                        "linked_service_definition": {
+                            "name": "adls_sink",
+                            "properties": {"type": "AzureBlobFS"},
+                        },
+                    }
+                ],
+            }
+        if activity_type == "Lookup":
+            return {
+                "first_row_only": True,
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": "SELECT TOP 1 * FROM config_table",
+                },
+                "input_dataset_definitions": [
+                    {
+                        "name": "lookup_source_dataset",
+                        "properties": {
+                            "type": "AzureSqlTable",
+                            "schema_type_properties_schema": "dbo",
+                            "table": "config_table",
+                        },
+                        "linked_service_definition": {
+                            "name": "sql_linked_service",
+                            "properties": {
+                                "type": "SqlServer",
+                                "server": "demo.database.windows.net",
+                                "database": "demo",
+                            },
+                        },
+                    }
+                ],
+            }
+        if activity_type == "WebActivity":
+            return {
+                "url": "https://api.example.com/webhook",
+                "method": "POST",
+                "body": {"event": "synthetic", "value": adf_expression},
+                "headers": {"Content-Type": "application/json"},
+            }
+        if activity_type == "ForEach":
+            return {
+                "batch_count": 2,
+                "items": {"type": "Expression", "value": "@createArray('a', 'b')"},
+                "activities": [
+                    {
+                        "name": f"{activity_name}_inner_notebook",
+                        "type": "DatabricksNotebook",
+                        "depends_on": [],
+                        "notebook_path": "/Workspace/notebooks/for_each_inner",
+                        "base_parameters": {"item_value": {"type": "Expression", "value": "@item()"}},
+                    }
+                ],
+            }
+        return {}
 
     def _build_expected_snapshot(
         self,

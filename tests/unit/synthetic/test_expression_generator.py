@@ -2,7 +2,7 @@
 
 import pytest
 
-from lakeflow_migration_validator.synthetic.expression_generator import ExpressionGenerator
+from lakeflow_migration_validator.synthetic.expression_generator import ExpressionGenerator, _TEMPLATES
 
 
 @pytest.mark.parametrize(
@@ -36,6 +36,13 @@ def test_generate_zero_count_returns_empty_list():
     assert cases == []
 
 
+def test_generate_negative_count_raises_value_error():
+    generator = ExpressionGenerator()
+
+    with pytest.raises(ValueError, match="count must be >= 0"):
+        generator.generate(count=-1)
+
+
 def test_generate_is_deterministic_for_same_inputs():
     generator = ExpressionGenerator()
 
@@ -61,3 +68,14 @@ def test_generated_cases_have_non_empty_fields():
         assert case.adf_expression.startswith("@")
         assert case.expected_python
         assert case.category
+
+
+def test_all_template_expected_python_values_are_valid_eval_expressions():
+    generator = ExpressionGenerator()
+
+    all_cases = []
+    for category, templates in _TEMPLATES.items():
+        all_cases.extend(generator.generate(count=len(templates), categories=[category]))
+
+    for case in all_cases:
+        compile(case.expected_python, "<test>", "eval")

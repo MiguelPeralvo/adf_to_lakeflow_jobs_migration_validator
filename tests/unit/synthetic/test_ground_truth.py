@@ -21,6 +21,7 @@ def test_json_roundtrip_preserves_pipeline_count(tmp_path):
 
     assert len(loaded.pipelines) == len(suite.pipelines)
     assert loaded.pipelines[0].description == suite.pipelines[0].description
+    assert loaded.pipelines[0].expected_snapshot.expected_outputs == suite.pipelines[0].expected_snapshot.expected_outputs
 
 
 def test_evaluate_converter_reports_perfect_when_converter_matches_expected_snapshot():
