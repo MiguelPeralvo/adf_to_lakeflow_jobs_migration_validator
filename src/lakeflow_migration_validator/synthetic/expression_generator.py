@@ -114,9 +114,14 @@ _EVAL_GLOBALS = {
 }
 
 
-def evaluate_expected_python(expected_python: str) -> object:
-    """Evaluate generated expected Python with synthetic-safe globals."""
+def _evaluate_expected_python(expected_python: str) -> object:
+    """Evaluate trusted synthetic template output only (never user input)."""
     return eval(expected_python, _EVAL_GLOBALS, {})
+
+
+def evaluate_expected_python(expected_python: str) -> object:
+    """Backward-compatible alias for test-only template evaluation."""
+    return _evaluate_expected_python(expected_python)
 
 
 class ExpressionGenerator:
@@ -134,7 +139,9 @@ class ExpressionGenerator:
         if count == 0:
             return []
 
-        selected = categories or list(_CATEGORIES)
+        selected = list(_CATEGORIES) if categories is None else categories
+        if not selected:
+            return []
         unknown = sorted(set(selected) - set(_CATEGORIES))
         if unknown:
             raise ValueError(f"Unknown expression categories: {unknown}")

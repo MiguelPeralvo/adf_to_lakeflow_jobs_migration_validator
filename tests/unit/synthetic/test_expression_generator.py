@@ -40,6 +40,14 @@ def test_generate_zero_count_returns_empty_list():
     assert cases == []
 
 
+def test_generate_with_explicit_empty_categories_returns_empty_list():
+    generator = ExpressionGenerator()
+
+    cases = generator.generate(count=5, categories=[])
+
+    assert cases == []
+
+
 def test_generate_negative_count_raises_value_error():
     generator = ExpressionGenerator()
 
