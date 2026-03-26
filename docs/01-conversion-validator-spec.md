@@ -1487,55 +1487,72 @@ def test_regression_check_exits_1_on_regression():
 
 ## 4. Implementation Plan
 
-### Week 1: Contract, adapter, programmatic dimensions + Scorecard
+### Week 1: Contract, adapter, programmatic dimensions + Scorecard (DONE)
+
+| Day | Task | Status |
+|---|---|---|
+| 1 | TDD test files + `conftest.py` with `ConversionSnapshot` fixture builders. | Done |
+| 2 | `contract.py`, `DimensionResult`, `Dimension` protocol, `ProgrammaticCheck`. | Done |
+| 3 | `activity_coverage`, `notebook_validity`, `parameter_completeness`, `secret_completeness`. | Done |
+| 4 | `dependency_preservation`, `expression_coverage`, `not_translatable_ratio`. | Done |
+| 5 | `Scorecard`, `evaluate()`, `adapters/wkmigrate_adapter.py`, `evaluate_from_wkmigrate()`. | Done |
+
+**Result:** 53 passed, 13 skipped. Merged as PR #1.
+
+### Week 2: Synthetic generation — find wkmigrate bugs
+
+Synthetic generation is the highest-leverage next step. It produces ADF pipelines and
+expressions with known-correct expected outputs, runs them through wkmigrate, and scores
+with `evaluate()`. Any CCS < 90 or expression mismatch = wkmigrate bug. This is how we
+found the `div` floor-division and `widgets.get` string-coercion bugs in Phase 6 of the
+expression work.
+
+Synthetic generation has **zero external dependencies** — no ADF factory, no Databricks
+workspace, no LLM calls. It only needs wkmigrate installed and Week 1's `evaluate()`.
 
 | Day | Task |
 |---|---|
-| 1 | Write all TDD test files (empty test functions with docstrings). Write `conftest.py` with `ConversionSnapshot` fixture builders. Confirm all tests fail/skip. |
-| 2 | Implement `contract.py` (`ConversionSnapshot`, `TaskSnapshot`, `NotebookSnapshot`, `SecretRef`, `DependencyRef`, `ExpressionPair`). Implement `DimensionResult`, `Dimension` protocol, `ProgrammaticCheck` class. |
-| 3 | Implement `activity_coverage`, `notebook_validity`, `parameter_completeness`, `secret_completeness` — all operating on `ConversionSnapshot`. Run tests — 4 dimension test files should pass. |
-| 4 | Implement `dependency_preservation`, `expression_coverage`, `not_translatable_ratio`. Run tests — all 7 dimension test files should pass. |
-| 5 | Implement `Scorecard`, `evaluate()`. Implement `adapters/wkmigrate_adapter.py` (`from_wkmigrate`). Implement `evaluate_from_wkmigrate()`. Write and run `test_wkmigrate_adapter.py`. Run all tests. |
+| 6 | Implement `synthetic/expression_generator.py` — template-based ADF expression + expected Python pairs across all function categories (string, math, datetime, logical, collection, nested). Write `test_expression_generator.py`. |
+| 7 | Implement `synthetic/pipeline_generator.py` — parameterized ADF pipeline JSON templates (vary activity count, expression complexity, nesting depth, activity types). Write `test_pipeline_generator.py`. |
+| 8 | Implement `synthetic/ground_truth.py` (`GroundTruthSuite.generate`, `evaluate_converter`). Write `test_ground_truth.py`. |
+| 9 | Generate a suite of 50-100 synthetic pipelines, run through wkmigrate + `evaluate()`, compute CCS distribution. Triage failures — file bugs against wkmigrate for any expression/activity the converter mishandles. |
+| 10 | Use expression pairs to build a golden set for the semantic equivalence judge (Week 3). Save as `golden_sets/expressions.json` and `golden_sets/pipelines.json`. |
 
-### Week 2: Agentic dimensions + CI integration
+### Week 3: Agentic dimensions (LLM judge + execution)
 
-| Day | Task |
-|---|---|
-| 6 | Implement `JudgeProvider` protocol, `FMAPIJudgeProvider` (Opus 4.6 + ChatGPT 5.4), and `LLMJudge` class. Write tests with a mock provider. |
-| 7 | Implement `semantic_equivalence.py` dimension. Calibrate against expression pairs from `set_variable_activities.json`. Write tests. |
-| 8 | Implement `ExecutionRunner` protocol and `ExecutionDimension` class. Wrap the existing `_run_job_and_wait` helper from `test_databricks_execution.py`. Write tests with a mock runner. |
-| 9 | Wire `evaluate_pipeline` into CI: add a pytest fixture that computes the scorecard after each integration test run and asserts `scorecard.score >= 70`. |
-| 10 | Curate golden set: 20-30 pipeline fixtures with expected score ranges. Write regression test: `evaluate_batch(golden_set)` scores should not regress from baseline. |
-
-### Week 3: Surface layer — App, MCP, API, CLI
+Now that synthetic generation provides calibration data, the LLM judge can be built and
+calibrated against known-correct expression pairs.
 
 | Day | Task |
 |---|---|
-| 11 | Implement FastAPI backend (`apps/lmv/backend/main.py`): `/api/validate`, `/api/validate/batch`, `/api/validate/expression`, `/api/history`. Write `test_api.py`. |
-| 12 | Implement MCP server (`apps/lmv/mcp_server.py`): `validate_pipeline`, `validate_expression`, `validate_batch`, `suggest_fix` tools. Write `test_mcp_server.py`. |
-| 13 | Implement Typer CLI (`apps/lmv/cli.py`): `evaluate`, `evaluate-batch`, `judge-expression`, `regression-check` commands. Write `test_cli.py`. |
-| 14 | Build React frontend: `ScorecardCard`, `DimensionDrilldown`, `Validate` page, `History` page. |
-| 15 | Deploy as Databricks App (`app.yaml`). Test end-to-end: upload ADF JSON in UI → see scorecard. Verify MCP tools work from Claude. Verify CLI works locally. |
+| 11 | Implement `JudgeProvider` protocol, `FMAPIJudgeProvider` (Opus 4.6 + ChatGPT 5.4), and `LLMJudge` class. Write tests with a mock provider. |
+| 12 | Implement `semantic_equivalence.py` dimension. Calibrate against expression pairs from `golden_sets/expressions.json` (produced in Week 2). Write tests. |
+| 13 | Implement `ExecutionRunner` protocol and `ExecutionDimension` class. Wrap the existing `_run_job_and_wait` helper from `test_databricks_execution.py`. Write tests with a mock runner. |
+| 14 | Wire `evaluate` into CI: pytest fixture that computes the scorecard after each integration test run and asserts `scorecard.score >= 70`. |
+| 15 | Curate golden set: 20-30 pipeline fixtures with expected score ranges. Write regression test: `evaluate_batch(golden_set)` scores should not regress from baseline. |
 
-### Week 4: Harness + synthetic generation
+### Week 4: Harness + surface layer
+
+The harness orchestrates wkmigrate end-to-end for implementation teams. Surfaces expose
+all capabilities (validate, harness, synthetic) through App, MCP, API, and CLI.
 
 | Day | Task |
 |---|---|
-| 16 | Implement `harness/adf_connector.py` (wraps `FactoryClient` + `FactoryDefinitionStore`). Implement `harness/harness_runner.py` (`HarnessRunner.run` — fetch → translate → prepare → adapter → evaluate). Write `test_harness_runner.py`. |
-| 17 | Implement `harness/fix_loop.py` (`FixLoop.iterate` — identify lowest dimension, call judge for failure diagnosis, generate fix suggestion via FMAPI). Wire into `HarnessRunner` with `max_iterations > 1`. Write `test_fix_loop.py`. |
-| 18 | Implement `synthetic/expression_generator.py` — template-based ADF expression + expected Python pairs for calibration. Implement `synthetic/pipeline_generator.py` — parameterized ADF pipeline templates (vary activity count, expression complexity, nesting depth). Write `test_pipeline_generator.py`. |
-| 19 | Implement `synthetic/ground_truth.py` (`GroundTruthSuite.generate`, `evaluate_converter`). Generate a suite of 50 synthetic pipelines, run the converter, compute CCS distribution. Write `test_ground_truth.py`. |
-| 20 | Add harness endpoints to surfaces: `/api/harness/run` (API), `harness_pipeline` (MCP tool), `lmv harness` (CLI). Update App frontend with "Harness" page. |
+| 16 | Implement `harness/adf_connector.py` + `harness/harness_runner.py` (`HarnessRunner.run` — fetch → translate → prepare → adapter → evaluate). Write `test_harness_runner.py`. |
+| 17 | Implement `harness/fix_loop.py` (`FixLoop.iterate` — identify lowest dimension, call judge for failure diagnosis, generate fix suggestion via FMAPI). Write `test_fix_loop.py`. |
+| 18 | Implement FastAPI backend: `/api/validate`, `/api/validate/batch`, `/api/harness/run`, `/api/synthetic/generate`. Implement MCP server tools. Write `test_api.py`, `test_mcp_server.py`. |
+| 19 | Implement Typer CLI: `evaluate`, `evaluate-batch`, `harness`, `synthetic`, `regression-check`. Write `test_cli.py`. |
+| 20 | Build React frontend: `ScorecardCard`, `DimensionDrilldown`, `Validate` page, `Harness` page. Deploy as Databricks App. |
 
 ### Week 5: Parallel testing
 
 | Day | Task |
 |---|---|
-| 21 | Implement `parallel/adf_runner.py` (`ADFExecutionRunner` — trigger ADF pipeline via REST API, poll until done, collect per-activity outputs). Write `test_adf_runner.py` (mock ADF API). |
-| 22 | Implement `parallel/comparator.py` (`OutputComparator` — type normalization, floating-point tolerance, date format alignment). Write `test_comparator.py` with edge cases. |
-| 23 | Implement `parallel/parallel_test_runner.py` (`ParallelTestRunner.run` — execute both, compare, return `ParallelTestResult`). Implement `dimensions/parallel_equivalence.py` (`compute_parallel_equivalence`). Write `test_parallel_equivalence.py`. |
-| 24 | Wire parallel equivalence as dimension 11 into evaluate(). Add parallel endpoints to surfaces: `/api/parallel-test` (API), `parallel_test` (MCP tool), `lmv parallel-test` (CLI). |
-| 25 | End-to-end test: run a real ADF pipeline, run the converted Lakeflow Job, compare outputs. Write `test_parallel_integration.py` (requires live ADF + Databricks). |
+| 21 | Implement `parallel/adf_runner.py` (`ADFExecutionRunner` — trigger ADF pipeline via REST API, poll, collect outputs). Write `test_adf_runner.py`. |
+| 22 | Implement `parallel/comparator.py` (`OutputComparator` — type normalization, float tolerance, date alignment). Write `test_comparator.py`. |
+| 23 | Implement `parallel/parallel_test_runner.py` + `dimensions/parallel_equivalence.py`. Write `test_parallel_equivalence.py`. |
+| 24 | Wire parallel equivalence as dimension 11. Add parallel endpoints to surfaces. |
+| 25 | End-to-end: run a real ADF pipeline + converted Lakeflow Job, compare outputs. Write `test_parallel_integration.py`. |
 
 ---
 

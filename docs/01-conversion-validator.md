@@ -86,13 +86,13 @@ CCS = (
 
 ## Agentic vs Deterministic Components
 
-8 of 10 scoring dimensions are **fully deterministic** — no LLM calls, no cost, run on every
+8 of 11 scoring dimensions are **fully deterministic** — no LLM calls, no cost, run on every
 commit in CI. The agentic components are opt-in and additive:
 
 ### What's deterministic (Tiers 1-2, always on)
 
-Dimensions 1-8: pure Python functions that inspect the `PreparedWorkflow` and source ADF
-pipeline. No external dependencies beyond wkmigrate's own models. These compute the
+Dimensions 1-8: pure Python functions that inspect the `ConversionSnapshot` (the validator's
+tool-agnostic contract). No wkmigrate imports, no external dependencies. These compute the
 Conversion Confidence Score.
 
 ### What uses LLMs (Tier 3, nightly)
@@ -122,9 +122,15 @@ judge_provider = FMAPIJudgeProvider(
 prompt (instructions + few-shot demonstrations) by maximizing agreement with human-labeled
 calibration pairs. LLM calls go through FMAPI. Runs weekly or on-demand, not per evaluation.
 
-**Synthetic test generation** — an LLM generates novel ADF expressions designed to stress
-the converter. GEPA's `optimize_anything` can optimize the generator prompt to maximize
-the discovery rate of converter failures.
+**Synthetic test generation (template mode)** — deterministic, no LLM. Generates parameterized
+ADF pipelines and expression pairs with known-correct expected outputs. Runs through wkmigrate
++ `evaluate()`. Any CCS < 90 or expression mismatch = wkmigrate bug. This is the primary
+mechanism for finding converter bugs — it's how we discovered the `div` floor-division and
+`widgets.get` string-coercion issues.
+
+**Synthetic test generation (LLM mode)** — uses FMAPI to generate novel, creative ADF
+expressions designed to stress the converter. GEPA's `optimize_anything` can optimize the
+generator prompt to maximize the discovery rate of converter failures.
 
 **Fix suggestion agent** — when a dimension fails, `dspy.Refine` iteratively generates
 code fix suggestions, validates them against the failing dimension, and returns the first
@@ -135,11 +141,13 @@ passing suggestion. Uses Opus 4.6 via FMAPI for the reasoning-heavy refinement l
 | Component | Frequency | Estimated cost |
 |---|---|---|
 | Tiers 1-2 (deterministic) | Every commit | $0 |
+| Synthetic generation (template mode) | Every commit / nightly | $0 (no LLM) |
+| Synthetic generation (LLM mode) | Monthly | ~$5-10/run |
 | Tier 3 (semantic judge, batch) | Nightly, ~100 expression pairs | ~$0.50/run (ChatGPT 5.4) |
 | Tier 3 (semantic judge, calibration) | Weekly, ~30 pairs | ~$1.00/run (Opus 4.6) |
 | Tier 4 (execution) | On-demand | ~$0.25/run (Databricks cluster) |
+| Tier 5 (parallel testing) | On-demand | ~$0.50/run (ADF + Databricks) |
 | DSPy judge optimization | Monthly or on-demand | ~$20-50/run (thousands of LLM calls) |
-| Synthetic test generation | Monthly | ~$5-10/run |
 
 ---
 
