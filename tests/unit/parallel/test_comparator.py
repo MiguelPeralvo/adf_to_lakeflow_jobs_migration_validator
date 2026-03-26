@@ -64,6 +64,12 @@ def test_comparator_negative_inf_equals_negative_inf():
     assert outputs_equivalent("-inf", "-inf")
 
 
+def test_comparator_special_float_token_casing_is_normalized():
+    assert outputs_equivalent("NaN", "nan")
+    assert outputs_equivalent("Infinity", "inf")
+    assert outputs_equivalent("-Infinity", "-inf")
+
+
 def test_comparator_empty_string_vs_null():
     assert not outputs_equivalent("", "null")
 

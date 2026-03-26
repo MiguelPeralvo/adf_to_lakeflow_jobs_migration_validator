@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -12,25 +14,20 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_frontend_validate_page_scaffold_exists():
-    path = _REPO_ROOT / "apps/lmv/frontend/src/pages/Validate.tsx"
+@pytest.mark.parametrize(
+    ("relative_path", "tokens"),
+    [
+        ("apps/lmv/frontend/src/pages/Validate.tsx", ("ValidatePage", "ScorecardCard")),
+        ("apps/lmv/frontend/src/pages/Parallel.tsx", ("ParallelPage", "/api/parallel/run")),
+        (
+            "apps/lmv/frontend/src/components/ParallelComparisonTable.tsx",
+            ("ParallelComparisonTable", "activity_name"),
+        ),
+    ],
+)
+def test_frontend_scaffold_files(relative_path: str, tokens: tuple[str, ...]):
+    path = _REPO_ROOT / relative_path
     assert path.exists()
     content = _read(path)
-    assert "ValidatePage" in content
-    assert "ScorecardCard" in content
-
-
-def test_frontend_parallel_page_references_parallel_endpoint():
-    path = _REPO_ROOT / "apps/lmv/frontend/src/pages/Parallel.tsx"
-    assert path.exists()
-    content = _read(path)
-    assert "ParallelPage" in content
-    assert "/api/parallel/run" in content
-
-
-def test_frontend_comparison_component_exists():
-    path = _REPO_ROOT / "apps/lmv/frontend/src/components/ParallelComparisonTable.tsx"
-    assert path.exists()
-    content = _read(path)
-    assert "ParallelComparisonTable" in content
-    assert "activity_name" in content
+    for token in tokens:
+        assert token in content

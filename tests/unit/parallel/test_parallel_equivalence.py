@@ -50,3 +50,17 @@ def test_parallel_equivalence_partial_mismatch_reports_details():
     assert details["compared"] == 2
     assert details["matched"] == 1
     assert details["mismatches"] == [{"activity": "b", "adf": "3", "expected": "2"}]
+
+
+def test_parallel_equivalence_missing_adf_activity_reports_details():
+    snapshot = make_snapshot(
+        expected_outputs={"a": "1", "b": "2"},
+        adf_run_outputs={"a": "1"},
+    )
+
+    score, details = compute_parallel_equivalence(snapshot)
+
+    assert score == 0.5
+    assert details["compared"] == 2
+    assert details["matched"] == 1
+    assert details["mismatches"] == [{"activity": "b", "adf": None, "expected": "2"}]

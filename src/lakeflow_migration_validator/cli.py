@@ -39,7 +39,7 @@ def evaluate_command(
     output: Path = typer.Option(..., "--output"),
 ) -> None:
     """Score one pipeline payload and write a JSON scorecard file."""
-    payload = _read_json(adf_json)
+    payload = _read_json(adf_json, "--adf-json")
     snapshot = _CONVERT_FN(payload)
     scorecard = evaluate(snapshot)
     rendered = json.dumps(scorecard.to_dict(), sort_keys=True, indent=2)
@@ -127,19 +127,23 @@ def parallel_test_command(
         typer.echo(json.dumps({"error": "parallel runner is not configured"}, sort_keys=True))
         raise typer.Exit(code=2)
 
-    parameters = _read_json(parameters_json, context="parameters-json") if parameters_json is not None else {}
+    parameters = (
+        _read_json(parameters_json, "--parameters-json")
+        if parameters_json is not None
+        else {}
+    )
 
     snapshot = None
     if snapshot_json is not None:
-        snapshot = _CONVERT_FN(_read_json(snapshot_json, context="snapshot-json"))
+        snapshot = _CONVERT_FN(_read_json(snapshot_json, "--snapshot-json"))
 
     result = _PARALLEL_RUNNER.run(pipeline_name, parameters=parameters, snapshot=snapshot)
     typer.echo(json.dumps(result.to_dict(), sort_keys=True))
 
 
-def _read_json(path: Path, *, context: str = "adf-json") -> dict:
+def _read_json(path: Path, option_name: str = "--adf-json") -> dict:
     raw = path.read_text(encoding="utf-8")
     payload = json.loads(raw)
     if not isinstance(payload, dict):
-        raise typer.BadParameter(f"{context} must contain a JSON object")
+        raise typer.BadParameter(f"{option_name} must contain a JSON object")
     return payload

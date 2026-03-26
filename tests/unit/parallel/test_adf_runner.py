@@ -114,3 +114,33 @@ def test_adf_runner_succeeds_on_success_variant():
     outputs = runner.run("pipe_a")
 
     assert outputs == {"a": "1"}
+
+
+def test_adf_runner_validates_max_polls():
+    with pytest.raises(ValueError, match="max_polls"):
+        ADFExecutionRunner(
+            trigger_run_fn=lambda _name, _params: "run-1",
+            get_run_status_fn=lambda _run_id: "SUCCEEDED",
+            get_activity_outputs_fn=lambda _run_id: {"a": "1"},
+            max_polls=0,
+        )
+
+
+def test_adf_runner_validates_poll_interval_seconds():
+    with pytest.raises(ValueError, match="poll_interval_seconds"):
+        ADFExecutionRunner(
+            trigger_run_fn=lambda _name, _params: "run-1",
+            get_run_status_fn=lambda _run_id: "SUCCEEDED",
+            get_activity_outputs_fn=lambda _run_id: {"a": "1"},
+            poll_interval_seconds=-0.1,
+        )
+
+
+def test_adf_runner_validates_sleep_fn_callable():
+    with pytest.raises(ValueError, match="sleep_fn"):
+        ADFExecutionRunner(
+            trigger_run_fn=lambda _name, _params: "run-1",
+            get_run_status_fn=lambda _run_id: "SUCCEEDED",
+            get_activity_outputs_fn=lambda _run_id: {"a": "1"},
+            sleep_fn=None,  # type: ignore[arg-type]
+        )

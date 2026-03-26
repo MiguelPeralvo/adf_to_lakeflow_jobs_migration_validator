@@ -25,6 +25,14 @@ class ADFExecutionRunner:
     poll_interval_seconds: float = 2.0
     sleep_fn: SleepFn = field(default=time.sleep, repr=False)
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.max_polls, int) or isinstance(self.max_polls, bool) or self.max_polls <= 0:
+            raise ValueError("max_polls must be an integer > 0")
+        if not isinstance(self.poll_interval_seconds, (int, float)) or self.poll_interval_seconds < 0:
+            raise ValueError("poll_interval_seconds must be a number >= 0")
+        if not callable(self.sleep_fn):
+            raise ValueError("sleep_fn must be callable")
+
     def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, str]:
         """Return normalized output payloads keyed by activity name."""
         payload = dict(parameters or {})

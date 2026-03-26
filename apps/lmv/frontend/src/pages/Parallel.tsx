@@ -3,8 +3,8 @@ import React from "react";
 import { ParallelComparisonTable } from "../components/ParallelComparisonTable";
 
 const demoRows = [
-  { activity_name: "task_a", match: true, diff: null },
-  { activity_name: "task_b", match: false, diff: "normalized outputs differ" },
+  { row_id: "task_a_0", activity_name: "task_a", match: true, diff: null },
+  { row_id: "task_b_1", activity_name: "task_b", match: false, diff: "normalized outputs differ" },
 ];
 
 export function ParallelPage() {

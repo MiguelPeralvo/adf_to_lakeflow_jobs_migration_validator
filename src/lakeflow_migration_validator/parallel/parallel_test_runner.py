@@ -77,7 +77,10 @@ class ParallelTestRunner:
         equivalence_score = self.comparator.score(list(comparisons))
 
         enriched_snapshot = _with_parallel_outputs(snapshot, adf_outputs, databricks_outputs)
-        parallel_score, parallel_details = compute_parallel_equivalence(enriched_snapshot)
+        parallel_score, parallel_details = compute_parallel_equivalence(
+            enriched_snapshot,
+            tolerance=self.comparator.float_tolerance,
+        )
 
         parallel_result = DimensionResult(
             name="parallel_equivalence",

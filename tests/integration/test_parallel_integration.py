@@ -47,15 +47,15 @@ def test_parallel_live_run_contract():
         payload = _run_json_command(os.environ["LMV_PARALLEL_ADF_STATUS_CMD"], {"run_id": run_id})
         return str(payload.get("status", "UNKNOWN"))
 
-    def outputs(run_id: str) -> dict[str, str]:
+    def outputs(run_id: str) -> dict[str, object]:
         payload = _run_json_command(os.environ["LMV_PARALLEL_ADF_OUTPUTS_CMD"], {"run_id": run_id})
         values = payload.get("outputs")
         if not isinstance(values, dict):
             raise RuntimeError("outputs command did not return dict in 'outputs'")
-        return {str(key): str(value) for key, value in values.items()}
+        return {str(key): value for key, value in values.items()}
 
     class _DatabricksRunner:
-        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, str]:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, object]:
             payload = _run_json_command(
                 os.environ["LMV_PARALLEL_DATABRICKS_CMD"],
                 {"pipeline_name": pipeline_name, "parameters": parameters or {}},
@@ -63,7 +63,7 @@ def test_parallel_live_run_contract():
             values = payload.get("outputs")
             if not isinstance(values, dict):
                 raise RuntimeError("databricks command did not return dict in 'outputs'")
-            return {str(key): str(value) for key, value in values.items()}
+            return {str(key): value for key, value in values.items()}
 
     runner = ParallelTestRunner(
         adf_runner=ADFExecutionRunner(
@@ -83,13 +83,18 @@ def test_parallel_live_run_contract():
 
 
 def _run_json_command(command: str, payload: dict) -> dict:
-    proc = subprocess.run(
-        shlex.split(command),
-        input=json.dumps(payload),
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    timeout_seconds = 30.0
+    try:
+        proc = subprocess.run(
+            shlex.split(command),
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"command timed out after {timeout_seconds}s ({command})") from exc
     if proc.returncode != 0:
         raise RuntimeError(f"command failed ({command}): {proc.stderr.strip()}")
     try:

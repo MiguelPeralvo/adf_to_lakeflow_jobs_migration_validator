@@ -1,6 +1,7 @@
 import React from "react";
 
 type Comparison = {
+  row_id: string;
   activity_name: string;
   match: boolean;
   diff: string | null;
@@ -22,7 +23,7 @@ export function ParallelComparisonTable({ rows }: ParallelComparisonTableProps) 
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.activity_name}>
+          <tr key={row.row_id}>
             <td>{row.activity_name}</td>
             <td>{String(row.match)}</td>
             <td>{row.diff ?? ""}</td>

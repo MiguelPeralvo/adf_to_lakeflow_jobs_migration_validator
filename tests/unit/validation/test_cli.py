@@ -197,3 +197,29 @@ def test_parallel_test_command_returns_result():
     assert payload["pipeline_name"] == "pipe_a"
     assert payload["equivalence_score"] == 1.0
     assert payload["comparisons"][0]["match"] is True
+
+
+def test_parallel_test_command_invalid_parameters_json_reports_correct_flag(tmp_path):
+    class _Runner:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None, *, snapshot=None):
+            scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
+            return ParallelTestResult(
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(),
+                equivalence_score=1.0,
+                scorecard=scorecard,
+            )
+
+    params_path = tmp_path / "params.json"
+    params_path.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+
+    configure_cli(parallel_runner=_Runner())
+    result = runner.invoke(
+        app,
+        ["parallel-test", "--pipeline-name", "pipe_a", "--parameters-json", str(params_path)],
+    )
+
+    assert result.exit_code != 0
+    assert "--parameters-json must contain a JSON object" in result.output
