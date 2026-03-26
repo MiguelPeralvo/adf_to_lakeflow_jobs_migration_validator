@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from lakeflow_migration_validator.dimensions import DimensionResult
@@ -22,11 +22,19 @@ class ExecutionDimension:
 
     name: str
     runner: ExecutionRunner
-    test_params: dict[str, str] = ()
+    test_params: dict[str, str] = field(default_factory=dict)
     threshold: float = 1.0
 
     def evaluate(self, input: Any, output: Any) -> DimensionResult:
-        results = self.runner.run(output, params=dict(self.test_params))
+        try:
+            results = self.runner.run(output, params=dict(self.test_params))
+        except Exception as exc:
+            return DimensionResult(
+                name=self.name,
+                score=0.0,
+                passed=False,
+                details={"error": str(exc)},
+            )
         if not results:
             return DimensionResult(
                 name=self.name, score=0.0, passed=False, details={"error": "no tasks returned"}

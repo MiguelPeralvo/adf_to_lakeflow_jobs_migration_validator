@@ -35,7 +35,7 @@ class LLMJudge:
     def evaluate(self, input: Any, output: Any) -> DimensionResult:
         prompt = self._build_prompt(input, output)
         response = self.provider.judge(prompt, model=self.model)
-        score = response.get("score", 0.0)
+        score = _normalize_score(response.get("score", 0.0))
         return DimensionResult(
             name=self.name,
             score=score,
@@ -58,3 +58,12 @@ class LLMJudge:
             f"{self.input_template.format(input=input, output=output)}\n\n"
             f'Respond with JSON: {{"score": <float>, "reasoning": "<explanation>"}}'
         )
+
+
+def _normalize_score(value: Any) -> float:
+    """Convert arbitrary score value to a clamped float in [0.0, 1.0]."""
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, score))

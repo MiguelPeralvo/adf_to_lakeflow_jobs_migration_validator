@@ -20,6 +20,8 @@ Example::
     print(scorecard.score, scorecard.label)
 """
 
+from typing import Any, Callable
+
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions import DimensionResult
 from lakeflow_migration_validator.dimensions.activity_coverage import compute_activity_coverage
@@ -32,7 +34,14 @@ from lakeflow_migration_validator.dimensions.programmatic import ProgrammaticChe
 from lakeflow_migration_validator.dimensions.secret_completeness import compute_secret_completeness
 from lakeflow_migration_validator.scorecard import Scorecard
 
-__all__ = ["evaluate", "evaluate_from_wkmigrate", "ConversionSnapshot", "Scorecard", "DimensionResult"]
+__all__ = [
+    "evaluate",
+    "evaluate_batch",
+    "evaluate_from_wkmigrate",
+    "ConversionSnapshot",
+    "Scorecard",
+    "DimensionResult",
+]
 
 _DEFAULT_WEIGHTS = {
     "activity_coverage": 0.25,
@@ -85,3 +94,22 @@ def evaluate_from_wkmigrate(source_pipeline: dict, prepared_workflow) -> Scoreca
 
     snapshot = from_wkmigrate(source_pipeline, prepared_workflow)
     return evaluate(snapshot)
+
+
+def evaluate_batch(
+    golden_set: Any,
+    convert_fn: Callable[[dict], ConversionSnapshot],
+    *,
+    threshold: float = 90.0,
+):
+    """Evaluate a converter against a GroundTruthSuite/GoldenSet and return a Report."""
+    from lakeflow_migration_validator.golden_set import GoldenSet
+    from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
+
+    if isinstance(golden_set, GroundTruthSuite):
+        suite = golden_set
+    elif isinstance(golden_set, GoldenSet):
+        suite = golden_set.pipelines
+    else:
+        raise TypeError("golden_set must be GroundTruthSuite or GoldenSet")
+    return suite.evaluate_converter(convert_fn, threshold=threshold)
