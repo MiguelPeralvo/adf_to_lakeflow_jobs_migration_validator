@@ -136,28 +136,7 @@ def parallel_test_command(
         snapshot = _CONVERT_FN(_read_json(snapshot_json))
 
     result = _PARALLEL_RUNNER.run(pipeline_name, parameters=parameters, snapshot=snapshot)
-    typer.echo(
-        json.dumps(
-            {
-                "pipeline_name": result.pipeline_name,
-                "adf_outputs": dict(result.adf_outputs),
-                "databricks_outputs": dict(result.databricks_outputs),
-                "comparisons": [
-                    {
-                        "activity_name": item.activity_name,
-                        "adf_output": item.adf_output,
-                        "databricks_output": item.databricks_output,
-                        "match": item.match,
-                        "diff": item.diff,
-                    }
-                    for item in result.comparisons
-                ],
-                "equivalence_score": result.equivalence_score,
-                "scorecard": result.scorecard.to_dict(),
-            },
-            sort_keys=True,
-        )
-    )
+    typer.echo(json.dumps(result.to_dict(), sort_keys=True))
 
 
 def _read_json(path: Path) -> dict:

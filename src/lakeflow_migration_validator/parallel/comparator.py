@@ -182,6 +182,9 @@ def _is_number(value: Any) -> bool:
 
 
 def _try_parse_number(value: str) -> int | float | None:
+    lowered = value.lower()
+    if lowered in ("nan", "inf", "-inf", "+inf", "infinity", "-infinity", "+infinity"):
+        return float(lowered.replace("infinity", "inf"))
     try:
         if any(ch in value for ch in (".", "e", "E")):
             return float(value)

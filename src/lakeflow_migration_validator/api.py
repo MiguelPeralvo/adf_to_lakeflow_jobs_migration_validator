@@ -186,23 +186,7 @@ def create_app(
             parameters=request.parameters,
             snapshot=snapshot,
         )
-        return {
-            "pipeline_name": result.pipeline_name,
-            "adf_outputs": dict(result.adf_outputs),
-            "databricks_outputs": dict(result.databricks_outputs),
-            "comparisons": [
-                {
-                    "activity_name": item.activity_name,
-                    "adf_output": item.adf_output,
-                    "databricks_output": item.databricks_output,
-                    "match": item.match,
-                    "diff": item.diff,
-                }
-                for item in result.comparisons
-            ],
-            "equivalence_score": result.equivalence_score,
-            "scorecard": result.scorecard.to_dict(),
-        }
+        return result.to_dict()
 
     return app
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from lakeflow_migration_validator import evaluate
 from lakeflow_migration_validator.contract import ConversionSnapshot
@@ -31,6 +31,26 @@ class ParallelTestResult:
     comparisons: tuple[ComparisonResult, ...]
     equivalence_score: float
     scorecard: Scorecard
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dict for API/CLI/MCP responses."""
+        return {
+            "pipeline_name": self.pipeline_name,
+            "adf_outputs": dict(self.adf_outputs),
+            "databricks_outputs": dict(self.databricks_outputs),
+            "comparisons": [
+                {
+                    "activity_name": item.activity_name,
+                    "adf_output": item.adf_output,
+                    "databricks_output": item.databricks_output,
+                    "match": item.match,
+                    "diff": item.diff,
+                }
+                for item in self.comparisons
+            ],
+            "equivalence_score": self.equivalence_score,
+            "scorecard": self.scorecard.to_dict(),
+        }
 
 
 @dataclass(frozen=True, slots=True)
