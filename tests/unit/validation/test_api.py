@@ -43,6 +43,23 @@ def test_post_validate_invalid_json_returns_422():
     assert response.status_code == 422
 
 
+def test_post_validate_snapshot_uses_injected_convert_fn():
+    """POST /api/validate with snapshot payload uses injected converter for snapshot path."""
+    sentinel = make_snapshot(tasks=[make_task("from_converter")], notebooks=[make_notebook()])
+
+    def convert_fn(payload: dict) -> ConversionSnapshot:
+        assert payload == {"name": "from_snapshot"}
+        return sentinel
+
+    client = TestClient(create_app(convert_fn=convert_fn))
+
+    response = client.post("/api/validate", json={"snapshot": {"name": "from_snapshot"}})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["score"] == evaluate(sentinel).score
+
+
 def test_post_validate_expression_returns_judge_result():
     """POST /api/validate/expression returns score + reasoning."""
 
