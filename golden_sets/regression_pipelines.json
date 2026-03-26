@@ -1,0 +1,139 @@
+{
+  "baseline": {
+    "max_score": 100.0,
+    "mean_score": 95.0,
+    "min_score": 90.0,
+    "p10": 92.0,
+    "p90": 99.0
+  },
+  "cases": [
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_000"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_001"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_002"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_003"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_004"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_005"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_006"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_007"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_008"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_009"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_010"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_011"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_012"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_013"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_014"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_015"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_016"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_017"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_018"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_019"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_020"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_021"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_022"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_023"
+    },
+    {
+      "max_score": 100.0,
+      "min_score": 95.0,
+      "pipeline_name": "synthetic_pipeline_024"
+    }
+  ],
+  "fixture_count": 25,
+  "source": "golden_sets/pipelines.json",
+  "version": 1
+}
