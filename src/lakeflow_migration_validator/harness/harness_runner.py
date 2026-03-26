@@ -79,10 +79,13 @@ class HarnessRunner:
 
         fix_suggestions: list[dict[str, Any]] = []
         iterations = 1
-        if self.max_iterations > 1 and self.judge_provider is not None:
-            loop = self.fix_loop or FixLoop(
+        if self.fix_loop is not None:
+            snapshot, scorecard, fix_suggestions = self.fix_loop.iterate(snapshot, scorecard)
+            iterations = len(fix_suggestions) + 1
+        elif self.max_iterations > 1 and self.judge_provider is not None:
+            loop = FixLoop(
                 judge_provider=self.judge_provider,
-                max_iterations=self.max_iterations,
+                max_iterations=1,
             )
             snapshot, scorecard, fix_suggestions = loop.iterate(snapshot, scorecard)
             iterations = len(fix_suggestions) + 1
