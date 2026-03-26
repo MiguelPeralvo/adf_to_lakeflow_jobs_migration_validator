@@ -46,3 +46,35 @@ def test_comparator_normalizes_json_and_whitespace():
 def test_comparator_score_is_one_for_empty_results():
     comparator = OutputComparator()
     assert comparator.score([]) == 1.0
+
+
+def test_comparator_nan_equals_nan():
+    assert outputs_equivalent("nan", "nan")
+
+
+def test_comparator_nan_not_equal_to_number():
+    assert not outputs_equivalent("nan", "1.0")
+
+
+def test_comparator_inf_equals_inf():
+    assert outputs_equivalent("inf", "inf")
+
+
+def test_comparator_negative_inf_equals_negative_inf():
+    assert outputs_equivalent("-inf", "-inf")
+
+
+def test_comparator_empty_string_vs_null():
+    assert not outputs_equivalent("", "null")
+
+
+def test_comparator_none_string_treated_as_null():
+    assert outputs_equivalent("None", "null")
+
+
+def test_comparator_boolean_string_normalization():
+    assert outputs_equivalent("TRUE", "true")
+
+
+def test_comparator_zero_vs_false_not_equal():
+    assert not outputs_equivalent("0", "false")

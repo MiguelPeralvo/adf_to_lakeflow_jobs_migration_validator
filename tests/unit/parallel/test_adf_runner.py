@@ -91,3 +91,26 @@ def test_adf_runner_raises_on_missing_outputs():
 
     with pytest.raises(RuntimeError, match="adf_outputs_missing"):
         runner.run("pipe_a")
+
+
+def test_adf_runner_raises_on_empty_run_id():
+    runner = ADFExecutionRunner(
+        trigger_run_fn=lambda _name, _params: "",
+        get_run_status_fn=lambda _run_id: "SUCCEEDED",
+        get_activity_outputs_fn=lambda _run_id: {"a": "1"},
+    )
+
+    with pytest.raises(RuntimeError, match="adf_trigger_failed: empty run id"):
+        runner.run("pipe_a")
+
+
+def test_adf_runner_succeeds_on_success_variant():
+    runner = ADFExecutionRunner(
+        trigger_run_fn=lambda _name, _params: "run-1",
+        get_run_status_fn=lambda _run_id: "SUCCESS",
+        get_activity_outputs_fn=lambda _run_id: {"a": "1"},
+    )
+
+    outputs = runner.run("pipe_a")
+
+    assert outputs == {"a": "1"}

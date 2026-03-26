@@ -163,10 +163,15 @@ def create_mcp_server(
     def run_parallel_test(
         pipeline_name: str,
         parameters: dict[str, str] | None = None,
+        snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Run parallel ADF-vs-Databricks output validation."""
         return service.run_parallel_test(
-            {"pipeline_name": pipeline_name, "parameters": parameters or {}}
+            {
+                "pipeline_name": pipeline_name,
+                "parameters": parameters or {},
+                "snapshot": snapshot,
+            }
         )
 
     return server

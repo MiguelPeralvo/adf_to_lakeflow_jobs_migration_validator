@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -155,7 +156,13 @@ def _equivalent(a: Any, b: Any, *, tolerance: float) -> bool:
         return a is b
 
     if _is_number(a) and _is_number(b):
-        return abs(float(a) - float(b)) <= tolerance
+        a_num = float(a)
+        b_num = float(b)
+        if math.isnan(a_num) and math.isnan(b_num):
+            return True
+        if a_num == b_num:
+            return True
+        return abs(a_num - b_num) <= tolerance
 
     if isinstance(a, dict) and isinstance(b, dict):
         if set(a) != set(b):
