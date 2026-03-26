@@ -2,7 +2,11 @@
 
 import pytest
 
-from lakeflow_migration_validator.synthetic.expression_generator import ExpressionGenerator, _TEMPLATES
+from lakeflow_migration_validator.synthetic.expression_generator import (
+    ExpressionGenerator,
+    _TEMPLATES,
+    evaluate_expected_python,
+)
 
 
 @pytest.mark.parametrize(
@@ -79,3 +83,15 @@ def test_all_template_expected_python_values_are_valid_eval_expressions():
 
     for case in all_cases:
         compile(case.expected_python, "<test>", "eval")
+
+
+def test_all_template_expected_python_values_evaluate_at_runtime():
+    generator = ExpressionGenerator()
+
+    all_cases = []
+    for category, templates in _TEMPLATES.items():
+        all_cases.extend(generator.generate(count=len(templates), categories=[category]))
+
+    for case in all_cases:
+        result = evaluate_expected_python(case.expected_python)
+        assert result is not None or case.expected_python.endswith("None)")

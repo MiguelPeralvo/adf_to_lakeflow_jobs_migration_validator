@@ -77,8 +77,10 @@ def _wkmigrate_utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _wkmigrate_format_datetime(dt: datetime, adf_format: str) -> str:
+def _wkmigrate_format_datetime(dt: datetime | str, adf_format: str) -> str:
     """Minimal formatter compatible with common ADF tokens used in synthetic tests."""
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
     format_mapping = {
         "yyyy": "%Y",
         "MM": "%m",
