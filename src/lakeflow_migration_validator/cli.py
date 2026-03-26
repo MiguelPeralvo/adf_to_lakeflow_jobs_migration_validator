@@ -127,21 +127,19 @@ def parallel_test_command(
         typer.echo(json.dumps({"error": "parallel runner is not configured"}, sort_keys=True))
         raise typer.Exit(code=2)
 
-    parameters = _read_json(parameters_json) if parameters_json is not None else {}
-    if not isinstance(parameters, dict):
-        raise typer.BadParameter("parameters-json must contain a JSON object")
+    parameters = _read_json(parameters_json, context="parameters-json") if parameters_json is not None else {}
 
     snapshot = None
     if snapshot_json is not None:
-        snapshot = _CONVERT_FN(_read_json(snapshot_json))
+        snapshot = _CONVERT_FN(_read_json(snapshot_json, context="snapshot-json"))
 
     result = _PARALLEL_RUNNER.run(pipeline_name, parameters=parameters, snapshot=snapshot)
     typer.echo(json.dumps(result.to_dict(), sort_keys=True))
 
 
-def _read_json(path: Path) -> dict:
+def _read_json(path: Path, *, context: str = "adf-json") -> dict:
     raw = path.read_text(encoding="utf-8")
     payload = json.loads(raw)
     if not isinstance(payload, dict):
-        raise typer.BadParameter("adf-json must contain a JSON object")
+        raise typer.BadParameter(f"{context} must contain a JSON object")
     return payload
