@@ -175,7 +175,7 @@ def _resolve_snapshot(
     convert_fn: Callable[[dict], ConversionSnapshot],
 ) -> ConversionSnapshot:
     if request.snapshot is not None:
-        return snapshot_from_adf_payload(request.snapshot)
+        return convert_fn(request.snapshot)
     if request.adf_json is not None:
         return convert_fn(request.adf_json)
     raise HTTPException(status_code=422, detail="either adf_json or snapshot must be provided")

@@ -7,15 +7,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 from lakeflow_migration_validator import evaluate
-from lakeflow_migration_validator.contract import (
-    ConversionSnapshot,
-    DependencyRef,
-    ExpressionPair,
-    NotebookSnapshot,
-    SecretRef,
-    TaskSnapshot,
-)
+from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.report import CaseReport, Report
+from lakeflow_migration_validator.serialization import snapshot_from_dict, snapshot_to_dict
 from lakeflow_migration_validator.synthetic.pipeline_generator import PipelineGenerator, SyntheticPipeline
 
 
@@ -136,7 +130,7 @@ def _synthetic_pipeline_to_dict(pipeline: SyntheticPipeline) -> dict:
         "adf_json": pipeline.adf_json,
         "description": pipeline.description,
         "difficulty": pipeline.difficulty,
-        "expected_snapshot": _snapshot_to_dict(pipeline.expected_snapshot),
+        "expected_snapshot": snapshot_to_dict(pipeline.expected_snapshot),
     }
 
 
@@ -145,82 +139,5 @@ def _synthetic_pipeline_from_dict(payload: dict) -> SyntheticPipeline:
         adf_json=payload["adf_json"],
         description=payload["description"],
         difficulty=payload["difficulty"],
-        expected_snapshot=_snapshot_from_dict(payload["expected_snapshot"]),
-    )
-
-
-def _snapshot_to_dict(snapshot: ConversionSnapshot) -> dict:
-    return {
-        "tasks": [
-            {
-                "task_key": task.task_key,
-                "is_placeholder": task.is_placeholder,
-            }
-            for task in snapshot.tasks
-        ],
-        "notebooks": [
-            {
-                "file_path": notebook.file_path,
-                "content": notebook.content,
-            }
-            for notebook in snapshot.notebooks
-        ],
-        "secrets": [
-            {
-                "scope": secret.scope,
-                "key": secret.key,
-            }
-            for secret in snapshot.secrets
-        ],
-        "parameters": list(snapshot.parameters),
-        "dependencies": [
-            {
-                "source_task": dependency.source_task,
-                "target_task": dependency.target_task,
-            }
-            for dependency in snapshot.dependencies
-        ],
-        "not_translatable": list(snapshot.not_translatable),
-        "resolved_expressions": [
-            {
-                "adf_expression": pair.adf_expression,
-                "python_code": pair.python_code,
-            }
-            for pair in snapshot.resolved_expressions
-        ],
-        "source_pipeline": snapshot.source_pipeline,
-        "total_source_dependencies": snapshot.total_source_dependencies,
-        "expected_outputs": snapshot.expected_outputs,
-        "adf_run_outputs": snapshot.adf_run_outputs,
-    }
-
-
-def _snapshot_from_dict(payload: dict) -> ConversionSnapshot:
-    return ConversionSnapshot(
-        tasks=tuple(
-            TaskSnapshot(task_key=task["task_key"], is_placeholder=task["is_placeholder"])
-            for task in payload["tasks"]
-        ),
-        notebooks=tuple(
-            NotebookSnapshot(file_path=notebook["file_path"], content=notebook["content"])
-            for notebook in payload["notebooks"]
-        ),
-        secrets=tuple(
-            SecretRef(scope=secret["scope"], key=secret["key"])
-            for secret in payload["secrets"]
-        ),
-        parameters=tuple(payload["parameters"]),
-        dependencies=tuple(
-            DependencyRef(source_task=dep["source_task"], target_task=dep["target_task"])
-            for dep in payload["dependencies"]
-        ),
-        not_translatable=tuple(payload["not_translatable"]),
-        resolved_expressions=tuple(
-            ExpressionPair(adf_expression=pair["adf_expression"], python_code=pair["python_code"])
-            for pair in payload["resolved_expressions"]
-        ),
-        source_pipeline=payload["source_pipeline"],
-        total_source_dependencies=payload["total_source_dependencies"],
-        expected_outputs=payload.get("expected_outputs", {}),
-        adf_run_outputs=payload.get("adf_run_outputs", {}),
+        expected_snapshot=snapshot_from_dict(payload["expected_snapshot"]),
     )
