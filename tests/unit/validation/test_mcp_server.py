@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from lakeflow_migration_validator import evaluate
 from lakeflow_migration_validator.mcp_server import LMVMCPServer
+from lakeflow_migration_validator.parallel.comparator import ComparisonResult
+from lakeflow_migration_validator.parallel.parallel_test_runner import ParallelTestResult
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
 
@@ -52,3 +55,46 @@ def test_missing_adf_json_returns_error():
     payload = server.validate_pipeline({})
 
     assert payload == {"error": "adf_json is required"}
+
+
+def test_run_parallel_test_returns_payload():
+    class _ParallelRunner:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None, *, snapshot=None):
+            scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
+            return ParallelTestResult(
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(
+                    ComparisonResult(
+                        activity_name="a",
+                        adf_output="1",
+                        databricks_output="1",
+                        match=True,
+                        diff=None,
+                    ),
+                ),
+                equivalence_score=1.0,
+                scorecard=scorecard,
+            )
+
+    server = LMVMCPServer(
+        convert_fn=lambda _adf: make_snapshot(),
+        judge_provider=_Provider(),
+        parallel_runner=_ParallelRunner(),
+    )
+
+    payload = server.run_parallel_test({"pipeline_name": "pipe_a", "parameters": {"p": "1"}})
+
+    assert payload["pipeline_name"] == "pipe_a"
+    assert payload["equivalence_score"] == 1.0
+    assert payload["comparisons"][0]["match"] is True
+    assert "scorecard" in payload
+
+
+def test_run_parallel_test_returns_error_when_runner_not_configured():
+    server = LMVMCPServer(convert_fn=lambda _adf: make_snapshot(), judge_provider=_Provider())
+
+    payload = server.run_parallel_test({"pipeline_name": "pipe_a"})
+
+    assert payload == {"error": "parallel_runner is not configured"}

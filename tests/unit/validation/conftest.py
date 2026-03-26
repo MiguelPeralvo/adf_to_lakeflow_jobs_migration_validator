@@ -23,6 +23,8 @@ def make_snapshot(
     resolved_expressions=(),
     source_pipeline=None,
     total_source_dependencies=0,
+    expected_outputs=None,
+    adf_run_outputs=None,
 ) -> ConversionSnapshot:
     return ConversionSnapshot(
         tasks=tuple(tasks),
@@ -34,6 +36,8 @@ def make_snapshot(
         resolved_expressions=tuple(resolved_expressions),
         source_pipeline=source_pipeline or {},
         total_source_dependencies=total_source_dependencies,
+        expected_outputs=dict(expected_outputs or {}),
+        adf_run_outputs=dict(adf_run_outputs or {}),
     )
 
 

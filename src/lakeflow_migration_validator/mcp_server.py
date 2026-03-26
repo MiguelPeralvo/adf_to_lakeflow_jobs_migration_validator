@@ -18,9 +18,11 @@ class LMVMCPServer:
         *,
         convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
         judge_provider: JudgeProvider | None = None,
+        parallel_runner=None,
     ):
         self._convert_fn = convert_fn or snapshot_from_adf_payload
         self._judge_provider = judge_provider
+        self._parallel_runner = parallel_runner
 
     def validate_pipeline(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Validate a pipeline payload and return serialized scorecard."""
@@ -76,11 +78,56 @@ class LMVMCPServer:
         except Exception as exc:
             return {"error": str(exc)}
 
+    def run_parallel_test(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Run ADF-vs-Databricks output comparison and return full result."""
+        if self._parallel_runner is None:
+            return {"error": "parallel_runner is not configured"}
+
+        pipeline_name = payload.get("pipeline_name")
+        if not isinstance(pipeline_name, str) or not pipeline_name:
+            return {"error": "pipeline_name is required"}
+
+        parameters = payload.get("parameters", {})
+        if not isinstance(parameters, dict):
+            return {"error": "parameters must be a dict"}
+
+        snapshot_payload = payload.get("snapshot")
+        if snapshot_payload is not None and not isinstance(snapshot_payload, dict):
+            return {"error": "snapshot must be a dict when provided"}
+
+        try:
+            snapshot = self._convert_fn(snapshot_payload) if snapshot_payload is not None else None
+            result = self._parallel_runner.run(
+                pipeline_name,
+                parameters=parameters,
+                snapshot=snapshot,
+            )
+            return {
+                "pipeline_name": result.pipeline_name,
+                "adf_outputs": dict(result.adf_outputs),
+                "databricks_outputs": dict(result.databricks_outputs),
+                "comparisons": [
+                    {
+                        "activity_name": item.activity_name,
+                        "adf_output": item.adf_output,
+                        "databricks_output": item.databricks_output,
+                        "match": item.match,
+                        "diff": item.diff,
+                    }
+                    for item in result.comparisons
+                ],
+                "equivalence_score": result.equivalence_score,
+                "scorecard": result.scorecard.to_dict(),
+            }
+        except Exception as exc:
+            return {"error": str(exc)}
+
 
 def create_mcp_server(
     *,
     convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
     judge_provider: JudgeProvider | None = None,
+    parallel_runner=None,
 ):
     """Create and register an MCP server with the validator tool surface."""
     try:
@@ -88,7 +135,11 @@ def create_mcp_server(
     except Exception as exc:  # pragma: no cover - depends on optional extra
         raise RuntimeError("mcp extra is not installed. Install with: pip install lmv[mcp]") from exc
 
-    service = LMVMCPServer(convert_fn=convert_fn, judge_provider=judge_provider)
+    service = LMVMCPServer(
+        convert_fn=convert_fn,
+        judge_provider=judge_provider,
+        parallel_runner=parallel_runner,
+    )
     server = FastMCP("lakeflow-migration-validator")
 
     @server.tool()
@@ -107,5 +158,15 @@ def create_mcp_server(
     def suggest_fix(context: str) -> dict[str, Any]:
         """Suggest a conversion fix for failed-dimension context."""
         return service.suggest_fix({"context": context})
+
+    @server.tool()
+    def run_parallel_test(
+        pipeline_name: str,
+        parameters: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Run parallel ADF-vs-Databricks output validation."""
+        return service.run_parallel_test(
+            {"pipeline_name": pipeline_name, "parameters": parameters or {}}
+        )
 
     return server

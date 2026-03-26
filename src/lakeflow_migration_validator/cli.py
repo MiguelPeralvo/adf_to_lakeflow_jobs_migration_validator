@@ -17,17 +17,20 @@ app = typer.Typer(no_args_is_help=True, help="Lakeflow Migration Validator CLI")
 
 _CONVERT_FN: Callable[[dict], ConversionSnapshot] = snapshot_from_adf_payload
 _HARNESS_RUNNER = None
+_PARALLEL_RUNNER = None
 
 
 def configure_cli(
     *,
     convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
     harness_runner=None,
+    parallel_runner=None,
 ) -> None:
     """Inject runtime dependencies for commands (primarily in tests)."""
-    global _CONVERT_FN, _HARNESS_RUNNER
+    global _CONVERT_FN, _HARNESS_RUNNER, _PARALLEL_RUNNER
     _CONVERT_FN = convert_fn or snapshot_from_adf_payload
     _HARNESS_RUNNER = harness_runner
+    _PARALLEL_RUNNER = parallel_runner
 
 
 @app.command("evaluate")
@@ -111,6 +114,50 @@ def regression_check_command(
     if report.mean_score >= threshold:
         raise typer.Exit(code=0)
     raise typer.Exit(code=1)
+
+
+@app.command("parallel-test")
+def parallel_test_command(
+    pipeline_name: str = typer.Option(..., "--pipeline-name"),
+    parameters_json: Path | None = typer.Option(None, "--parameters-json", exists=True, readable=True),
+    snapshot_json: Path | None = typer.Option(None, "--snapshot-json", exists=True, readable=True),
+) -> None:
+    """Run ADF-vs-Databricks parallel output validation."""
+    if _PARALLEL_RUNNER is None:
+        typer.echo(json.dumps({"error": "parallel runner is not configured"}, sort_keys=True))
+        raise typer.Exit(code=2)
+
+    parameters = _read_json(parameters_json) if parameters_json is not None else {}
+    if not isinstance(parameters, dict):
+        raise typer.BadParameter("parameters-json must contain a JSON object")
+
+    snapshot = None
+    if snapshot_json is not None:
+        snapshot = _CONVERT_FN(_read_json(snapshot_json))
+
+    result = _PARALLEL_RUNNER.run(pipeline_name, parameters=parameters, snapshot=snapshot)
+    typer.echo(
+        json.dumps(
+            {
+                "pipeline_name": result.pipeline_name,
+                "adf_outputs": dict(result.adf_outputs),
+                "databricks_outputs": dict(result.databricks_outputs),
+                "comparisons": [
+                    {
+                        "activity_name": item.activity_name,
+                        "adf_output": item.adf_output,
+                        "databricks_output": item.databricks_output,
+                        "match": item.match,
+                        "diff": item.diff,
+                    }
+                    for item in result.comparisons
+                ],
+                "equivalence_score": result.equivalence_score,
+                "scorecard": result.scorecard.to_dict(),
+            },
+            sort_keys=True,
+        )
+    )
 
 
 def _read_json(path: Path) -> dict:

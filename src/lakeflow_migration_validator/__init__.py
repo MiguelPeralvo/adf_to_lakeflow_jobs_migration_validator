@@ -58,6 +58,7 @@ _DEFAULT_WEIGHTS = {
     "not_translatable_ratio": 0.05,
     "semantic_equivalence": 0.0,
     "runtime_success": 0.0,
+    "parallel_equivalence": 0.0,
 }
 
 _DIMENSIONS = [

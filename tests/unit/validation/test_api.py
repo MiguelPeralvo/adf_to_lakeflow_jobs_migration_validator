@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from lakeflow_migration_validator.api import create_app
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.harness.harness_runner import HarnessResult
+from lakeflow_migration_validator.parallel.comparator import ComparisonResult
+from lakeflow_migration_validator.parallel.parallel_test_runner import ParallelTestResult
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 from lakeflow_migration_validator import evaluate
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
@@ -157,5 +159,49 @@ def test_post_harness_run_returns_503_when_not_configured():
     client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot()))
 
     response = client.post("/api/harness/run", json={"pipeline_name": "pipeline_a"})
+
+    assert response.status_code == 503
+
+
+def test_post_parallel_run_returns_result():
+    class _Runner:
+        def run(self, pipeline_name: str, parameters: dict[str, str] | None = None, *, snapshot=None):
+            scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
+            return ParallelTestResult(
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(
+                    ComparisonResult(
+                        activity_name="a",
+                        adf_output="1",
+                        databricks_output="1",
+                        match=True,
+                        diff=None,
+                    ),
+                ),
+                equivalence_score=1.0,
+                scorecard=scorecard,
+            )
+
+    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot(), parallel_runner=_Runner()))
+
+    response = client.post(
+        "/api/parallel/run",
+        json={"pipeline_name": "pipeline_a", "parameters": {"p": "1"}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pipeline_name"] == "pipeline_a"
+    assert payload["equivalence_score"] == 1.0
+    assert payload["comparisons"][0]["match"] is True
+    assert "scorecard" in payload
+
+
+def test_post_parallel_run_returns_503_when_not_configured():
+    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot()))
+
+    response = client.post("/api/parallel/run", json={"pipeline_name": "pipeline_a"})
 
     assert response.status_code == 503
