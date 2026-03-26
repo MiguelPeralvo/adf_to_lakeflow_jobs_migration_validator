@@ -8,6 +8,7 @@ from typing import Any, Callable
 from lakeflow_migration_validator import evaluate, evaluate_full
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
+from lakeflow_migration_validator.harness.adf_connector import ADFConnector
 from lakeflow_migration_validator.harness.fix_loop import FixLoop
 from lakeflow_migration_validator.scorecard import Scorecard
 
@@ -38,7 +39,7 @@ class HarnessRunner:
     def __init__(
         self,
         *,
-        adf_connector,
+        adf_connector: ADFConnector,
         wkmigrate_adapter: Callable[[dict, Any], ConversionSnapshot],
         judge_provider: JudgeProvider | None = None,
         max_iterations: int = 1,
@@ -84,7 +85,7 @@ class HarnessRunner:
                 max_iterations=self.max_iterations,
             )
             snapshot, scorecard, fix_suggestions = loop.iterate(snapshot, scorecard)
-            iterations = max(1, len(fix_suggestions))
+            iterations = len(fix_suggestions) + 1
 
         return HarnessResult(
             pipeline_name=pipeline_name,

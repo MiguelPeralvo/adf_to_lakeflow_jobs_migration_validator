@@ -8,6 +8,22 @@ from typing import Any, Callable
 class ADFConnector:
     """Injectable boundary for listing, fetching, and translating ADF pipelines."""
 
+    @classmethod
+    def from_credentials(
+        cls,
+        tenant_id: str,
+        client_id: str,
+        client_secret: str,
+        subscription_id: str,
+        resource_group: str,
+        factory_name: str,
+    ) -> ADFConnector:
+        """Build a real connector from ADF credentials (not implemented in core tests)."""
+        raise NotImplementedError(
+            "Real ADF FactoryClient integration requires wkmigrate and azure-identity. "
+            "Use pip install lmv[wkmigrate]."
+        )
+
     def __init__(
         self,
         *,

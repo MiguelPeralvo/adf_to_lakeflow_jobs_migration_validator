@@ -8,8 +8,10 @@ from typer.testing import CliRunner
 
 from lakeflow_migration_validator.cli import app, configure_cli
 from lakeflow_migration_validator.contract import ConversionSnapshot
+from lakeflow_migration_validator.harness.harness_runner import HarnessResult
 from lakeflow_migration_validator.serialization import snapshot_to_dict
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
+from lakeflow_migration_validator import evaluate
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
 runner = CliRunner()
@@ -102,3 +104,54 @@ def test_regression_check_exits_1_on_regression(tmp_path):
     )
 
     assert result.exit_code == 1
+
+
+def test_harness_command_not_configured_exits_2():
+    """'lmv harness' exits 2 with a deterministic error when no runner is configured."""
+    configure_cli(harness_runner=None)
+    result = runner.invoke(app, ["harness", "--pipeline-name", "pipe_a"])
+
+    assert result.exit_code == 2
+    assert json.loads(result.stdout.strip()) == {"error": "harness runner is not configured"}
+
+
+def test_harness_command_returns_result():
+    """'lmv harness' prints a valid JSON result payload when a runner is configured."""
+
+    class _Runner:
+        def run(self, pipeline_name: str) -> HarnessResult:
+            snapshot = make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()])
+            scorecard = evaluate(snapshot)
+            return HarnessResult(
+                pipeline_name=pipeline_name,
+                scorecard=scorecard,
+                snapshot=snapshot,
+                fix_suggestions=({"dimension": "activity_coverage", "suggestion": "replace placeholder"},),
+                iterations=2,
+            )
+
+    configure_cli(harness_runner=_Runner())
+    result = runner.invoke(app, ["harness", "--pipeline-name", "pipe_a"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout.strip())
+    assert payload["pipeline_name"] == "pipe_a"
+    assert "scorecard" in payload
+    assert payload["iterations"] == 2
+    assert payload["fix_suggestions"]
+
+
+def test_synthetic_command_generates_pipelines(tmp_path):
+    """'lmv synthetic --count N --output ...' writes a suite with N pipelines."""
+    output_path = tmp_path / "synthetic.json"
+    configure_cli()
+
+    result = runner.invoke(
+        app,
+        ["synthetic", "--count", "3", "--output", str(output_path)],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+    suite = GroundTruthSuite.from_json(str(output_path))
+    assert len(suite.pipelines) == 3

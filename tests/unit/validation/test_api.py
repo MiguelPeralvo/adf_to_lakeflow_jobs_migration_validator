@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 
 from lakeflow_migration_validator.api import create_app
 from lakeflow_migration_validator.contract import ConversionSnapshot
+from lakeflow_migration_validator.harness.harness_runner import HarnessResult
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
+from lakeflow_migration_validator import evaluate
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
 
@@ -107,3 +109,36 @@ def test_post_validate_batch_returns_report(tmp_path):
     assert payload["total"] == 3
     assert "mean_score" in payload
     assert "cases" in payload
+
+
+def test_post_harness_run_returns_result():
+    class _Runner:
+        def run(self, pipeline_name: str) -> HarnessResult:
+            snapshot = make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()])
+            scorecard = evaluate(snapshot)
+            return HarnessResult(
+                pipeline_name=pipeline_name,
+                scorecard=scorecard,
+                snapshot=snapshot,
+                fix_suggestions=({"dimension": "activity_coverage", "suggestion": "replace placeholder"},),
+                iterations=2,
+            )
+
+    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot(), harness_runner=_Runner()))
+
+    response = client.post("/api/harness/run", json={"pipeline_name": "pipeline_a"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pipeline_name"] == "pipeline_a"
+    assert "scorecard" in payload
+    assert payload["iterations"] == 2
+    assert payload["fix_suggestions"]
+
+
+def test_post_harness_run_returns_503_when_not_configured():
+    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot()))
+
+    response = client.post("/api/harness/run", json={"pipeline_name": "pipeline_a"})
+
+    assert response.status_code == 503

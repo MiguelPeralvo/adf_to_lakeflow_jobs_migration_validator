@@ -102,3 +102,26 @@ def test_harness_run_reports_adapter_failure_deterministically():
 
     with pytest.raises(HarnessRunnerError, match="ADAPTER_FAILED"):
         runner.run("pipe_a")
+
+
+def test_harness_run_with_fix_loop_integration():
+    class _Provider:
+        def judge(self, prompt: str, model: str | None = None):
+            return {"score": 0.5, "reasoning": f"fix from prompt: {prompt[:30]}"}
+
+    connector = _Connector()
+
+    def adapter(_source_pipeline: dict, _prepared_workflow: object):
+        return make_snapshot(tasks=[make_task("a", is_placeholder=True)])
+
+    runner = HarnessRunner(
+        adf_connector=connector,
+        wkmigrate_adapter=adapter,
+        judge_provider=_Provider(),
+        max_iterations=2,
+    )
+
+    result = runner.run("pipe_a")
+
+    assert result.fix_suggestions
+    assert result.iterations > 1

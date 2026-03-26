@@ -75,3 +75,37 @@ class LMVMCPServer:
             return {"suggestion": str(response.get("reasoning", ""))}
         except Exception as exc:
             return {"error": str(exc)}
+
+
+def create_mcp_server(
+    *,
+    convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
+    judge_provider: JudgeProvider | None = None,
+):
+    """Create and register an MCP server with the validator tool surface."""
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except Exception as exc:  # pragma: no cover - depends on optional extra
+        raise RuntimeError("mcp extra is not installed. Install with: pip install lmv[mcp]") from exc
+
+    service = LMVMCPServer(convert_fn=convert_fn, judge_provider=judge_provider)
+    server = FastMCP("lakeflow-migration-validator")
+
+    @server.tool()
+    def validate_pipeline(adf_json: dict[str, Any]) -> dict[str, Any]:
+        """Validate one pipeline and return serialized scorecard."""
+        return service.validate_pipeline({"adf_json": adf_json})
+
+    @server.tool()
+    def validate_expression(adf_expression: str, python_code: str) -> dict[str, Any]:
+        """Validate one expression pair and return score + reasoning."""
+        return service.validate_expression(
+            {"adf_expression": adf_expression, "python_code": python_code}
+        )
+
+    @server.tool()
+    def suggest_fix(context: str) -> dict[str, Any]:
+        """Suggest a conversion fix for failed-dimension context."""
+        return service.suggest_fix({"context": context})
+
+    return server
