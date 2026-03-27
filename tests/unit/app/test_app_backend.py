@@ -5,11 +5,10 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from apps.lmv.backend.main import create_app
-from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
 
 def test_app_backend_healthz_route():
-    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot()))
+    client = TestClient(create_app())
 
     response = client.get("/healthz")
 
@@ -18,11 +17,7 @@ def test_app_backend_healthz_route():
 
 
 def test_app_backend_wraps_core_validation_routes():
-    client = TestClient(
-        create_app(
-            convert_fn=lambda _adf: make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()])
-        )
-    )
+    client = TestClient(create_app())
 
     response = client.post("/api/validate", json={"adf_json": {"name": "pipeline_a"}})
 
@@ -33,7 +28,7 @@ def test_app_backend_wraps_core_validation_routes():
 
 
 def test_app_backend_exposes_parallel_route_contract():
-    client = TestClient(create_app(convert_fn=lambda _adf: make_snapshot()))
+    client = TestClient(create_app())
 
     response = client.post("/api/parallel/run", json={"pipeline_name": "pipeline_a"})
 

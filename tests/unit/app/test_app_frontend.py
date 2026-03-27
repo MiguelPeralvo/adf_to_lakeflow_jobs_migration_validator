@@ -17,12 +17,13 @@ def _read(path: Path) -> str:
 @pytest.mark.parametrize(
     ("relative_path", "tokens"),
     [
-        ("apps/lmv/frontend/src/pages/Validate.tsx", ("ValidatePage", "ScorecardCard")),
-        ("apps/lmv/frontend/src/pages/Parallel.tsx", ("ParallelPage", "/api/parallel/run")),
-        (
-            "apps/lmv/frontend/src/components/ParallelComparisonTable.tsx",
-            ("ParallelComparisonTable", "activity_name"),
-        ),
+        ("apps/lmv/frontend/src/pages/Validate.tsx", ("ValidatePage", "ScorecardGauge")),
+        ("apps/lmv/frontend/src/pages/Parallel.tsx", ("ParallelPage", "parallelRun")),
+        ("apps/lmv/frontend/src/pages/Harness.tsx", ("HarnessPage", "harnessRun")),
+        ("apps/lmv/frontend/src/pages/History.tsx", ("HistoryPage", "history")),
+        ("apps/lmv/frontend/src/components/DimensionBreakdown.tsx", ("DimensionBreakdown", "DimensionRow")),
+        ("apps/lmv/frontend/src/components/ScorecardGauge.tsx", ("ScorecardGauge", "gaugeReveal")),
+        ("apps/lmv/frontend/src/App.tsx", ("App", "Sidebar")),
     ],
 )
 def test_frontend_scaffold_files(relative_path: str, tokens: tuple[str, ...]):

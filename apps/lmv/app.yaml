@@ -1,5 +1,21 @@
 name: lakeflow-migration-validator
-entrypoint: apps/lmv/backend/main.py
-runtime: python
-description: Databricks App scaffold for validation and parallel comparison workflows.
+description: Validate ADF-to-Databricks Lakeflow Jobs conversions — App + API + MCP
 command: "uvicorn apps.lmv.backend.main:app --host 0.0.0.0 --port 8000"
+env:
+  - name: DATABRICKS_HOST
+    description: Workspace URL for FMAPI judge and execution runner
+  - name: DATABRICKS_TOKEN
+    description: PAT or OAuth token (optional if using SP auth via AZURE_CLIENT_*)
+  - name: AZURE_TENANT_ID
+    description: Azure AD tenant for ADF harness (optional)
+  - name: AZURE_CLIENT_ID
+    description: Service principal for ADF harness (optional)
+  - name: AZURE_CLIENT_SECRET
+    valueFrom: secret
+    description: SP secret for ADF harness (optional)
+  - name: AZURE_SUBSCRIPTION_ID
+    description: Subscription for ADF harness (optional)
+  - name: AZURE_RESOURCE_GROUP
+    description: Resource group for ADF harness (optional)
+  - name: AZURE_FACTORY_NAME
+    description: ADF factory name for harness (optional)
