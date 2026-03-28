@@ -125,3 +125,41 @@ def test_harness_run_with_fix_loop_integration():
 
     assert result.fix_suggestions
     assert result.iterations > 1
+
+
+def test_harness_runner_creates_advance_fn_with_max_iterations():
+    """When max_iterations > 1 and judge_provider is set, the harness wires an advance_fn
+    that re-translates and re-evaluates, enabling multiple fix-loop iterations."""
+    translate_calls = []
+    adapter_calls = []
+
+    class _TrackingConnector(_Connector):
+        def translate_and_prepare(self, pipeline_json: dict) -> tuple[dict, object]:
+            translate_calls.append(pipeline_json["name"])
+            return pipeline_json, {"prepared": pipeline_json["name"]}
+
+    class _Provider:
+        def judge(self, prompt: str, model: str | None = None):
+            return {"score": 0.5, "reasoning": "needs improvement"}
+
+    connector = _TrackingConnector()
+
+    def adapter(source_pipeline: dict, _prepared_workflow: object):
+        adapter_calls.append(source_pipeline["name"])
+        return make_snapshot(tasks=[make_task("a", is_placeholder=True)])
+
+    runner = HarnessRunner(
+        adf_connector=connector,
+        wkmigrate_adapter=adapter,
+        judge_provider=_Provider(),
+        max_iterations=3,
+    )
+
+    result = runner.run("pipe_a")
+
+    # Initial translate + one per advance iteration (max_iterations=3 means up to 3 suggestions,
+    # each followed by an advance call except possibly the last if loop completes)
+    assert len(translate_calls) >= 2, f"Expected re-translation calls, got {len(translate_calls)}"
+    assert len(adapter_calls) >= 2, f"Expected re-adaptation calls, got {len(adapter_calls)}"
+    assert result.iterations > 1
+    assert len(result.fix_suggestions) == result.iterations - 1
