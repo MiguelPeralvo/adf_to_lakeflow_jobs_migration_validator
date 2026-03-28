@@ -80,7 +80,10 @@ class ADFConnector:
             return factory_client.get_pipeline(name)
 
         def _translate_and_prepare(pipeline_json: dict) -> tuple[dict, Any]:
-            pipeline_ir = factory_store.load(pipeline_json.get("name", ""))
+            pipeline_name = pipeline_json.get("name")
+            if not pipeline_name:
+                raise ValueError("Pipeline JSON must contain a 'name' key for translation")
+            pipeline_ir = factory_store.load(pipeline_name)
             prepared = prepare_workflow(pipeline=pipeline_ir)
             return pipeline_json, prepared
 

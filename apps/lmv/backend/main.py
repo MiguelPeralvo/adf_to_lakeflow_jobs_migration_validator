@@ -74,8 +74,8 @@ def _build_harness_runner(judge_provider=None):
             judge_provider=judge_provider,
             max_iterations=1,
         )
-    except NotImplementedError:
-        logger.info("ADFConnector.from_credentials not implemented — harness disabled")
+    except (NotImplementedError, ImportError) as exc:
+        logger.info("ADFConnector not available (%s) — harness disabled", exc)
         return None
     except Exception as exc:
         logger.warning("Failed to build HarnessRunner: %s", exc)
