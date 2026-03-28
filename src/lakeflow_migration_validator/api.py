@@ -120,6 +120,16 @@ def create_app(
     convert = convert_fn or snapshot_from_adf_payload
     history = history_store or InMemoryHistoryStore()
 
+    @app.get("/api/status")
+    def get_status() -> dict[str, Any]:
+        """Return which capabilities are active."""
+        return {
+            "validator": True,
+            "judge": judge_provider is not None,
+            "harness": harness_runner is not None,
+            "parallel": parallel_runner is not None,
+        }
+
     @app.post("/api/validate")
     def post_validate(request: ValidateRequest) -> dict[str, Any]:
         snapshot = _resolve_snapshot(request, convert)
