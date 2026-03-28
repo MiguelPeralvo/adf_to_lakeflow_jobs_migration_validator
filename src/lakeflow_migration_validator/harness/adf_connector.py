@@ -50,7 +50,7 @@ class ADFConnector:
             from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
             from wkmigrate.preparers.preparer import prepare_workflow
         except ImportError as exc:
-            raise ImportError(
+            raise NotImplementedError(
                 "ADFConnector.from_credentials requires wkmigrate and azure-identity. "
                 "Install with: pip install lmv[wkmigrate]"
             ) from exc
