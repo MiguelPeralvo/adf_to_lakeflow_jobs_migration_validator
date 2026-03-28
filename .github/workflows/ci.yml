@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install pytest
+          pip install fastapi httpx uvicorn pyyaml
+
+      - name: Run unit tests (no wkmigrate)
+        run: |
+          PYTHONPATH=src pytest tests/unit/ -q \
+            --ignore=tests/unit/validation/test_wkmigrate_adapter.py \
+            --ignore=tests/unit/validation/test_cli.py
+
+  unit-tests-with-wkmigrate:
+    name: Unit Tests (with wkmigrate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ghanse/wkmigrate
+          path: wkmigrate
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install pytest fastapi httpx uvicorn pyyaml typer
+          pip install -e wkmigrate/ 2>/dev/null || pip install -e wkmigrate/
+          pip install -e . 2>/dev/null || true
+
+      - name: Run all unit tests
+        run: PYTHONPATH=src pytest tests/unit/ -q
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install and build
+        working-directory: apps/lmv/frontend
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npx vite build
+
+  integration-tests:
+    name: Integration Tests (ADF)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [unit-tests]
+    environment: integration
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ghanse/wkmigrate
+          path: wkmigrate
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install -e wkmigrate/
+          pip install -e . 2>/dev/null || true
+
+      - name: Run ADF integration tests
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          AZURE_FACTORY_NAME: ${{ secrets.AZURE_FACTORY_NAME }}
+        run: |
+          PYTHONPATH=src pytest tests/integration/ -m "integration and not databricks" -q
+
+  databricks-tests:
+    name: Databricks Execution Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: integration
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ghanse/wkmigrate
+          path: wkmigrate
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install -e wkmigrate/
+          pip install -e . 2>/dev/null || true
+
+      - name: Run Databricks execution tests
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          AZURE_FACTORY_NAME: ${{ secrets.AZURE_FACTORY_NAME }}
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_RESOURCE_ID: ${{ secrets.DATABRICKS_RESOURCE_ID }}
+        run: |
+          PYTHONPATH=src pytest tests/integration/ -m "databricks" -q
