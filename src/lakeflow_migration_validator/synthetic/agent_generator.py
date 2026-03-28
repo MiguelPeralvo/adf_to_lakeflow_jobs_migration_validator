@@ -328,9 +328,10 @@ def _build_expected_snapshot(
         for i, t in enumerate(tasks)
         if not t.is_placeholder
     }
-    # Include LLM-predicted dimension scores as metadata for comparison
-    if expected:
-        expected_outputs["__predicted_dimensions__"] = json.dumps(expected)
+    # Include deterministic ground-truth estimates as metadata
+    gt = _estimate_ground_truth(adf_json)
+    if gt:
+        expected_outputs["__predicted_dimensions__"] = json.dumps(gt)
 
     return ConversionSnapshot(
         tasks=tasks,
