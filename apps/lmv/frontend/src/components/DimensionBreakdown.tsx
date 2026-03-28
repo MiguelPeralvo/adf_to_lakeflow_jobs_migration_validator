@@ -1,56 +1,104 @@
 import React, { useState } from "react";
 import type { DimensionResult } from "../types";
 
-const LABELS: Record<string, string> = {
-  activity_coverage: "Activity Coverage",
-  expression_coverage: "Expression Coverage",
-  dependency_preservation: "Dependency Preservation",
-  notebook_validity: "Notebook Validity",
-  parameter_completeness: "Parameter Completeness",
-  secret_completeness: "Secret Completeness",
-  not_translatable_ratio: "Translatable Ratio",
-  semantic_equivalence: "Semantic Equivalence",
-  runtime_success: "Runtime Success",
-  parallel_equivalence: "Parallel Equivalence",
+const LABELS: Record<string, { label: string; icon: string }> = {
+  activity_coverage: { label: "Activity Coverage", icon: "check_circle" },
+  expression_coverage: { label: "Expression Coverage", icon: "function" },
+  dependency_preservation: { label: "Dependency Preservation", icon: "link" },
+  notebook_validity: { label: "Notebook Validity", icon: "code" },
+  parameter_completeness: { label: "Parameter Completeness", icon: "tune" },
+  secret_completeness: { label: "Secret Completeness", icon: "lock" },
+  not_translatable_ratio: { label: "Translatable Ratio", icon: "translate" },
+  semantic_equivalence: { label: "Semantic Equivalence", icon: "psychology" },
+  runtime_success: { label: "Runtime Success", icon: "play_arrow" },
+  parallel_equivalence: { label: "Parallel Equivalence", icon: "compare_arrows" },
 };
 
-function barColor(score: number, passed: boolean): string {
-  if (!passed) return "var(--red)";
-  if (score >= 0.9) return "var(--green)";
-  if (score >= 0.7) return "var(--amber)";
-  return "var(--red)";
+function dimColor(score: number, passed: boolean): string {
+  if (!passed) return "#ff5c5c";
+  if (score >= 0.9) return "#27e199";
+  if (score >= 0.7) return "#ffb547";
+  return "#ff5c5c";
 }
 
-function DetailBlock({ details }: { details: Record<string, unknown> }) {
-  const entries = Object.entries(details).filter(
+function DetailPanel({ name, details }: { name: string; details: Record<string, unknown> }) {
+  const d = details;
+
+  // Render actionable details based on dimension type
+  if (name === "activity_coverage" && Array.isArray(d.placeholders) && d.placeholders.length > 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-slate-400">
+          {String(d.covered ?? 0)} of {String(d.total ?? 0)} activities translated
+        </p>
+        <p className="text-[10px] font-mono text-red-400 uppercase tracking-wider">Placeholder activities:</p>
+        {(d.placeholders as string[]).map((p) => (
+          <div key={p} className="flex items-center gap-2 text-xs font-mono text-red-300 bg-red-500/5 px-3 py-1.5 rounded">
+            <span className="material-symbols-outlined text-red-400 text-sm">warning</span>
+            {p}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (name === "notebook_validity" && Array.isArray(d.errors) && d.errors.length > 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-slate-400">{String(d.valid ?? 0)} of {String(d.total ?? 0)} notebooks valid</p>
+        <p className="text-[10px] font-mono text-red-400 uppercase tracking-wider">Syntax errors:</p>
+        {(d.errors as Array<{ file_path: string; error: string }>).map((e, i) => (
+          <div key={i} className="bg-red-500/5 px-3 py-2 rounded space-y-0.5">
+            <p className="text-xs font-mono text-slate-300">{e.file_path}</p>
+            <p className="text-[11px] font-mono text-red-300">{e.error}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (name === "parameter_completeness" && Array.isArray(d.missing) && d.missing.length > 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-mono text-amber-400 uppercase tracking-wider">Missing parameters:</p>
+        <div className="flex flex-wrap gap-2">
+          {(d.missing as string[]).map((p) => (
+            <span key={p} className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-mono text-amber-300">
+              {p}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (name === "secret_completeness" && Array.isArray(d.missing) && d.missing.length > 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-mono text-amber-400 uppercase tracking-wider">Missing secrets:</p>
+        {(d.missing as string[]).map((s, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs font-mono text-amber-300 bg-amber-500/5 px-3 py-1.5 rounded">
+            <span className="material-symbols-outlined text-amber-400 text-sm">vpn_key</span>
+            {s}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Generic fallback: render key-value pairs
+  const entries = Object.entries(d).filter(
     ([, v]) => v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0)
   );
-  if (entries.length === 0) return <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No details</span>;
+  if (entries.length === 0) return <p className="text-xs text-slate-600 italic">No additional details</p>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div className="space-y-1.5">
       {entries.map(([key, value]) => (
-        <div key={key} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--text-muted)",
-              minWidth: 140,
-              flexShrink: 0,
-            }}
-          >
-            {key}
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--text-secondary)",
-              wordBreak: "break-all",
-            }}
-          >
-            {typeof value === "object" ? JSON.stringify(value, null, 0) : String(value)}
+        <div key={key} className="flex gap-3 text-xs">
+          <span className="font-mono text-slate-500 min-w-[140px] shrink-0">{key}</span>
+          <span className="font-mono text-slate-300 break-all">
+            {typeof value === "object" ? JSON.stringify(value) : String(value)}
           </span>
         </div>
       ))}
@@ -58,158 +106,70 @@ function DetailBlock({ details }: { details: Record<string, unknown> }) {
   );
 }
 
-function DimensionRow({
-  name,
-  result,
-  delay,
-}: {
-  name: string;
-  result: DimensionResult;
-  delay: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const pct = Math.round(result.score * 100);
-  const color = barColor(result.score, result.passed);
-
-  return (
-    <div
-      style={{
-        animation: `slideIn 0.4s ease ${delay}ms both`,
-        borderBottom: "1px solid var(--border)",
-        padding: "14px 0",
-      }}
-    >
-      <div
-        onClick={() => setOpen(!open)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
-        <span
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: "50%",
-            background: result.passed ? "var(--green-dim)" : "var(--red-dim)",
-            border: `1.5px solid ${result.passed ? "var(--green)" : "var(--red)"}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 10,
-            flexShrink: 0,
-          }}
-        >
-          {result.passed ? "\u2713" : "\u2717"}
-        </span>
-
-        <span
-          style={{
-            fontFamily: "var(--font-body)",
-            fontWeight: 500,
-            fontSize: 13,
-            color: "var(--text-primary)",
-            width: 180,
-            flexShrink: 0,
-          }}
-        >
-          {LABELS[name] || name}
-        </span>
-
-        <div
-          style={{
-            flex: 1,
-            height: 6,
-            background: "var(--border)",
-            borderRadius: 3,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: `${pct}%`,
-              background: color,
-              borderRadius: 3,
-              animation: `barGrow 0.8s cubic-bezier(0.22, 1, 0.36, 1) ${delay + 100}ms both`,
-              boxShadow: `0 0 8px ${color}44`,
-            }}
-          />
-        </div>
-
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            fontWeight: 600,
-            color,
-            width: 45,
-            textAlign: "right",
-            flexShrink: 0,
-          }}
-        >
-          {pct}%
-        </span>
-
-        <span
-          style={{
-            fontSize: 10,
-            color: "var(--text-muted)",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform var(--transition)",
-            flexShrink: 0,
-          }}
-        >
-          \u25BC
-        </span>
-      </div>
-
-      {open && (
-        <div
-          style={{
-            marginTop: 10,
-            marginLeft: 32,
-            padding: "12px 16px",
-            background: "var(--bg-base)",
-            borderRadius: "var(--radius)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <DetailBlock details={result.details} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function DimensionBreakdown({
-  dimensions,
-}: {
-  dimensions: Record<string, DimensionResult>;
-}) {
+export function DimensionBreakdown({ dimensions }: { dimensions: Record<string, DimensionResult> }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const sorted = Object.entries(dimensions).sort(([, a], [, b]) => a.score - b.score);
 
   return (
-    <div>
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 14,
-          fontWeight: 600,
-          color: "var(--text-secondary)",
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          marginBottom: 8,
-        }}
-      >
-        Dimension Breakdown
-      </h3>
-      {sorted.map(([name, result], i) => (
-        <DimensionRow key={name} name={name} result={result} delay={i * 60} />
-      ))}
+    <div className="bg-surface-container rounded-xl overflow-hidden border border-white/5 shadow-xl">
+      <div className="px-8 py-5 border-b border-white/5 bg-surface-container-high/20 flex justify-between items-center">
+        <h3 className="font-headline text-lg text-on-surface font-semibold">Dimension Breakdown</h3>
+        <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-widest text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#27e199]" /> Pass
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#ff5c5c]" /> Fail
+          </div>
+        </div>
+      </div>
+      <div className="p-8 space-y-2">
+        {sorted.map(([name, result]) => {
+          const color = dimColor(result.score, result.passed);
+          const pct = Math.round(result.score * 100);
+          const meta = LABELS[name] || { label: name, icon: "help" };
+          const isOpen = expanded === name;
+
+          return (
+            <div key={name}>
+              <div
+                onClick={() => setExpanded(isOpen ? null : name)}
+                className="flex items-center gap-6 p-2 -m-2 rounded-lg hover:bg-surface-container-low/50 transition-colors cursor-pointer group"
+              >
+                <div className="w-6 flex items-center justify-center">
+                  <span
+                    className="material-symbols-outlined text-xl"
+                    style={{ color, fontVariationSettings: "'FILL' 1" }}
+                  >
+                    {result.passed ? "check_circle" : "cancel"}
+                  </span>
+                </div>
+                <div className="w-[180px] text-slate-300 text-sm font-medium">{meta.label}</div>
+                <div className="flex-1 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                  />
+                </div>
+                <div className="w-16 text-right font-mono text-sm font-semibold" style={{ color }}>
+                  {pct}%
+                </div>
+                <span
+                  className="material-symbols-outlined text-slate-600 text-sm transition-transform"
+                  style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}
+                >
+                  expand_more
+                </span>
+              </div>
+              {isOpen && (
+                <div className="ml-12 mt-2 mb-4 p-4 bg-base rounded-lg border border-white/5 animate-[fade-in-up_0.2s_ease]">
+                  <DetailPanel name={name} details={result.details} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

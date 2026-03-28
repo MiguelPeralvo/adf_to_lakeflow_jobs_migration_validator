@@ -1,93 +1,15 @@
 import React, { useState } from "react";
 import { api } from "../api";
-import type { HistoryEntry, Scorecard } from "../types";
-import { Card, SectionTitle } from "../components/Card";
+import type { HistoryEntry } from "../types";
+import { TopHeader } from "../components/TopHeader";
 import { DimensionBreakdown } from "../components/DimensionBreakdown";
 import { LoadingOverlay } from "../components/LoadingOverlay";
 import { ErrorBanner } from "../components/ErrorBanner";
 
-function scoreBadge(score: number) {
-  const color = score >= 90 ? "var(--green)" : score >= 70 ? "var(--amber)" : "var(--red)";
-  const bg = score >= 90 ? "var(--green-dim)" : score >= 70 ? "var(--amber-dim)" : "var(--red-dim)";
-  return { color, bg };
-}
-
-function TimelineEntry({ entry, onExpand, expanded }: { entry: HistoryEntry; onExpand: () => void; expanded: boolean }) {
-  const { color, bg } = scoreBadge(entry.scorecard.score);
-  const ts = new Date(entry.timestamp);
-  const timeStr = ts.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-
-  return (
-    <div
-      style={{
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
-        background: expanded ? "var(--bg-elevated)" : "var(--bg-surface)",
-        overflow: "hidden",
-        transition: "all var(--transition)",
-      }}
-    >
-      <div
-        onClick={onExpand}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          padding: "14px 18px",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 22,
-            color,
-            minWidth: 50,
-            textAlign: "right",
-          }}
-        >
-          {Math.round(entry.scorecard.score)}
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            fontWeight: 500,
-            padding: "3px 10px",
-            borderRadius: 12,
-            background: bg,
-            color,
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-          }}
-        >
-          {entry.scorecard.label.replace(/_/g, " ")}
-        </span>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>
-          {timeStr}
-        </span>
-        <span
-          style={{
-            fontSize: 10,
-            color: "var(--text-muted)",
-            transform: expanded ? "rotate(180deg)" : "rotate(0)",
-            transition: "transform var(--transition)",
-          }}
-        >
-          {"\u25BC"}
-        </span>
-      </div>
-
-      {expanded && (
-        <div style={{ padding: "0 18px 18px", animation: "fadeInUp 0.3s ease" }}>
-          <DimensionBreakdown dimensions={entry.scorecard.dimensions} />
-        </div>
-      )}
-    </div>
-  );
+function scoreColor(s: number): string {
+  if (s >= 90) return "#27e199";
+  if (s >= 70) return "#ffb547";
+  return "#ff5c5c";
 }
 
 export function HistoryPage() {
@@ -100,87 +22,96 @@ export function HistoryPage() {
 
   async function handleSearch() {
     if (!pipelineName.trim()) return;
-    setError(null);
-    setEntries([]);
-    setExpandedIdx(null);
-    setLoading(true);
-    setSearched(true);
+    setError(null); setEntries([]); setExpandedIdx(null); setLoading(true); setSearched(true);
     try {
-      const res = await api.history(pipelineName.trim());
-      setEntries(res);
+      setEntries(await api.history(pipelineName.trim()));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load history");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   return (
-    <div style={{ animation: "fadeInUp 0.4s ease" }}>
-      <SectionTitle>Scorecard History</SectionTitle>
+    <>
+      <TopHeader title="Audit Log" />
+      <div className="pt-24 pb-12 px-10 space-y-8 max-w-7xl">
+        <div>
+          <h2 className="text-3xl font-bold font-headline text-on-surface tracking-tight">Scorecard History</h2>
+          <p className="text-slate-400 mt-1">Track conversion quality over time. Search by pipeline name.</p>
+        </div>
 
-      <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 12 }}>
-          <input
-            value={pipelineName}
-            onChange={(e) => setPipelineName(e.target.value)}
-            placeholder="Pipeline name to search..."
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            style={{
-              flex: 1,
-              padding: "10px 14px",
-              background: "var(--bg-base)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 13,
-              outline: "none",
-            }}
-          />
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
+        <div className="bg-surface-container rounded-xl p-6 border border-white/5 flex gap-4">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+            <input
+              value={pipelineName}
+              onChange={(e) => setPipelineName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Search pipeline name..."
+              className="w-full bg-surface-container-lowest border-none rounded-lg py-3 pl-12 pr-4 text-sm font-mono text-slate-200 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+            />
+          </div>
           <button
             onClick={handleSearch}
             disabled={loading || !pipelineName.trim()}
-            style={{
-              padding: "10px 24px",
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "var(--radius)",
-              fontFamily: "var(--font-display)",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-              opacity: loading || !pipelineName.trim() ? 0.5 : 1,
-            }}
+            className="px-6 py-3 rounded-lg bg-accent text-white font-bold text-sm hover:bg-blue-600 transition-all"
           >
             Search
           </button>
         </div>
-      </Card>
 
-      {loading && <Card><LoadingOverlay message="Loading history..." /></Card>}
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+        {loading && <div className="bg-surface-container rounded-xl p-8"><LoadingOverlay message="Loading history..." /></div>}
 
-      {!loading && searched && entries.length === 0 && !error && (
-        <Card>
-          <div style={{ textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12, padding: 24 }}>
-            No history found for "{pipelineName}"
+        {!loading && searched && entries.length === 0 && !error && (
+          <div className="bg-surface-container rounded-xl p-12 text-center">
+            <span className="material-symbols-outlined text-4xl text-slate-700 mb-4 block">history</span>
+            <p className="text-xs font-mono text-slate-600">No history found for "{pipelineName}"</p>
           </div>
-        </Card>
-      )}
+        )}
 
-      {entries.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {entries.map((entry, i) => (
-            <TimelineEntry
-              key={i}
-              entry={entry}
-              expanded={expandedIdx === i}
-              onExpand={() => setExpandedIdx(expandedIdx === i ? null : i)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+        {entries.length > 0 && (
+          <div className="space-y-3">
+            {entries.map((entry, i) => {
+              const color = scoreColor(entry.scorecard.score);
+              const isOpen = expandedIdx === i;
+              const ts = new Date(entry.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+              return (
+                <div key={i} className={`rounded-xl border border-white/5 overflow-hidden transition-all ${isOpen ? "bg-surface-container-high" : "bg-surface-container"}`}>
+                  <div
+                    onClick={() => setExpandedIdx(isOpen ? null : i)}
+                    className="flex items-center gap-6 px-6 py-4 cursor-pointer hover:bg-surface-container-high/50 transition-colors"
+                  >
+                    <span className="text-2xl font-bold font-headline min-w-[50px] text-right" style={{ color }}>
+                      {Math.round(entry.scorecard.score)}
+                    </span>
+                    <span
+                      className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-1 rounded"
+                      style={{ color, backgroundColor: `${color}15`, border: `1px solid ${color}30` }}
+                    >
+                      {entry.scorecard.label.replace(/_/g, " ")}
+                    </span>
+                    <span className="flex-1" />
+                    <span className="text-xs font-mono text-slate-500">{ts}</span>
+                    <span
+                      className="material-symbols-outlined text-slate-600 text-sm transition-transform"
+                      style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}
+                    >
+                      expand_more
+                    </span>
+                  </div>
+                  {isOpen && (
+                    <div className="px-6 pb-6">
+                      <DimensionBreakdown dimensions={entry.scorecard.dimensions} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

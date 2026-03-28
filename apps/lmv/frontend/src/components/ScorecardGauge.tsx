@@ -1,100 +1,111 @@
 import React from "react";
 import type { Scorecard } from "../types";
 
-const SIZE = 200;
-const STROKE = 14;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
 function scoreColor(score: number): string {
-  if (score >= 90) return "var(--green)";
-  if (score >= 70) return "var(--amber)";
-  return "var(--red)";
+  if (score >= 90) return "#27e199";
+  if (score >= 70) return "#ffb547";
+  return "#ff5c5c";
 }
 
-function labelBadge(label: string): { text: string; bg: string; fg: string } {
+function labelText(label: string): { text: string; color: string } {
   switch (label) {
     case "HIGH_CONFIDENCE":
-      return { text: "High Confidence", bg: "var(--green-dim)", fg: "var(--green)" };
+      return { text: "OPTIMAL", color: "#27e199" };
     case "REVIEW_RECOMMENDED":
-      return { text: "Review Recommended", bg: "var(--amber-dim)", fg: "var(--amber)" };
+      return { text: "REVIEW NEEDED", color: "#ffb547" };
     default:
-      return { text: "Manual Intervention", bg: "var(--red-dim)", fg: "var(--red)" };
+      return { text: "CRITICAL", color: "#ff5c5c" };
   }
 }
 
-export function ScorecardGauge({ scorecard }: { scorecard: Scorecard }) {
+export function ScorecardGauge({
+  scorecard,
+  size = 200,
+}: {
+  scorecard: Scorecard;
+  size?: number;
+}) {
   const pct = Math.max(0, Math.min(100, scorecard.score));
-  const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
+  const r = (size - 16) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (pct / 100) * circumference;
   const color = scoreColor(pct);
-  const badge = labelBadge(scorecard.label);
+  const badge = labelText(scorecard.label);
+  const cx = size / 2;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-      <svg
-        width={SIZE}
-        height={SIZE}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        style={{ transform: "rotate(-90deg)", filter: `drop-shadow(0 0 18px ${color}33)` }}
+    <div className="flex flex-col items-center">
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg className="w-full h-full -rotate-90">
+          <circle
+            className="text-surface-container-highest"
+            cx={cx}
+            cy={cx}
+            r={r}
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth={8}
+          />
+          <circle
+            cx={cx}
+            cy={cx}
+            r={r}
+            fill="transparent"
+            stroke={color}
+            strokeWidth={12}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{
+              transition: "stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-5xl font-bold font-headline text-white tracking-tighter">
+            {Math.round(pct)}
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 tracking-tighter">/ 100</span>
+        </div>
+      </div>
+      <div
+        className="machined-chip px-4 py-1.5 rounded-sm mt-4"
+        style={{ borderColor: badge.color }}
       >
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--border)"
-          strokeWidth={STROKE}
-        />
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          fill="none"
-          stroke={color}
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          style={{
-            // @ts-expect-error CSS custom properties for animation
-            "--circumference": CIRCUMFERENCE,
-            "--dash-offset": offset,
-            animation: "gaugeReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards",
-          }}
-        />
-        <text
-          x={SIZE / 2}
-          y={SIZE / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{
-            transform: "rotate(90deg)",
-            transformOrigin: "center",
-            fontFamily: "var(--font-display)",
-            fontSize: 48,
-            fontWeight: 700,
-            fill: "var(--text-primary)",
-          }}
+        <span
+          className="font-mono text-[10px] font-bold uppercase tracking-widest"
+          style={{ color: badge.color }}
         >
-          {Math.round(pct)}
-        </text>
-      </svg>
+          {badge.text}
+        </span>
+      </div>
+    </div>
+  );
+}
 
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 11,
-          fontWeight: 500,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          padding: "5px 14px",
-          borderRadius: 20,
-          background: badge.bg,
-          color: badge.fg,
-          border: `1px solid ${badge.fg}22`,
-        }}
-      >
-        {badge.text}
+/** Small inline gauge for tables/lists */
+export function MiniGauge({ value, size = 48 }: { value: number; size?: number }) {
+  const r = (size - 8) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (value / 100) * circumference;
+  const color = scoreColor(value);
+  const cx = size / 2;
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg className="w-full h-full -rotate-90">
+        <circle
+          className="text-surface-container-highest"
+          cx={cx} cy={cx} r={r} fill="transparent" stroke="currentColor" strokeWidth={3}
+        />
+        <circle
+          cx={cx} cy={cx} r={r} fill="transparent" stroke={color}
+          strokeWidth={3} strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="absolute text-xs font-bold font-mono" style={{ color }}>
+        {Math.round(value)}
       </span>
     </div>
   );

@@ -38,16 +38,24 @@ class InMemoryHistoryStore:
 
 
 class ValidateRequest(BaseModel):
-    """Request payload for /api/validate."""
+    """Request payload for /api/validate.
+
+    Accepts three input modes:
+    - ``adf_json``: raw ADF pipeline JSON (dict) — creates a minimal snapshot
+    - ``snapshot``: a pre-converted ConversionSnapshot dict (from wkmigrate adapter)
+    - ``adf_yaml``: raw ADF pipeline definition as a YAML string — parsed to dict
+    """
 
     adf_json: dict[str, Any] | None = None
+    adf_yaml: str | None = None
     snapshot: dict[str, Any] | None = None
     pipeline_name: str | None = None
+    input_mode: str | None = None  # "adf_json", "adf_yaml", "snapshot" — auto-detected if not set
 
     @model_validator(mode="after")
     def _validate_source(self):
-        if self.adf_json is None and self.snapshot is None:
-            raise ValueError("either adf_json or snapshot must be provided")
+        if self.adf_json is None and self.snapshot is None and self.adf_yaml is None:
+            raise ValueError("provide one of: adf_json, adf_yaml, or snapshot")
         return self
 
 
@@ -112,6 +120,8 @@ def create_app(
             pipeline_name = request.pipeline_name
         elif request.adf_json:
             pipeline_name = str(request.adf_json.get("name", "<unknown>"))
+        elif request.adf_yaml:
+            pipeline_name = str(snapshot.source_pipeline.get("name", "<yaml>"))
         else:
             pipeline_name = "<snapshot>"
 
@@ -197,6 +207,15 @@ def _resolve_snapshot(
 ) -> ConversionSnapshot:
     if request.snapshot is not None:
         return convert_fn(request.snapshot)
+    if request.adf_yaml is not None:
+        try:
+            import yaml
+            parsed = yaml.safe_load(request.adf_yaml)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid YAML: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=422, detail="YAML must parse to an object (dict)")
+        return convert_fn(parsed)
     if request.adf_json is not None:
         return convert_fn(request.adf_json)
-    raise HTTPException(status_code=422, detail="either adf_json or snapshot must be provided")
+    raise HTTPException(status_code=422, detail="provide one of: adf_json, adf_yaml, or snapshot")

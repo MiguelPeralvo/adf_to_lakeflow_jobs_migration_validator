@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind v4 theme — generates utility classes like bg-surface, text-on-surface, etc.
+ * Color system from Google Stitch M3 dark theme.
+ */
 @theme {
+  /* Surfaces */
   --color-base: #060a13;
   --color-surface: #0f131d;
   --color-surface-container: #1b2029;
@@ -8,28 +13,46 @@
   --color-surface-container-highest: #30353f;
   --color-surface-container-low: #171c25;
   --color-surface-container-lowest: #0a0e17;
+  --color-surface-bright: #353944;
+
+  /* On-surface text */
   --color-on-surface: #dfe2f0;
-  --color-outline: #8b90a0;
-  --color-outline-variant: #414754;
-  --color-primary: #adc6ff;
-  --color-primary-container: #4c8eff;
   --color-on-primary: #002e69;
   --color-on-primary-container: #00285c;
+  --color-on-primary-fixed: #001a41;
+
+  /* Borders */
+  --color-outline: #8b90a0;
+  --color-outline-variant: #414754;
+
+  /* Primary (blue) */
+  --color-primary: #adc6ff;
+  --color-primary-container: #4c8eff;
+  --color-primary-fixed: #d8e2ff;
+  --color-primary-fixed-dim: #adc6ff;
+
+  /* Secondary */
   --color-secondary: #b6c7e7;
   --color-secondary-container: #394a64;
+
+  /* Tertiary (green) */
   --color-tertiary: #27e199;
   --color-tertiary-container: #00a56d;
+
+  /* Error (red) */
   --color-error: #ffb4ab;
   --color-error-container: #93000a;
+
+  /* Accent */
   --color-accent: #2d7ff9;
-  --color-green: #00d68f;
-  --color-amber: #ffb547;
-  --color-red: #ff5c5c;
+
+  /* Fonts */
   --font-headline: "Outfit", sans-serif;
   --font-body: "DM Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 }
 
+/* Base styles */
 body {
   background-color: var(--color-base);
   color: var(--color-on-surface);
@@ -37,10 +60,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Material Symbols */
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
+/* Stitch design tokens */
 .glass-panel {
   background: rgba(48, 53, 63, 0.8);
   backdrop-filter: blur(20px);
@@ -51,24 +76,18 @@ body {
   background: rgba(48, 53, 63, 0.4);
 }
 
+/* Selection */
 ::selection {
   background: var(--color-accent);
   color: #fff;
 }
 
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-outline-variant); border-radius: 3px; }
 
-@keyframes gauge-reveal {
-  from { stroke-dashoffset: var(--circumference); }
-  to { stroke-dashoffset: var(--target-offset); }
-}
-
-@keyframes bar-grow {
-  from { width: 0; }
-}
-
+/* Animations */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }

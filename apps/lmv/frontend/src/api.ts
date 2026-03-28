@@ -25,7 +25,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  validate(payload: { adf_json?: object; snapshot?: object; pipeline_name?: string }): Promise<Scorecard> {
+  validate(payload: { adf_json?: object; adf_yaml?: string; snapshot?: object; pipeline_name?: string }): Promise<Scorecard> {
     return post("/validate", payload);
   },
   validateExpression(adf_expression: string, python_code: string) {
