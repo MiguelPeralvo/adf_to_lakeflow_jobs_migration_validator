@@ -36,6 +36,11 @@ typer = ">=0.9"
 
 [tool.poetry.group.llm.dependencies]
 dspy = ">=3.0"
+# Pin litellm to safe versions — 1.82.7 and 1.82.8 were compromised by
+# TeamPCP supply chain attack (March 24, 2026). Both yanked from PyPI.
+# This pin is belt-and-suspenders; pip won't install yanked versions,
+# but the pin protects against re-uploads or version range confusion.
+litellm = ">=1.64.0,!=1.82.7,!=1.82.8"
 
 [tool.poetry.scripts]
 lmv = "lakeflow_migration_validator.cli:app"
