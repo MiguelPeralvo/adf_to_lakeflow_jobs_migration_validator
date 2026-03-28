@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { LoadingOverlay } from "../components/LoadingOverlay";
-import { MiniGauge } from "../components/ScorecardGauge";
 
 interface BatchReport {
   total: number;

@@ -10,15 +10,18 @@ export function ParallelPage() {
   const [pipelineName, setPipelineName] = useState("");
   const [paramsJson, setParamsJson] = useState('{ "env": "dev" }');
   const [result, setResult] = useState<ParallelResult | null>(null);
+  const [runId, setRunId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleRun() {
     if (!pipelineName.trim()) return;
-    setError(null); setResult(null); setLoading(true);
+    setError(null); setResult(null); setRunId(""); setLoading(true);
     try {
       const params = JSON.parse(paramsJson);
-      setResult(await api.parallelRun(pipelineName.trim(), params));
+      const newResult = await api.parallelRun(pipelineName.trim(), params);
+      setResult(newResult);
+      setRunId(`${Math.floor(Math.random() * 900 + 100)}-AX`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Parallel run failed");
     } finally { setLoading(false); }
@@ -26,7 +29,6 @@ export function ParallelPage() {
 
   const eqPct = result ? Math.round(result.equivalence_score * 100) : 0;
   const eqColor = eqPct >= 90 ? "#27e199" : eqPct >= 70 ? "#ffb547" : "#ff5c5c";
-  const runId = result ? `${Math.floor(Math.random() * 900 + 100)}-AX` : "";
 
   return (
     <>
