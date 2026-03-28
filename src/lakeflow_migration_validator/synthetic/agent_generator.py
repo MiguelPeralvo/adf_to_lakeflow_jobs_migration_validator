@@ -269,7 +269,7 @@ def _estimate_ground_truth(adf_json: dict) -> dict:
 
     total = max(len(activities), 1)
     supported = sum(1 for a in activities if a.get("type") in _SUPPORTED_TYPES)
-    unsupported = total - supported
+    unsupported = len(activities) - supported
 
     return {
         "activity_coverage": supported / total,
