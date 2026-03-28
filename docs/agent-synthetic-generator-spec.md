@@ -222,6 +222,179 @@ class FailureFeedback:
 
 ---
 
+## Prompt Customization (User-Editable Generation)
+
+### Problem
+
+The current generator uses a hardcoded prompt template. Implementation teams need to:
+1. Focus generation on specific patterns (e.g., "50 pipelines with complex expressions only")
+2. Edit the prompt before generation to add domain-specific constraints
+3. Choose from preset templates for common scenarios
+4. Write completely custom prompts for edge-case testing
+
+### UI Flow
+
+The Synthetic page should have a **prompt editor** with:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Generation Mode:  [Template ▾]  [LLM ▾]  [Custom]      │
+│                                                          │
+│  Preset Templates:                                        │
+│  [Complex Expressions] [Deep Nesting] [Activity Mix]     │
+│  [Math on Params] [Unsupported Types] [Full Coverage]    │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Prompt (editable):                                 │  │
+│  │                                                    │  │
+│  │ Generate 50 realistic ADF pipelines that stress    │  │
+│  │ complex nested expressions. Each pipeline should:  │  │
+│  │ - Use concat, formatDateTime, and pipeline()       │  │
+│  │   .parameters references nested 3+ levels deep     │  │
+│  │ - Include at least one activity that references an │  │
+│  │   upstream activity's output via @activity()       │  │
+│  │ - Have 5-10 activities with dependency chains      │  │
+│  │                                                    │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                          │
+│  Count: [50]  Max Activities: [10]                       │
+│                                                          │
+│  [Generate Suite]                                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Preset Templates
+
+Each template generates a prompt focused on a specific testing scenario:
+
+```python
+PROMPT_TEMPLATES: dict[str, str] = {
+    "complex_expressions": """Generate {count} ADF pipelines that stress-test complex
+nested ADF expressions. Each pipeline should use expressions nested 3+ levels deep
+combining concat, formatDateTime, utcNow, pipeline().parameters, and activity().output
+references. Include SetVariable activities that consume upstream Lookup outputs.
+Include pipeline parameters: env, prefix, threshold, date_override.""",
+
+    "deep_nesting": """Generate {count} ADF pipelines with deeply nested control flow:
+ForEach containing IfCondition containing another ForEach or nested IfCondition.
+Inner activities should be DatabricksNotebook with expression-valued parameters.
+The ForEach items should be expression-generated arrays, not static.""",
+
+    "activity_mix": """Generate {count} ADF pipelines using ALL supported activity
+types: DatabricksNotebook, Copy, Lookup, WebActivity, SetVariable, ForEach,
+IfCondition. Each pipeline should use at least 4 different activity types with
+realistic dependency chains between them.""",
+
+    "math_on_params": """Generate {count} ADF pipelines that use math functions
+(add, mul, sub, div, mod) on pipeline parameters. Include expressions like
+@add(mul(pipeline().parameters.count, 2), 1). These stress-test the numeric
+coercion logic since dbutils.widgets.get returns strings.""",
+
+    "unsupported_types": """Generate {count} ADF pipelines that include a mix of
+supported and unsupported activity types (AzureFunction, ExecuteSSISPackage,
+Wait, ExecutePipeline, Switch, Until). This tests placeholder generation and
+activity_coverage scoring.""",
+
+    "full_coverage": """Generate {count} ADF pipelines that exercise ALL dimensions
+of the Lakeflow Migration Validator: activity coverage, expression coverage,
+dependency preservation, notebook validity, parameter completeness, secret
+completeness, and translatable ratio. Each pipeline should have deliberate
+weaknesses in 1-2 dimensions for targeted testing.""",
+}
+```
+
+### API Changes
+
+```python
+# POST /api/synthetic/generate — updated request model
+class SyntheticGenerateRequest(BaseModel):
+    count: int = 10
+    mode: str = "template"              # "template", "llm", "custom"
+    preset: str | None = None           # key from PROMPT_TEMPLATES
+    custom_prompt: str | None = None    # user-edited or fully custom prompt
+    max_activities: int = 20
+    difficulty: str = "medium"
+    output_path: str | None = None
+```
+
+When `mode="llm"` and `preset` is set, the preset template is used as the base prompt.
+When `mode="custom"`, `custom_prompt` is used directly.
+The UI always shows the effective prompt in the editor, allowing the user to modify it
+before clicking Generate.
+
+---
+
+## Synthetic Test Data Generation (for Parallel Testing)
+
+### Problem
+
+Parallel testing compares ADF pipeline execution outputs with Databricks job outputs.
+But running real ADF pipelines requires real data in the source systems (Azure SQL,
+Blob Storage, etc.). The generator should be able to produce test data alongside
+the pipeline definitions.
+
+### What the data generator needs to produce
+
+For each generated pipeline that includes data-reading activities (Copy, Lookup):
+
+1. **Source data files** — CSV/JSON/Parquet files with synthetic rows matching the
+   pipeline's dataset schema
+2. **Database seed scripts** — SQL INSERT statements for Lookup activities that query
+   SQL databases
+3. **Expected output data** — what the pipeline should produce given the seed data
+   (for comparison in parallel testing)
+
+### Data Generation Strategy
+
+```python
+@dataclass(frozen=True, slots=True)
+class SyntheticTestData:
+    """Test data generated alongside a synthetic pipeline."""
+    pipeline_name: str
+    source_files: dict[str, str]          # file_path → CSV/JSON content
+    seed_sql: list[str]                   # SQL statements to seed lookup sources
+    expected_outputs: dict[str, str]      # activity_name → expected output value
+    setup_instructions: str               # human-readable setup guide
+
+
+class TestDataGenerator:
+    """Generate test data that matches a pipeline's data requirements."""
+
+    def __init__(self, judge_provider: JudgeProvider | None = None):
+        self._provider = judge_provider
+
+    def generate_for_pipeline(self, adf_json: dict) -> SyntheticTestData:
+        """Analyze the pipeline and generate matching test data."""
+        ...
+
+    def generate_for_suite(self, suite: list[SyntheticPipeline]) -> list[SyntheticTestData]:
+        """Generate test data for all pipelines in a suite."""
+        ...
+```
+
+### Integration with Parallel Testing
+
+The parallel test runner should optionally accept test data:
+
+```python
+# Updated parallel test flow:
+# 1. Generate synthetic pipeline + test data
+# 2. Seed the test data into ADF source systems
+# 3. Run the ADF pipeline → collect outputs
+# 4. Run the converted Lakeflow Job with same data → collect outputs
+# 5. Compare outputs
+```
+
+### UI Changes
+
+The Synthetic page should have a "Generate Test Data" toggle that:
+- Shows a preview of generated source files and SQL scripts
+- Offers a "Deploy Test Data" button that uploads files to Azure storage
+  and runs seed SQL against the configured database
+- Shows setup instructions for manual deployment
+
+---
+
 ## Test Plan
 
 ### Unit tests (no LLM calls)

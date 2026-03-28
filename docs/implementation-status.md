@@ -93,6 +93,8 @@
 **Tests:** `tests/unit/validation/test_adf_connector.py` (new), integration test with real ADF
 **Depends on:** wkmigrate installed
 
+### ~~Priority 2: ADFConnector Real Implementation~~ — DONE (PR #6)
+
 ### Priority 3: DSPy Judge Calibration
 **Status:** Semantic equivalence judge uses uncalibrated prompt. No DSPy optimization.
 
@@ -107,16 +109,38 @@
 **Tests:** `tests/unit/validation/test_judge_optimizer.py`
 **Depends on:** DSPy 3.x, golden set data (from Priority 1)
 
-### Priority 4: Frontend Polish (Stitch Design Fidelity)
-**Status:** Stitch designs applied but rough. Missing glass panels, gradient effects, proper spacing.
+### ~~Priority 4: Frontend Polish (Stitch Design Fidelity)~~ — DONE (PR #9)
+
+### ~~Priority 5: CI Workflow for Integration Tests~~ — DONE (PR #7)
+
+### Priority 8: Synthetic Prompt Customization (NEW)
+**Status:** Generator uses hardcoded prompt template. No user control.
 
 **What's needed:**
-- Full conversion of 8 Stitch HTML screens to React (currently partial)
-- Bento grid dimension cards on Harness page
-- Glass panel effects on results
-- Traffic-light dots on code editors
-- Top header bar with search, notifications, settings
-- Capability status bar in sidebar (done)
+- Preset prompt templates (complex_expressions, deep_nesting, activity_mix, math_on_params, unsupported_types, full_coverage)
+- Editable prompt in the UI — user can modify preset or write custom
+- API update: `SyntheticGenerateRequest.custom_prompt` and `preset` fields
+- UI: prompt editor textarea with template selector buttons
+- Mode selector: Template (deterministic) / LLM (preset+editable) / Custom (free-form)
+
+**Files:** `synthetic/agent_generator.py` (prompt templates), `api.py`, Synthetic page
+**Tests:** `tests/unit/synthetic/test_prompt_templates.py`
+**Depends on:** Agent generator (done, PR #8)
+
+### Priority 9: Synthetic Test Data Generation (NEW)
+**Status:** Not implemented. Parallel testing needs data in source systems.
+
+**What's needed:**
+- `synthetic/test_data_generator.py` — analyze pipeline, generate matching data
+- Source data files (CSV/JSON) for Copy activities
+- SQL seed scripts for Lookup activities
+- Expected output data for parallel comparison
+- UI: "Generate Test Data" toggle on Synthetic page
+- Deploy button to upload data to Azure storage / run seed SQL
+
+**Files:** `synthetic/test_data_generator.py`, API endpoint, Synthetic page update
+**Tests:** `tests/unit/synthetic/test_data_generator.py`
+**Depends on:** Agent generator (done), ADF connector (done)
 - Responsive layout fixes
 
 **Files:** `apps/lmv/frontend/src/pages/*.tsx`, `apps/lmv/frontend/src/components/*.tsx`
