@@ -322,11 +322,15 @@ def _build_expected_snapshot(
     # Derive parameters from the pipeline, not from config
     parameters = _extract_parameters(adf_json)
 
+    # Store both task-level expected outputs and predicted dimension scores
     expected_outputs = {
         t.task_key: f"expected_output_{i}"
         for i, t in enumerate(tasks)
         if not t.is_placeholder
     }
+    # Include LLM-predicted dimension scores as metadata for comparison
+    if expected:
+        expected_outputs["__predicted_dimensions__"] = json.dumps(expected)
 
     return ConversionSnapshot(
         tasks=tasks,
