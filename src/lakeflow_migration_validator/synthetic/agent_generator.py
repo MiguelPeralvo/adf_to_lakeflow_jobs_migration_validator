@@ -26,18 +26,15 @@ from lakeflow_migration_validator.contract import (
     TaskSnapshot,
 )
 from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
-from lakeflow_migration_validator.synthetic.pipeline_generator import SyntheticPipeline
+from lakeflow_migration_validator.synthetic.pipeline_generator import (
+    SyntheticPipeline,
+    _DEFAULT_ACTIVITY_TYPES,
+)
 
-# ADF activity types wkmigrate supports
-_SUPPORTED_TYPES = {
-    "DatabricksNotebook", "DatabricksSparkJar", "DatabricksSparkPython",
-    "DatabricksJob", "Copy", "Lookup", "WebActivity", "ForEach",
-    "IfCondition", "SetVariable",
-}
-
-_UNSUPPORTED_TYPES = {
-    "AzureFunctionActivity", "ExecuteSSISPackage", "Wait",
-    "ExecutePipeline", "AppendVariable", "Filter", "Switch", "Until",
+# Canonical supported types — derived from the shared pipeline_generator constant
+# to avoid drift. Control-flow types (ForEach, IfCondition) are also supported.
+_SUPPORTED_TYPES: frozenset[str] = frozenset(_DEFAULT_ACTIVITY_TYPES) | {
+    "DatabricksSparkJar", "DatabricksSparkPython", "DatabricksJob",
 }
 
 _WEAK_SPOTS = {
@@ -143,7 +140,7 @@ class AgentPipelineGenerator:
                 continue
 
             expected = self._predict_ground_truth(adf_json)
-            snapshot = _build_expected_snapshot(adf_json, expected, cfg)
+            snapshot = _build_expected_snapshot(adf_json, expected)
 
             pipelines.append(SyntheticPipeline(
                 adf_json=adf_json,
@@ -163,6 +160,8 @@ class AgentPipelineGenerator:
                 adf_json = _extract_json(raw_text)
                 if adf_json is None:
                     continue  # retry — LLM returned non-JSON
+                if not _is_adf_pipeline(adf_json):
+                    continue  # retry — JSON is not an ADF pipeline
                 if "name" not in adf_json:
                     adf_json["name"] = f"llm_pipeline_{pipeline_index:03d}"
                 return adf_json
@@ -284,10 +283,30 @@ def _estimate_ground_truth(adf_json: dict) -> dict:
     }
 
 
+def _is_adf_pipeline(obj: dict) -> bool:
+    """Check if a JSON object looks like an ADF pipeline definition."""
+    # Must have activities (either at top level or under properties)
+    props = obj.get("properties", obj)
+    activities = props.get("activities")
+    if isinstance(activities, list) and len(activities) > 0:
+        # At least one activity should have a "type" field
+        return any(isinstance(a, dict) and "type" in a for a in activities)
+    return False
+
+
+def _extract_parameters(adf_json: dict) -> tuple[str, ...]:
+    """Extract parameter names from the generated pipeline JSON."""
+    params = adf_json.get("properties", {}).get("parameters", {})
+    if isinstance(params, dict):
+        return tuple(params.keys())
+    if isinstance(params, list):
+        return tuple(p.get("name", "") for p in params if isinstance(p, dict) and p.get("name"))
+    return ()
+
+
 def _build_expected_snapshot(
     adf_json: dict,
     expected: dict,
-    config: GenerationConfig,
 ) -> ConversionSnapshot:
     """Build an expected ConversionSnapshot from the generated pipeline + predictions."""
     activities = adf_json.get("properties", {}).get("activities", [])
@@ -302,6 +321,9 @@ def _build_expected_snapshot(
         for i, a in enumerate(activities)
     )
 
+    # Derive parameters from the pipeline, not from config
+    parameters = _extract_parameters(adf_json)
+
     expected_outputs = {
         t.task_key: f"expected_output_{i}"
         for i, t in enumerate(tasks)
@@ -312,7 +334,7 @@ def _build_expected_snapshot(
         tasks=tasks,
         notebooks=(),
         secrets=(),
-        parameters=config.parameters,
+        parameters=parameters,
         dependencies=(),
         not_translatable=(),
         resolved_expressions=(),

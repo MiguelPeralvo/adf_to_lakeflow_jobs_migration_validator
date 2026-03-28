@@ -13,6 +13,8 @@ from lakeflow_migration_validator.synthetic.agent_generator import (
     GenerationConfig,
     _estimate_ground_truth,
     _extract_json,
+    _extract_parameters,
+    _is_adf_pipeline,
 )
 
 
@@ -53,6 +55,30 @@ _VALID_PIPELINE_JSON = json.dumps({
         ],
     },
 })
+
+
+def test_is_adf_pipeline_valid():
+    assert _is_adf_pipeline({"properties": {"activities": [{"name": "a", "type": "SetVariable"}]}})
+
+
+def test_is_adf_pipeline_rejects_non_pipeline():
+    assert not _is_adf_pipeline({"activity_coverage": 1.0})
+    assert not _is_adf_pipeline({"foo": "bar"})
+    assert not _is_adf_pipeline({"properties": {"activities": []}})
+
+
+def test_is_adf_pipeline_top_level_activities():
+    assert _is_adf_pipeline({"activities": [{"name": "a", "type": "Copy"}]})
+
+
+def test_extract_parameters_dict_format():
+    adf = {"properties": {"parameters": {"env": {"type": "String"}, "count": {"type": "Int"}}}}
+    assert _extract_parameters(adf) == ("env", "count")
+
+
+def test_extract_parameters_empty():
+    assert _extract_parameters({"properties": {}}) == ()
+    assert _extract_parameters({}) == ()
 
 
 def test_extract_json_from_plain_json():
