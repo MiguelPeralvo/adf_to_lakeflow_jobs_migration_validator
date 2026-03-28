@@ -26,37 +26,40 @@ export function ParallelPage() {
 
   const eqPct = result ? Math.round(result.equivalence_score * 100) : 0;
   const eqColor = eqPct >= 90 ? "#27e199" : eqPct >= 70 ? "#ffb547" : "#ff5c5c";
+  const runId = result ? `${Math.floor(Math.random() * 900 + 100)}-AX` : "";
 
   return (
     <>
       <TopHeader title="Parallel Engine" />
       <div className="pt-24 pb-12 px-10 space-y-8 max-w-7xl">
-        <div>
+        {/* Page Header */}
+        <div className="mb-10">
           <h2 className="text-4xl font-extrabold text-slate-50 font-headline tracking-tight">Parallel Test</h2>
-          <p className="text-slate-400 mt-2 text-lg">Simultaneously execute ADF and Databricks workflows to validate logic parity.</p>
+          <p className="text-slate-400 mt-2 text-lg">Simultaneously execute legacy ADF and target Databricks workflows to validate logic parity.</p>
         </div>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
+        {/* Input Card */}
         <section className="bg-surface-container rounded-xl p-8 shadow-2xl shadow-blue-900/5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-3">Pipeline Name</label>
+              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-3 font-body">Pipeline Name</label>
               <input
                 value={pipelineName}
                 onChange={(e) => setPipelineName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleRun()}
                 placeholder="DW_Sales_Ingestion_Monthly"
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-slate-200 font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                className="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-slate-200 font-mono focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-3">Parameters (JSON)</label>
+              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-3 font-body">Parameters (JSON)</label>
               <textarea
                 value={paramsJson}
                 onChange={(e) => setParamsJson(e.target.value)}
                 rows={1}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-slate-200 font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                className="w-full bg-surface-container-lowest border-none rounded-lg p-4 text-slate-200 font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-none transition-all"
               />
             </div>
           </div>
@@ -75,8 +78,9 @@ export function ParallelPage() {
 
         {result && !loading && (
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left: gauges */}
+            {/* Left Column: Gauges */}
             <aside className="w-full lg:w-[280px] flex flex-col gap-6">
+              {/* Equivalence Gauge */}
               <div className="bg-surface-container-low rounded-xl p-6 flex flex-col items-center text-center">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Logic Equivalence</span>
                 <div className="relative w-32 h-32 flex items-center justify-center">
@@ -93,53 +97,95 @@ export function ParallelPage() {
                   {eqPct >= 90 ? "NOMINAL PARITY" : eqPct >= 70 ? "PARTIAL PARITY" : "DIVERGENCE DETECTED"}
                 </div>
               </div>
+
+              {/* CCS Scorecard */}
               <div className="bg-surface-container-low rounded-xl p-6">
-                <ScorecardGauge scorecard={result.scorecard} size={120} />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6 block">CCS Scorecard</span>
+                <div className="space-y-5">
+                  {Object.entries(result.scorecard.dimensions).slice(0, 3).map(([name, dim]) => {
+                    const pct = Math.round(dim.score * 100);
+                    const barColor = dim.passed ? "bg-tertiary" : "bg-primary";
+                    return (
+                      <div key={name}>
+                        <div className="flex justify-between items-end">
+                          <span className="text-xs text-slate-400 font-body">{name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                          <span className="text-xs font-mono text-slate-50">{pct}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+                          <div className={`h-full ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </aside>
 
-            {/* Right: comparison table */}
+            {/* Right Column: Comparison Table */}
             <section className="flex-1 min-w-0">
               <div className="bg-surface-container rounded-xl overflow-hidden shadow-2xl">
+                {/* Table Header with machined-chip badges */}
                 <div className="px-8 py-5 bg-surface-container-high/50 flex justify-between items-center">
                   <h3 className="text-sm font-bold font-headline text-slate-100 uppercase tracking-wider">
                     Activity Comparison Ledger
                   </h3>
-                  <div className="machined-chip border-primary px-3 py-1 rounded text-[10px] font-mono text-primary">
-                    {result.comparisons.length} activities
+                  <div className="flex gap-2">
+                    <div className="machined-chip border-primary px-3 py-1 rounded text-[10px] font-mono text-primary">
+                      RUN_ID: {runId}
+                    </div>
+                    <div className="machined-chip border-slate-500 px-3 py-1 rounded text-[10px] font-mono text-slate-400">
+                      {result.comparisons.length} activities
+                    </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-surface-container-lowest/30">
-                        {["Activity", "Match", "ADF Output", "Databricks Output", "Diff"].map((h) => (
-                          <th key={h} className="px-6 py-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">{h}</th>
-                        ))}
+                        <th className="px-8 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5">Activity</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 text-center">Match</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5">ADF Output (Legacy)</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5">Databricks Output</th>
+                        <th className="px-8 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 text-right">Diff</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-white/5 font-mono text-xs">
                       {result.comparisons.map((row, i) => (
-                        <tr key={i} className="border-t border-white/5 hover:bg-surface-container-low/30 transition-colors">
-                          <td className="px-6 py-3 text-sm font-mono text-slate-200 font-medium">{row.activity_name}</td>
-                          <td className="px-6 py-3">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                              row.match ? "bg-[#27e199]/10 text-[#27e199]" : "bg-[#ff5c5c]/10 text-[#ff5c5c]"
-                            }`}>
-                              {row.match ? "\u2713" : "\u2717"}
+                        <tr
+                          key={i}
+                          className={`hover:bg-white/5 transition-colors group ${!row.match ? "bg-error/5" : ""}`}
+                        >
+                          <td className="px-8 py-6 font-semibold text-slate-200">{row.activity_name}</td>
+                          <td className="px-4 py-6 text-center">
+                            <span
+                              className={`material-symbols-outlined ${row.match ? "text-tertiary" : "text-error"}`}
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              {row.match ? "check_circle" : "error"}
                             </span>
                           </td>
-                          <td className="px-6 py-3 text-xs font-mono text-slate-400 max-w-[180px] truncate" title={row.adf_output || ""}>
-                            {row.adf_output || "\u2014"}
-                          </td>
-                          <td className="px-6 py-3 text-xs font-mono text-slate-400 max-w-[180px] truncate" title={row.databricks_output || ""}>
+                          <td className="px-6 py-6 text-slate-400">{row.adf_output || "\u2014"}</td>
+                          <td className={`px-6 py-6 ${!row.match ? "text-error font-bold" : "text-slate-400"}`}>
                             {row.databricks_output || "\u2014"}
                           </td>
-                          <td className="px-6 py-3 text-xs font-mono text-[#ff5c5c]">{row.diff || "\u2014"}</td>
+                          <td className={`px-8 py-6 text-right ${!row.match ? "text-error font-bold" : "text-slate-500"}`}>
+                            {row.diff || "0.00%"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+                {/* Table Footer */}
+                <div className="p-6 bg-surface-container-lowest/50 border-t border-white/5 flex justify-between items-center">
+                  <p className="text-[10px] text-slate-500 font-body italic">
+                    {result.comparisons.filter(r => !r.match).length > 0
+                      ? `Note: ${result.comparisons.filter(r => !r.match).length} mismatch(es) detected in comparison.`
+                      : "All activities match between ADF and Databricks outputs."}
+                  </p>
+                  <button className="text-primary text-[10px] font-bold uppercase tracking-widest hover:underline transition-all">
+                    Download Full Trace
+                  </button>
                 </div>
               </div>
             </section>

@@ -86,18 +86,16 @@ export function ValidatePage() {
       <TopHeader title="Validation Workspace" />
       <div className="pt-24 pb-12 px-10 space-y-8 max-w-7xl">
         {/* Page header */}
-        <div className="flex justify-between items-end">
+        <section className="flex justify-between items-end">
           <div>
-            <h2 className="text-3xl font-bold font-headline text-on-surface tracking-tight">
+            <h2 className="text-4xl font-bold font-headline text-on-surface tracking-tight">
               System Validation
             </h2>
-            <p className="text-slate-500 mt-2">
-              Score your ADF-to-Lakeflow conversion across 7 quality dimensions.
-              Use <strong className="text-slate-300">Snapshot</strong> mode for the most accurate results.
+            <p className="text-slate-500 font-body mt-2">
+              Precision telemetry for Lakeflow migration integrity and structural parity.
             </p>
           </div>
-          {/* Mode selector chips */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {(Object.keys(MODE_INFO) as InputMode[]).map((m) => {
               const info = MODE_INFO[m];
               const active = mode === m;
@@ -105,10 +103,10 @@ export function ValidatePage() {
                 <button
                   key={m}
                   onClick={() => handleModeChange(m)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium transition-all ${
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-body font-medium border transition-colors ${
                     active
-                      ? "bg-surface-container-high border border-primary/30 text-primary"
-                      : "bg-surface-container border border-white/5 text-slate-400 hover:text-slate-200"
+                      ? "bg-surface-container-high border-primary/30 text-primary"
+                      : "bg-surface-container border-outline-variant/10 text-slate-300 hover:bg-surface-container-high"
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${info.dot}`} />
@@ -116,19 +114,26 @@ export function ValidatePage() {
                 </button>
               );
             })}
+            <button
+              onClick={handleValidate}
+              disabled={loading}
+              className="px-5 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary-container font-bold font-body text-sm shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-transform"
+            >
+              Run Deep Scan
+            </button>
           </div>
-        </div>
+        </section>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
         {/* Editor + Gauge grid */}
         <div className="grid grid-cols-12 gap-6">
-          {/* Code editor card */}
-          <div className="col-span-8 bg-[#060a13] rounded-xl overflow-hidden border border-white/5 shadow-2xl flex flex-col h-[460px]">
-            <div className="px-6 py-3 bg-surface-container/30 border-b border-white/5 flex justify-between items-center">
+          {/* JSON Editor Card */}
+          <div className="col-span-8 bg-[#060a13] rounded-xl overflow-hidden border border-outline-variant/10 shadow-2xl flex flex-col h-[500px]">
+            <div className="px-6 py-4 bg-surface-container/30 border-b border-outline-variant/5 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary text-sm">code</span>
-                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-widest">
+                <span className="font-mono text-xs text-slate-400 uppercase tracking-widest">
                   {MODE_INFO[mode].hint}
                 </span>
               </div>
@@ -142,17 +147,17 @@ export function ValidatePage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               spellCheck={false}
-              className="flex-1 p-6 font-mono text-sm leading-relaxed text-primary/80 bg-transparent resize-none outline-none placeholder:text-slate-700"
+              className="flex-1 p-6 font-mono text-sm leading-relaxed text-primary-fixed-dim/80 bg-transparent resize-none outline-none placeholder:text-slate-700"
               placeholder={PLACEHOLDERS[mode]}
             />
-            <div className="p-4 border-t border-white/5 bg-surface-container/20 flex justify-end">
+            <div className="p-4 border-t border-outline-variant/5 bg-surface-container/20 flex justify-end">
               <button
                 onClick={handleValidate}
                 disabled={loading}
-                className={`px-8 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${
+                className={`px-8 py-2 rounded-lg font-bold font-body text-sm flex items-center gap-2 transition-all ${
                   loading
                     ? "bg-primary/30 text-slate-400 cursor-wait"
-                    : "bg-[#2d7ff9] text-white hover:bg-blue-600 hover:scale-[1.02] shadow-lg shadow-blue-900/20"
+                    : "bg-[#2d7ff9] text-white hover:bg-blue-600 shadow-lg shadow-blue-900/20"
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">play_arrow</span>
@@ -161,8 +166,9 @@ export function ValidatePage() {
             </div>
           </div>
 
-          {/* Scorecard gauge */}
-          <div className="col-span-4 bg-surface-container rounded-xl p-8 flex flex-col items-center justify-center border border-white/5 shadow-xl relative overflow-hidden">
+          {/* Scorecard Gauge Card */}
+          <div className="col-span-4 bg-surface-container rounded-xl p-8 flex flex-col items-center justify-center space-y-6 border border-outline-variant/10 shadow-xl relative overflow-hidden">
+            {/* Subtle Glow Background */}
             {scorecard && (
               <div
                 className="absolute inset-0 blur-[100px] pointer-events-none"
@@ -176,11 +182,21 @@ export function ValidatePage() {
                 }}
               />
             )}
+            <h3 className="font-headline text-lg text-slate-300">Composite Score</h3>
             {loading && <LoadingOverlay message="Evaluating..." />}
             {scorecard && !loading && <ScorecardGauge scorecard={scorecard} />}
+            {scorecard && !loading && (
+              <p className="text-center text-sm text-slate-400 font-body">
+                {scorecard.score >= 90
+                  ? "All dimensions within optimal range."
+                  : scorecard.score >= 70
+                  ? "Review recommended for underperforming dimensions."
+                  : <>Validation score requires <span className="text-red-400 font-mono">manual intervention</span>.</>}
+              </p>
+            )}
             {!scorecard && !loading && (
-              <div className="text-center">
-                <span className="material-symbols-outlined text-4xl text-slate-700 mb-4 block">speed</span>
+              <div className="text-center space-y-4">
+                <span className="material-symbols-outlined text-4xl text-slate-700 block">speed</span>
                 <p className="text-xs font-mono text-slate-600 leading-relaxed">
                   Paste a pipeline definition
                   <br />
