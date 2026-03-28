@@ -139,8 +139,7 @@ class AgentPipelineGenerator:
             if adf_json is None:
                 continue
 
-            expected = self._predict_ground_truth(adf_json)
-            snapshot = _build_expected_snapshot(adf_json, expected)
+            snapshot = _build_expected_snapshot(adf_json)
 
             pipelines.append(SyntheticPipeline(
                 adf_json=adf_json,
@@ -306,9 +305,8 @@ def _extract_parameters(adf_json: dict) -> tuple[str, ...]:
 
 def _build_expected_snapshot(
     adf_json: dict,
-    expected: dict,
 ) -> ConversionSnapshot:
-    """Build an expected ConversionSnapshot from the generated pipeline + predictions."""
+    """Build an expected ConversionSnapshot from the generated pipeline."""
     activities = adf_json.get("properties", {}).get("activities", [])
     if not activities:
         activities = adf_json.get("activities", [])
