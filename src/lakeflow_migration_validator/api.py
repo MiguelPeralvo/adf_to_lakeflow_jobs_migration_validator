@@ -191,7 +191,7 @@ def create_app(
             "prompt": resolve_template(
                 request.get("preset", "complex_expressions"),
                 count=request.get("count", 10),
-                max_activities=request.get("max_activities", 10),
+                max_activities=request.get("max_activities", 20),
             )
         }
 
@@ -202,6 +202,9 @@ def create_app(
             difficulty=request.difficulty,
             max_activities=request.max_activities,
             mode=request.mode,
+            preset=request.preset,
+            custom_prompt=request.custom_prompt,
+            judge_provider=judge_provider,
         )
         if request.output_path:
             suite.to_json(request.output_path)

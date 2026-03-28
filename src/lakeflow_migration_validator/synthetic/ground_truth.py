@@ -22,7 +22,16 @@ class GroundTruthSuite:
     @classmethod
     def generate(cls, count: int = 50, **kwargs) -> GroundTruthSuite:
         """Generate a synthetic suite with template-based pipelines."""
-        generator = PipelineGenerator(mode=kwargs.pop("mode", "template"))
+        mode = kwargs.pop("mode", "template")
+        judge_provider = kwargs.pop("judge_provider", None)
+        preset = kwargs.pop("preset", None)
+        custom_prompt = kwargs.pop("custom_prompt", None)
+        generator = PipelineGenerator(
+            mode=mode,
+            judge_provider=judge_provider,
+            preset=preset,
+            custom_prompt=custom_prompt,
+        )
         pipelines = generator.generate(count=count, **kwargs)
         return cls(pipelines=tuple(pipelines))
 

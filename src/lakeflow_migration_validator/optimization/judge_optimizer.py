@@ -279,6 +279,7 @@ class JudgeOptimizer:
         optimizer: str = "MIPROv2",
         model: str = "claude-opus-4-6",
         threshold: float = 0.7,
+        calibration_pairs: list[CalibrationPair] | None = None,
     ) -> None:
         try:
             import dspy  # noqa: F401
@@ -296,7 +297,13 @@ class JudgeOptimizer:
         self._optimizer_name = optimizer
         self._model = model
         self._threshold = threshold
+        self._calibration_pairs = list(calibration_pairs) if calibration_pairs else []
         self._optimized_program: Any = None
+
+    @property
+    def calibration_pairs(self) -> list[CalibrationPair]:
+        """Return the loaded calibration pairs."""
+        return list(self._calibration_pairs)
 
     def optimize(
         self,
@@ -428,11 +435,16 @@ def create_calibrator(
     :class:`JudgeOptimizer`.  Otherwise falls back to
     :class:`ManualCalibrator`.
     """
+    calibration_pairs = load_calibration_pairs(calibration_path)
     try:
         import dspy  # noqa: F401
         if provider is not None:
-            return JudgeOptimizer(provider, optimizer=optimizer)
+            return JudgeOptimizer(
+                provider,
+                optimizer=optimizer,
+                calibration_pairs=calibration_pairs[:max_examples],
+            )
     except ImportError:
         pass
 
-    return ManualCalibrator.from_file(calibration_path, max_examples=max_examples)
+    return ManualCalibrator(calibration_pairs, max_examples=max_examples)

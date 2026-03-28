@@ -38,13 +38,21 @@ class SyntheticPipeline:
 class PipelineGenerator:
     """Generates synthetic ADF pipelines using deterministic templates."""
 
-    def __init__(self, mode: str = "template", judge_provider=None):
+    def __init__(
+        self,
+        mode: str = "template",
+        judge_provider=None,
+        preset: str | None = None,
+        custom_prompt: str | None = None,
+    ):
         if mode not in _SUPPORTED_MODES:
             raise ValueError(f"Unsupported generator mode: {mode}")
         if mode in {"llm", "adversarial"} and judge_provider is None:
             raise NotImplementedError("LLM mode requires a judge_provider")
         self.mode = mode
         self.judge_provider = judge_provider
+        self.preset = preset
+        self.custom_prompt = custom_prompt
         self.expression_generator = ExpressionGenerator()
 
     def generate(
