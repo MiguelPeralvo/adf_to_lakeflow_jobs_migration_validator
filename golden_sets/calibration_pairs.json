@@ -1,0 +1,147 @@
+{
+  "description": "Human-labelled ADF expression / Python translation pairs for judge calibration. Scores range from 0.0 (completely wrong) to 1.0 (perfect semantic equivalence).",
+  "version": "1.0",
+  "count": 20,
+  "calibration_pairs": [
+    {
+      "adf_expression": "@concat('hello', 'world')",
+      "python_code": "str('hello') + str('world')",
+      "human_score": 1.0,
+      "category": "string",
+      "notes": "Perfect translation — concat maps to string concatenation with str() coercion."
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "python_code": "str('abc').replace('a', 'z')",
+      "human_score": 1.0,
+      "category": "string",
+      "notes": "Exact semantic match for single-character replacement."
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "python_code": "'abc'.upper()",
+      "human_score": 0.9,
+      "category": "string",
+      "notes": "Correct behaviour but missing str() wrapper — minor deviation from wkmigrate convention."
+    },
+    {
+      "adf_expression": "@concat('a', 'b', 'c')",
+      "python_code": "str('a') + str('b')",
+      "human_score": 0.3,
+      "category": "string",
+      "notes": "Missing third argument — concat('a','b','c') should produce 'abc', not 'ab'."
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "python_code": "(1 + 2)",
+      "human_score": 1.0,
+      "category": "math",
+      "notes": "Perfect — add(1,2) maps directly to (1 + 2)."
+    },
+    {
+      "adf_expression": "@add(mul(pipeline().parameters.count, 2), 1)",
+      "python_code": "(int(dbutils.widgets.get('count')) * 2 + 1)",
+      "human_score": 0.95,
+      "category": "math",
+      "notes": "Correct semantics with proper coercion from string widget. Minor: no outer parens for add."
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "python_code": "(9 / 2)",
+      "human_score": 0.5,
+      "category": "math",
+      "notes": "ADF div() returns integer division — Python / returns float. Should be int(9 / 2)."
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "python_code": "(9 % 2)",
+      "human_score": 1.0,
+      "category": "math",
+      "notes": "Perfect modulo mapping."
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "human_score": 1.0,
+      "category": "datetime",
+      "notes": "Correct delegation to wkmigrate helper with proper arguments."
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "python_code": "datetime.now()",
+      "human_score": 0.4,
+      "category": "datetime",
+      "notes": "Missing timezone — utcNow() must return UTC-aware datetime. datetime.now() returns local time."
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "python_code": "(1 == 1)",
+      "human_score": 1.0,
+      "category": "logical",
+      "notes": "Perfect — direct equality comparison."
+    },
+    {
+      "adf_expression": "@and(greater(pipeline().parameters.threshold, 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "python_code": "(int(dbutils.widgets.get('threshold')) > 50 and not (dbutils.widgets.get('env') == 'prod'))",
+      "human_score": 0.85,
+      "category": "logical",
+      "notes": "Correct logic. Minor: threshold comparison should use > not >=, and env doesn't need int coercion (correct)."
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "python_code": "('yes' if (1 == 1) else 'no')",
+      "human_score": 1.0,
+      "category": "logical",
+      "notes": "Perfect ternary mapping."
+    },
+    {
+      "adf_expression": "@if(greater(pipeline().parameters.x, 10), 'big', 'small')",
+      "python_code": "'big'",
+      "human_score": 0.1,
+      "category": "logical",
+      "notes": "Hardcoded result — completely ignores the conditional logic and parameter reference."
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "python_code": "len([1, 2, 3])",
+      "human_score": 1.0,
+      "category": "collection",
+      "notes": "Perfect — createArray maps to list literal, length maps to len()."
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)",
+      "human_score": 1.0,
+      "category": "collection",
+      "notes": "Correct coalesce implementation using generator expression."
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "python_code": "str(str('x').upper()) + str(str((1 + 2)))",
+      "human_score": 1.0,
+      "category": "nested",
+      "notes": "Correct nesting — toUpper inside concat, add inside string inside concat."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(), 'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env'))",
+      "human_score": 0.95,
+      "category": "nested",
+      "notes": "Correct semantics with proper helper delegation. Minor: extra str() around '/' literal is unnecessary but harmless."
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "python_code": "str(len(str('a-b-c').split('-')))",
+      "human_score": 1.0,
+      "category": "nested",
+      "notes": "Perfect — split to .split(), length to len(), string to str()."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.prefix, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'), '/data.csv')",
+      "python_code": "dbutils.widgets.get('prefix')",
+      "human_score": 0.0,
+      "category": "nested",
+      "notes": "Completely wrong — only emits the first parameter, drops the path construction, date formatting, and filename."
+    }
+  ]
+}
