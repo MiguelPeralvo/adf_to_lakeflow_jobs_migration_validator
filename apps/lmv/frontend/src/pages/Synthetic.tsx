@@ -66,10 +66,29 @@ export function SyntheticPage() {
     } catch {}
   }
 
+  const [progressMessage, setProgressMessage] = useState("");
+
   async function handleGenerate() {
     setError(null);
     setResult(null);
     setLoading(true);
+    setProgressMessage(`Initializing generation of ${count} pipelines...`);
+
+    // Show progress messages on a timer
+    const progressMessages = [
+      `Generating ${count} synthetic ADF pipelines (${difficulty} difficulty)...`,
+      `Building activity definitions and dependency chains...`,
+      `Resolving expression patterns (${complexity} complexity)...`,
+      `Validating pipeline JSON structures...`,
+      generateTestData ? `Generating test data (CSV + SQL seed scripts)...` : `Finalizing pipeline suite...`,
+      `Computing ground truth expectations...`,
+    ];
+    let msgIdx = 0;
+    const progressInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % progressMessages.length;
+      setProgressMessage(progressMessages[msgIdx]);
+    }, 3000);
+
     try {
       const body: Record<string, unknown> = {
         count,
@@ -90,11 +109,20 @@ export function SyntheticPage() {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
-      setResult(await res.json());
+      const data = await res.json();
+      setResult(data);
       setResultTab("pipelines");
+      setProgressMessage(`Done — ${data.count} pipelines generated successfully`);
+
+      // Auto-scroll to results
+      setTimeout(() => {
+        document.getElementById("synthetic-results")?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
+      setProgressMessage("");
     } finally {
+      clearInterval(progressInterval);
       setLoading(false);
     }
   }
@@ -110,6 +138,30 @@ export function SyntheticPage() {
             Initialize automated test suites with precisely calibrated complexity metrics to stress-test your migration logic.
           </p>
         </section>
+
+        {/* Sticky progress banner */}
+        {(loading || progressMessage) && (
+          <div className={`sticky top-16 z-30 rounded-xl p-4 flex items-center gap-4 transition-all ${
+            loading
+              ? "bg-primary/10 border border-primary/20"
+              : result
+              ? "bg-tertiary/10 border border-tertiary/20"
+              : "bg-surface-container border border-outline-variant/10"
+          }`}>
+            {loading && (
+              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
+            )}
+            {!loading && result && (
+              <span className="material-symbols-outlined text-tertiary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            )}
+            <span className="text-sm font-mono text-on-surface">{progressMessage}</span>
+            {loading && (
+              <div className="flex-1 h-1 bg-surface-container-highest rounded-full overflow-hidden ml-4">
+                <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease_infinite]" style={{ width: "60%" }} />
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
@@ -271,7 +323,7 @@ export function SyntheticPage() {
 
         {/* Results */}
         {result && !loading && (
-          <section className="space-y-6">
+          <section id="synthetic-results" className="space-y-6">
             {/* Tab bar */}
             <div className="flex gap-8 border-b border-outline-variant/20">
               <button
