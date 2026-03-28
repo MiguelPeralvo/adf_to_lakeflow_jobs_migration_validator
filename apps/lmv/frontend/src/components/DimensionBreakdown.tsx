@@ -111,47 +111,58 @@ export function DimensionBreakdown({ dimensions }: { dimensions: Record<string, 
   const sorted = Object.entries(dimensions).sort(([, a], [, b]) => a.score - b.score);
 
   return (
-    <div className="bg-surface-container rounded-xl overflow-hidden border border-white/5 shadow-xl">
-      <div className="px-8 py-5 border-b border-white/5 bg-surface-container-high/20 flex justify-between items-center">
-        <h3 className="font-headline text-lg text-on-surface font-semibold">Dimension Breakdown</h3>
+    <section className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-xl">
+      <div className="px-8 py-6 border-b border-outline-variant/5 flex justify-between items-center bg-surface-container-high/20">
+        <h3 className="font-headline text-xl text-on-surface">Dimension Breakdown</h3>
         <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-widest text-slate-500">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#27e199]" /> Pass
+            <span className="w-2 h-2 rounded-full bg-tertiary" /> Pass
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#ff5c5c]" /> Fail
+            <span className="w-2 h-2 rounded-full bg-error" /> Fail
           </div>
         </div>
       </div>
-      <div className="p-8 space-y-2">
+      <div className="p-8 space-y-6">
         {sorted.map(([name, result]) => {
           const color = dimColor(result.score, result.passed);
           const pct = Math.round(result.score * 100);
           const meta = LABELS[name] || { label: name, icon: "help" };
           const isOpen = expanded === name;
+          // Determine icon and color class based on score thresholds (matching Stitch)
+          const iconName = result.passed
+            ? "check_circle"
+            : pct >= 70
+            ? "error"
+            : "cancel";
+          const colorClass = result.passed
+            ? "text-tertiary"
+            : pct >= 70
+            ? "text-amber-500"
+            : "text-error";
 
           return (
             <div key={name}>
               <div
                 onClick={() => setExpanded(isOpen ? null : name)}
-                className="flex items-center gap-6 p-2 -m-2 rounded-lg hover:bg-surface-container-low/50 transition-colors cursor-pointer group"
+                className="flex items-center gap-6 group hover:bg-surface-container-low/50 p-2 -m-2 rounded-lg transition-colors cursor-pointer"
               >
                 <div className="w-6 flex items-center justify-center">
                   <span
-                    className="material-symbols-outlined text-xl"
-                    style={{ color, fontVariationSettings: "'FILL' 1" }}
+                    className={`material-symbols-outlined ${colorClass} text-xl`}
+                    style={{ fontVariationSettings: "'FILL' 1" }}
                   >
-                    {result.passed ? "check_circle" : "cancel"}
+                    {iconName}
                   </span>
                 </div>
-                <div className="w-[180px] text-slate-300 text-sm font-medium">{meta.label}</div>
+                <div className="w-[180px] font-body font-medium text-slate-300">{meta.label}</div>
                 <div className="flex-1 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-1000"
+                    className="h-full transition-all duration-1000"
                     style={{ width: `${pct}%`, backgroundColor: color }}
                   />
                 </div>
-                <div className="w-16 text-right font-mono text-sm font-semibold" style={{ color }}>
+                <div className="w-16 text-right font-mono text-sm" style={{ color }}>
                   {pct}%
                 </div>
                 <span
@@ -170,6 +181,6 @@ export function DimensionBreakdown({ dimensions }: { dimensions: Record<string, 
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

@@ -9,6 +9,14 @@ interface GenerateResult {
   output_path: string | null;
 }
 
+function difficultyStyle(d: string): { bg: string; border: string; text: string } {
+  switch (d) {
+    case "complex": return { bg: "bg-error/10", border: "border-error", text: "text-error" };
+    case "medium": return { bg: "bg-primary/10", border: "border-primary", text: "text-primary" };
+    default: return { bg: "bg-tertiary/10", border: "border-tertiary", text: "text-tertiary" };
+  }
+}
+
 export function SyntheticPage() {
   const [count, setCount] = useState(50);
   const [difficulty, setDifficulty] = useState("medium");
@@ -51,93 +59,92 @@ export function SyntheticPage() {
     <>
       <TopHeader title="Synthetic Engine" />
       <div className="pt-24 pb-12 px-10 space-y-8 max-w-7xl">
-        <div>
-          <h2 className="text-3xl font-bold font-headline text-on-surface tracking-tight">
+        {/* Page Header */}
+        <section>
+          <h2 className="text-3xl font-bold font-headline text-on-surface mb-2">
             Synthetic Pipeline Generator
           </h2>
-          <p className="text-slate-400 mt-1">
-            Generate parameterized ADF pipelines with known-correct outputs for stress testing.
+          <p className="text-on-surface-variant max-w-2xl font-body">
+            Initialize automated test suites with precisely calibrated complexity metrics.
+            Generated assets are compatible with Lakeflow version 2.4 and higher.
           </p>
-        </div>
+        </section>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-        {/* Config panel */}
-        <div className="bg-surface-container rounded-xl p-8 border border-white/5 shadow-xl">
-          <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6 font-mono">
-            Generation Parameters
-          </h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-2 font-mono">
-                Count
-              </label>
-              <input
-                type="number"
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-                min={1}
-                max={500}
-                className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-3 px-4 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all"
-              />
+        {/* Configuration Panel (Bento-style Grid) */}
+        <section className="bg-surface-container rounded-xl p-8 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Column Left */}
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-headline font-bold text-primary uppercase tracking-widest">Pipeline Count</label>
+                <div className="bg-surface-container-lowest p-4 rounded-lg flex items-center justify-between">
+                  <span className="font-mono text-xl text-primary">{count}</span>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setCount(c => Math.min(500, c + 10))}
+                      className="material-symbols-outlined text-slate-500 hover:text-primary transition-colors text-sm"
+                    >expand_less</button>
+                    <button
+                      onClick={() => setCount(c => Math.max(1, c - 10))}
+                      className="material-symbols-outlined text-slate-500 hover:text-primary transition-colors text-sm"
+                    >expand_more</button>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-headline font-bold text-primary uppercase tracking-widest">Difficulty Profile</label>
+                <select
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value)}
+                  className="w-full bg-surface-container-lowest border-none text-on-surface rounded-lg py-4 px-4 focus:ring-1 focus:ring-primary font-body"
+                >
+                  <option value="simple">simple</option>
+                  <option value="medium">medium</option>
+                  <option value="complex">complex</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-2 font-mono">
-                Difficulty
-              </label>
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-3 px-4 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all"
-              >
-                <option value="simple">Simple</option>
-                <option value="medium">Medium</option>
-                <option value="complex">Complex</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-2 font-mono">
-                Expression Complexity
-              </label>
-              <select
-                value={complexity}
-                onChange={(e) => setComplexity(e.target.value)}
-                className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-3 px-4 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all"
-              >
-                <option value="simple">Simple</option>
-                <option value="nested">Nested</option>
-                <option value="mixed">Mixed</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-primary tracking-widest uppercase mb-2 font-mono">
-                Max Activities
-              </label>
-              <input
-                type="number"
-                value={maxActivities}
-                onChange={(e) => setMaxActivities(Number(e.target.value))}
-                min={1}
-                max={100}
-                className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-3 px-4 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all"
-              />
+            {/* Column Right */}
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-headline font-bold text-primary uppercase tracking-widest">Expression Complexity</label>
+                <select
+                  value={complexity}
+                  onChange={(e) => setComplexity(e.target.value)}
+                  className="w-full bg-surface-container-lowest border-none text-on-surface rounded-lg py-4 px-4 focus:ring-1 focus:ring-primary font-body"
+                >
+                  <option value="simple">simple</option>
+                  <option value="nested">nested</option>
+                  <option value="mixed">mixed</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-headline font-bold text-primary uppercase tracking-widest">Max Activities</label>
+                <input
+                  type="number"
+                  value={maxActivities}
+                  onChange={(e) => setMaxActivities(Number(e.target.value))}
+                  className="w-full bg-surface-container-lowest border-none text-on-surface rounded-lg py-4 px-4 focus:ring-1 focus:ring-primary font-mono text-lg"
+                />
+              </div>
             </div>
           </div>
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8">
             <button
               onClick={handleGenerate}
               disabled={loading}
-              className={`px-8 py-3 rounded-lg font-bold text-sm tracking-wide flex items-center gap-2 transition-all shadow-lg ${
+              className={`w-full md:w-auto px-12 py-4 rounded-lg font-bold font-headline uppercase tracking-widest transition-all active:scale-95 ${
                 loading
                   ? "bg-primary/30 text-slate-400 cursor-wait"
-                  : "bg-gradient-to-br from-primary to-primary-container text-on-primary-container hover:scale-[1.02] active:scale-95 shadow-primary/10"
+                  : "bg-gradient-to-br from-primary to-primary-container text-on-primary hover:shadow-xl hover:shadow-primary/20 shadow-lg shadow-primary/10"
               }`}
             >
-              <span className="material-symbols-outlined">science</span>
               {loading ? "Generating..." : "Generate Suite"}
             </button>
           </div>
-        </div>
+        </section>
 
         {loading && (
           <div className="bg-surface-container rounded-xl p-8">
@@ -147,81 +154,111 @@ export function SyntheticPage() {
 
         {result && !loading && (
           <>
-            {/* Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-surface-container p-6 rounded-xl">
-                <p className="text-sm text-slate-500 uppercase tracking-wider">Generated</p>
-                <span className="text-4xl font-headline font-bold text-on-surface mt-2 block">
-                  {result.count}
-                </span>
-                <span className="text-xs font-mono text-[#27e199]">pipelines</span>
-              </div>
-              <div className="bg-surface-container p-6 rounded-xl">
-                <p className="text-sm text-slate-500 uppercase tracking-wider">Difficulty</p>
-                <span className="text-2xl font-headline font-bold text-on-surface mt-2 block capitalize">
-                  {difficulty}
-                </span>
-              </div>
-              <div className="bg-surface-container p-6 rounded-xl">
-                <p className="text-sm text-slate-500 uppercase tracking-wider">Complexity</p>
-                <span className="text-2xl font-headline font-bold text-on-surface mt-2 block capitalize">
-                  {complexity}
-                </span>
-              </div>
-            </div>
-
-            {/* Pipeline list */}
-            <div className="bg-surface-container rounded-xl overflow-hidden border border-white/5">
-              <div className="px-8 py-5 bg-surface-container-high/20 border-b border-white/5 flex justify-between items-center">
-                <h3 className="text-sm font-headline font-semibold text-slate-100 uppercase tracking-wider">
-                  Generated Pipelines
-                </h3>
-                <span className="text-xs font-mono text-slate-500">{result.pipelines.length} items</span>
-              </div>
-              <div className="max-h-[400px] overflow-y-auto">
-                {result.pipelines.map((name, i) => {
-                  const isSelected = selectedPipeline === i;
-                  return (
-                    <div key={i}>
-                      <div
-                        onClick={() => setSelectedPipeline(isSelected ? null : i)}
-                        className={`flex items-center gap-4 px-8 py-3 border-b border-white/5 cursor-pointer transition-colors ${
-                          isSelected ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-container-low/30"
-                        }`}
-                      >
-                        <span className="text-[10px] font-mono text-slate-600 w-8">{String(i + 1).padStart(3, "0")}</span>
-                        <span className="material-symbols-outlined text-primary text-sm">account_tree</span>
-                        <span className="text-sm font-mono text-slate-200 flex-1">{name}</span>
-                        <span className="material-symbols-outlined text-slate-600 text-sm transition-transform" style={{ transform: isSelected ? "rotate(180deg)" : "rotate(0)" }}>
-                          expand_more
-                        </span>
-                      </div>
-                      {isSelected && (
-                        <div className="px-8 py-4 bg-base border-b border-white/5 animate-[fade-in-up_0.2s_ease]">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Pipeline Definition</span>
-                            <button
-                              onClick={() => {
-                                window.location.hash = "#/validate";
-                                // Store in sessionStorage so Validate page can pick it up
-                                sessionStorage.setItem("lmv_prefill_json", JSON.stringify({ name }, null, 2));
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-mono font-medium hover:bg-accent/20 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-sm">open_in_new</span>
-                              Open in Validator
-                            </button>
-                          </div>
-                          <pre className="p-4 bg-surface-container-lowest rounded-lg font-mono text-xs text-primary/80 overflow-x-auto max-h-[200px]">
-                            {JSON.stringify({ name, type: "synthetic", difficulty, expression_complexity: complexity, index: i }, null, 2)}
-                          </pre>
-                        </div>
-                      )}
+            {/* Results Summary */}
+            <section className="space-y-6">
+              <div className="flex justify-between items-end">
+                <div className="flex items-center gap-6">
+                  <div className="bg-surface-container-high px-4 py-2 rounded-lg border-l-4 border-tertiary">
+                    <p className="text-[10px] text-slate-500 font-headline uppercase font-bold">Total Generated</p>
+                    <p className="font-mono text-xl text-tertiary">{result.count}</p>
+                  </div>
+                  {result.output_path && (
+                    <div className="bg-surface-container-high px-4 py-2 rounded-lg">
+                      <p className="text-[10px] text-slate-500 font-headline uppercase font-bold">Output Path</p>
+                      <p className="font-mono text-sm text-slate-300">{result.output_path}</p>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+                <button className="text-primary text-sm font-body flex items-center gap-2 hover:underline">
+                  <span className="material-symbols-outlined text-sm">download</span> Export All
+                </button>
               </div>
-            </div>
+
+              {/* Preview Table */}
+              <div className="bg-surface-container rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-container-high border-b border-outline-variant/10">
+                      <th className="px-6 py-4 text-xs font-headline font-bold text-slate-400 uppercase tracking-widest">Pipeline Name</th>
+                      <th className="px-6 py-4 text-xs font-headline font-bold text-slate-400 uppercase tracking-widest text-right">Index</th>
+                      <th className="px-6 py-4 text-xs font-headline font-bold text-slate-400 uppercase tracking-widest">Difficulty</th>
+                      <th className="px-6 py-4 text-xs font-headline font-bold text-slate-400 uppercase tracking-widest">Complexity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/5">
+                    {result.pipelines.slice(0, 10).map((name, i) => {
+                      const ds = difficultyStyle(difficulty);
+                      return (
+                        <tr
+                          key={i}
+                          onClick={() => setSelectedPipeline(selectedPipeline === i ? null : i)}
+                          className="hover:bg-surface-container-low transition-colors cursor-pointer group"
+                        >
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <span className="material-symbols-outlined text-slate-500 text-sm group-hover:text-primary">data_object</span>
+                              <span className="font-mono text-sm text-on-surface">{name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-right font-mono text-slate-400">{String(i + 1).padStart(2, "0")}</td>
+                          <td className="px-6 py-5">
+                            <div className={`inline-flex items-center px-2 py-0.5 rounded ${ds.bg} border-l-2 ${ds.border}`}>
+                              <span className={`font-mono text-[10px] ${ds.text} uppercase`}>{difficulty}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-xs text-slate-400 font-body capitalize">{complexity}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Conversion Feasibility Analytics */}
+            <section className="bg-surface-container-low p-8 rounded-xl space-y-8 border border-outline-variant/5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-xl font-headline font-bold text-on-surface">Conversion Feasibility Analytics</h3>
+                  <p className="text-sm text-slate-500 font-body">Preview how the generated suite maps to target architecture.</p>
+                </div>
+                <button className="px-8 py-3 rounded-lg border border-primary/20 bg-primary/5 text-primary font-bold font-headline uppercase tracking-wider hover:bg-primary/10 transition-colors flex items-center gap-3">
+                  <span className="material-symbols-outlined">analytics</span>
+                  Run Converter + Score
+                </button>
+              </div>
+              {/* CCS Distribution Chart */}
+              <div className="bg-surface-container-lowest p-6 rounded-lg space-y-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-slate-400 font-headline uppercase tracking-widest">Capability Coverage Score (CCS)</span>
+                  <span className="text-xl font-mono text-primary">--</span>
+                </div>
+                <div className="h-4 w-full bg-surface-container-high rounded-full overflow-hidden flex">
+                  <div className="h-full bg-tertiary" style={{ width: "45%" }} />
+                  <div className="h-full bg-primary" style={{ width: "30%" }} />
+                  <div className="h-full bg-secondary-container" style={{ width: "9%" }} />
+                  <div className="h-full bg-error" style={{ width: "16%" }} />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-tertiary" />
+                    <span className="text-[10px] text-slate-400 font-mono">Native Support (45%)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    <span className="text-[10px] text-slate-400 font-mono">Refactor Required (30%)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-secondary-container" />
+                    <span className="text-[10px] text-slate-400 font-mono">UDF Emulated (9%)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-error" />
+                    <span className="text-[10px] text-slate-400 font-mono">Unsupported (16%)</span>
+                  </div>
+                </div>
+              </div>
+            </section>
           </>
         )}
       </div>

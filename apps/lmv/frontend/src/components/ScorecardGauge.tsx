@@ -34,9 +34,9 @@ export function ScorecardGauge({
   const cx = size / 2;
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center space-y-4">
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-        <svg className="w-full h-full -rotate-90">
+        <svg className="w-full h-full transform -rotate-90">
           <circle
             className="text-surface-container-highest"
             cx={cx}
@@ -62,14 +62,14 @@ export function ScorecardGauge({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-5xl font-bold font-headline text-white tracking-tighter">
+          <span className="text-6xl font-bold font-headline text-white">
             {Math.round(pct)}
           </span>
-          <span className="text-[10px] font-mono text-slate-500 tracking-tighter">/ 100</span>
+          <span className="font-mono text-xs text-slate-500 tracking-tighter">/ 100</span>
         </div>
       </div>
       <div
-        className="machined-chip px-4 py-1.5 rounded-sm mt-4"
+        className="machined-chip px-4 py-1.5 rounded-sm"
         style={{ borderColor: badge.color }}
       >
         <span
