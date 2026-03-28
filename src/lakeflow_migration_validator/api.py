@@ -80,12 +80,21 @@ class HarnessRunRequest(BaseModel):
 
 
 class SyntheticGenerateRequest(BaseModel):
-    """Request payload for /api/synthetic/generate."""
+    """Request payload for /api/synthetic/generate.
+
+    Modes:
+    - ``template``: deterministic templates (fast, no LLM)
+    - ``llm``: LLM generation using a preset or custom prompt
+    - ``custom``: user-provided prompt (free-form)
+    """
 
     count: int = 10
     difficulty: str = "medium"
     max_activities: int = 20
     mode: str = "template"
+    preset: str | None = None           # key from PROMPT_TEMPLATES (for llm mode)
+    custom_prompt: str | None = None    # user-edited prompt (for custom mode)
+    generate_test_data: bool = False    # also generate test data for parallel testing
     output_path: str | None = None
 
 
@@ -170,6 +179,22 @@ def create_app(
             "fix_suggestions": list(result.fix_suggestions),
         }
 
+    @app.get("/api/synthetic/templates")
+    def get_synthetic_templates() -> list[dict[str, str]]:
+        from lakeflow_migration_validator.synthetic.prompt_templates import list_templates
+        return list_templates()
+
+    @app.post("/api/synthetic/resolve-template")
+    def post_resolve_template(request: dict[str, Any]) -> dict[str, str]:
+        from lakeflow_migration_validator.synthetic.prompt_templates import resolve_template
+        return {
+            "prompt": resolve_template(
+                request.get("preset", "complex_expressions"),
+                count=request.get("count", 10),
+                max_activities=request.get("max_activities", 10),
+            )
+        }
+
     @app.post("/api/synthetic/generate")
     def post_synthetic_generate(request: SyntheticGenerateRequest) -> dict[str, Any]:
         suite = GroundTruthSuite.generate(
@@ -180,11 +205,21 @@ def create_app(
         )
         if request.output_path:
             suite.to_json(request.output_path)
-        return {
+
+        result: dict[str, Any] = {
             "count": len(suite.pipelines),
             "pipelines": [pipeline.adf_json.get("name", "<unknown>") for pipeline in suite.pipelines],
             "output_path": request.output_path,
         }
+
+        # Optionally generate test data for parallel testing
+        if request.generate_test_data:
+            from lakeflow_migration_validator.synthetic.test_data_generator import TestDataGenerator
+            gen = TestDataGenerator()
+            test_data = gen.generate_for_suite([p.adf_json for p in suite.pipelines])
+            result["test_data"] = [td.to_dict() for td in test_data]
+
+        return result
 
     @app.post("/api/parallel/run")
     def post_parallel_run(request: ParallelRunRequest) -> dict[str, Any]:
