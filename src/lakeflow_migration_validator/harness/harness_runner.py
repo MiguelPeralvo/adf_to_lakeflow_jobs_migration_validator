@@ -83,9 +83,11 @@ class HarnessRunner:
             snapshot, scorecard, fix_suggestions = self.fix_loop.iterate(snapshot, scorecard)
             iterations = len(fix_suggestions) + 1
         elif self.max_iterations > 1 and self.judge_provider is not None:
+            advance_fn = self._make_advance_fn(pipeline_json)
             loop = FixLoop(
                 judge_provider=self.judge_provider,
-                max_iterations=1,
+                max_iterations=self.max_iterations,
+                advance_fn=advance_fn,
             )
             snapshot, scorecard, fix_suggestions = loop.iterate(snapshot, scorecard)
             iterations = len(fix_suggestions) + 1
@@ -102,6 +104,22 @@ class HarnessRunner:
         """Run harness for explicit pipelines, or all pipelines from connector."""
         names = pipeline_names if pipeline_names is not None else self.adf_connector.list_pipelines()
         return [self.run(name) for name in names]
+
+    def _make_advance_fn(self, pipeline_json: dict):
+        """Build an advance callback that re-translates and re-evaluates."""
+
+        def _advance(
+            current_snapshot: ConversionSnapshot,
+            current_scorecard: Scorecard,
+            suggestion: dict,
+            iteration: int,
+        ) -> tuple[ConversionSnapshot, Scorecard]:
+            source_pipeline, prepared_workflow = self.adf_connector.translate_and_prepare(pipeline_json)
+            new_snapshot = self.wkmigrate_adapter(source_pipeline, prepared_workflow)
+            new_scorecard = self._evaluate_snapshot(new_snapshot)
+            return new_snapshot, new_scorecard
+
+        return _advance
 
     def _evaluate_snapshot(self, snapshot: ConversionSnapshot) -> Scorecard:
         if self.judge_provider is None:
