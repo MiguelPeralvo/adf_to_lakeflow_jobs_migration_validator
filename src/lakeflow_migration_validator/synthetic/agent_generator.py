@@ -31,6 +31,12 @@ from lakeflow_migration_validator.synthetic.pipeline_generator import (
     _DEFAULT_ACTIVITY_TYPES,
 )
 
+# Max tokens for LLM pipeline generation.  Complex ADF pipelines with deeply
+# nested expressions can exceed 10 K tokens, so we set a generous ceiling.
+# Adjust downward if your serving endpoint has a lower limit or you want to
+# reduce cost; 8192 is the practical minimum for non-trivial pipelines.
+MAX_GENERATION_TOKENS: int = 65_536
+
 # Canonical supported types — derived from the shared pipeline_generator constant
 # to avoid drift. Control-flow types (ForEach, IfCondition) are also supported.
 _SUPPORTED_TYPES: frozenset[str] = frozenset(_DEFAULT_ACTIVITY_TYPES) | {
@@ -48,19 +54,49 @@ _WEAK_SPOTS = {
     "deep_nesting": "Use 3+ levels of control flow nesting: ForEach → IfCondition → ForEach → Notebook",
 }
 
-_GENERATION_PROMPT = """You are an Azure Data Factory expert. Generate a realistic ADF pipeline JSON
-definition that would stress-test an ADF-to-Databricks migration tool.
+_PLAN_PROMPT = """You are an Azure Data Factory expert planning a synthetic test suite.
 
-Requirements:
-- Valid ADF pipeline JSON: {{"name": "...", "properties": {{"parameters": {{...}}, "variables": {{...}}, "activities": [...]}}}}
-- Include {activity_count} activities using these types: {activity_types}
-- Include dependency chains between activities (depends_on with Succeeded conditions)
-- Use these ADF expression patterns in activity properties: {expression_patterns}
+User request:
+{user_request}
+
+Analyze the request and produce a generation plan as JSON:
+{{
+  "count": <number of pipelines to generate>,
+  "pipelines": [
+    {{
+      "name": "<descriptive_pipeline_name>",
+      "activity_count": <3-10>,
+      "activity_types": ["SetVariable", "DatabricksNotebook", ...],
+      "stress_area": "<what this pipeline tests>",
+      "expression_complexity": "<simple|nested|deeply_nested>",
+      "parameters": ["env", "batch_id", ...]
+    }}
+  ]
+}}
+
+Rules:
+- Each pipeline must have a unique name and distinct stress focus
+- Activity types: SetVariable, IfCondition, DatabricksNotebook, Copy, Lookup, WebActivity, ForEach
+- Match the user's intent for count, complexity, and coverage
+- If the user didn't specify a count, default to 10
+
+Output ONLY valid JSON. No markdown, no explanation."""
+
+_GENERATION_PROMPT = """You are an Azure Data Factory expert. Generate exactly ONE realistic ADF pipeline JSON.
+
+Pipeline spec:
+- Name: {pipeline_name}
+- Include {activity_count} activities using types: {activity_types}
+- Include dependency chains (dependsOn with Succeeded conditions)
+- Use these ADF expression patterns: {expression_patterns}
 - Include pipeline parameters: {parameters}
-- Target this stress area: {target_description}
+- Stress area: {target_description}
 {extra_instructions}
 
-CRITICAL: Output ONLY valid JSON. No markdown, no explanation, no code blocks. Just the JSON object."""
+Output format — a single JSON object:
+{{"name": "{pipeline_name}", "properties": {{"parameters": {{...}}, "variables": {{...}}, "activities": [...]}}}}
+
+CRITICAL: Output ONLY the single JSON object. No arrays, no markdown, no explanation, no code blocks."""
 
 _GROUND_TRUTH_PROMPT = """Analyze this ADF pipeline JSON and predict what a migration validator would score.
 
@@ -78,6 +114,25 @@ For each quality dimension, predict a score from 0.0 to 1.0:
 
 Output JSON: {{"activity_coverage": 0.X, "expression_coverage": 0.X, ...}}
 ONLY valid JSON, no explanation."""
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineSpec:
+    """Spec for a single pipeline from the generation plan."""
+    name: str
+    activity_count: int = 5
+    activity_types: tuple[str, ...] = ("SetVariable", "DatabricksNotebook", "Lookup", "IfCondition")
+    stress_area: str = "nested_expressions"
+    expression_complexity: str = "nested"
+    parameters: tuple[str, ...] = ("env", "batch_id", "output_path")
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationPlan:
+    """An LLM-produced plan describing the full test suite to generate."""
+    count: int
+    specs: tuple[PipelineSpec, ...]
+    raw_plan: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,12 +156,16 @@ class AgentPipelineGenerator:
     def __init__(
         self,
         judge_provider: JudgeProvider,
-        model: str = "chatgpt-5-4",
+        model: str | None = None,
         max_retries: int = 2,
     ):
         self._provider = judge_provider
-        self._model = model
+        self._model = model  # None → provider picks its default
         self._max_retries = max_retries
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def generate(
         self,
@@ -114,59 +173,190 @@ class AgentPipelineGenerator:
         config: GenerationConfig | None = None,
     ) -> list[SyntheticPipeline]:
         """Generate synthetic pipelines using the LLM."""
+        return [p for ev in self.generate_stream(count, config) if ev["type"] == "pipeline" and ev.get("pipeline") for p in [ev["pipeline"]]]
+
+    def generate_stream(
+        self,
+        count: int = 10,
+        config: GenerationConfig | None = None,
+        plan: GenerationPlan | None = None,
+    ):
+        """Yield event dicts for streaming: plan, pipeline progress, errors.
+
+        Event types:
+          {"type": "plan", "plan": GenerationPlan}
+          {"type": "pipeline", "completed": int, "total": int,
+           "pipeline": SyntheticPipeline | None, "error": str | None}
+        """
         cfg = config or GenerationConfig()
-        pipelines: list[SyntheticPipeline] = []
 
-        for i in range(count):
-            # Rotate through weak spots
-            weak_spot_key = cfg.target_weak_spots[i % len(cfg.target_weak_spots)]
-            target_desc = _WEAK_SPOTS.get(weak_spot_key, weak_spot_key)
+        # Phase 1: Plan (skip if pre-built plan provided)
+        if plan is None:
+            plan = self._create_plan(count, cfg)
+        yield {"type": "plan", "plan": plan}
 
-            activity_types = list(cfg.activity_types)
-            if cfg.include_unsupported and i % 3 == 0:
-                activity_types.append("AzureFunctionActivity")
-
+        # Phase 2: Execute per spec with per-pipeline stage events
+        total = plan.count
+        for i, spec in enumerate(plan.specs):
+            target_desc = _WEAK_SPOTS.get(spec.stress_area, spec.stress_area)
             prompt = _GENERATION_PROMPT.format(
-                activity_count=cfg.activity_count + (i % 3),
-                activity_types=", ".join(activity_types),
+                pipeline_name=spec.name,
+                activity_count=spec.activity_count,
+                activity_types=", ".join(spec.activity_types),
                 expression_patterns=target_desc,
-                parameters=", ".join(cfg.parameters),
+                parameters=", ".join(spec.parameters),
                 target_description=target_desc,
                 extra_instructions=cfg.extra_instructions,
             )
+            pipeline = None
+            error = None
+            for stage_ev in self._generate_one_staged(prompt, spec.name, spec.stress_area):
+                yield {
+                    "type": "stage",
+                    "pipeline_index": i,
+                    "pipeline_name": spec.name,
+                    "total": total,
+                    **stage_ev,
+                }
+                if stage_ev["stage"] == "complete":
+                    pipeline = stage_ev["pipeline"]
+                elif stage_ev["stage"] == "failed":
+                    error = stage_ev.get("error")
 
-            adf_json = self._generate_one(prompt, pipeline_index=i)
-            if adf_json is None:
+            yield {
+                "type": "pipeline",
+                "completed": i + 1,
+                "total": total,
+                "pipeline": pipeline,
+                "error": error,
+                "spec_name": spec.name,
+            }
+
+    # Keep old name as alias for backward compat
+    def generate_iter(self, count: int = 10, config: GenerationConfig | None = None):
+        """Yield ``(completed, total, pipeline | None, error | None)``."""
+        for ev in self.generate_stream(count, config):
+            if ev["type"] == "pipeline":
+                yield (ev["completed"], ev["total"], ev.get("pipeline"), ev.get("error"))
+
+    # ------------------------------------------------------------------
+    # Phase 1: Planning
+    # ------------------------------------------------------------------
+
+    def _create_plan(self, count: int, cfg: GenerationConfig) -> GenerationPlan:
+        """Ask the LLM to produce a generation plan, or build a deterministic fallback."""
+        user_request = cfg.extra_instructions or f"Generate {count} ADF pipelines targeting: {', '.join(cfg.target_weak_spots)}"
+        prompt = _PLAN_PROMPT.format(user_request=user_request)
+
+        try:
+            raw_text = self._complete(prompt, max_tokens=16_384)
+            plan_json = _extract_json(raw_text)
+            if plan_json and "pipelines" in plan_json:
+                specs = []
+                for item in plan_json["pipelines"]:
+                    if not isinstance(item, dict):
+                        continue
+                    specs.append(PipelineSpec(
+                        name=item.get("name", f"llm_pipeline_{len(specs):03d}"),
+                        activity_count=int(item.get("activity_count", cfg.activity_count)),
+                        activity_types=tuple(item.get("activity_types", cfg.activity_types)),
+                        stress_area=item.get("stress_area", cfg.target_weak_spots[0]),
+                        expression_complexity=item.get("expression_complexity", "nested"),
+                        parameters=tuple(item.get("parameters", cfg.parameters)),
+                    ))
+                if specs:
+                    return GenerationPlan(
+                        count=len(specs),
+                        specs=tuple(specs),
+                        raw_plan=plan_json,
+                    )
+        except Exception:
+            pass  # fall through to deterministic plan
+
+        # Deterministic fallback
+        specs = []
+        for i in range(count):
+            weak_spot = cfg.target_weak_spots[i % len(cfg.target_weak_spots)]
+            specs.append(PipelineSpec(
+                name=f"llm_pipeline_{i:03d}",
+                activity_count=cfg.activity_count + (i % 3),
+                activity_types=cfg.activity_types,
+                stress_area=weak_spot,
+                parameters=cfg.parameters,
+            ))
+        return GenerationPlan(count=count, specs=tuple(specs))
+
+    # ------------------------------------------------------------------
+    # Phase 2: Single pipeline generation
+    # ------------------------------------------------------------------
+
+    def _generate_one_staged(self, prompt: str, pipeline_name: str, stress_area: str = ""):
+        """Yield stage events during single pipeline generation.
+
+        Stages: preparing → generating → parsing → validating → complete/failed.
+        Each event is a dict with ``stage``, ``pct`` (0-100), and optional metadata.
+        """
+        max_attempts = self._max_retries + 1
+        yield {"stage": "preparing", "pct": 0}
+
+        last_error: str | None = None
+        for attempt in range(max_attempts):
+            yield {"stage": "generating", "pct": 10, "attempt": attempt + 1, "max_attempts": max_attempts}
+            try:
+                raw_text = self._complete(prompt, max_tokens=MAX_GENERATION_TOKENS)
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                yield {"stage": "retry", "pct": 10, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
                 continue
 
-            snapshot = _build_expected_snapshot(adf_json)
+            yield {"stage": "parsing", "pct": 70}
+            adf_json = _extract_json(raw_text)
+            if adf_json is None:
+                last_error = f"LLM returned non-JSON (attempt {attempt + 1}/{max_attempts})"
+                yield {"stage": "retry", "pct": 75, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                continue
 
-            pipelines.append(SyntheticPipeline(
+            yield {"stage": "validating", "pct": 85}
+            if not _is_adf_pipeline(adf_json):
+                last_error = f"Not a valid ADF pipeline (attempt {attempt + 1}/{max_attempts})"
+                yield {"stage": "retry", "pct": 88, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                continue
+
+            if "name" not in adf_json:
+                adf_json["name"] = pipeline_name
+
+            yield {"stage": "building_snapshot", "pct": 92}
+            snapshot = _build_expected_snapshot(adf_json)
+            pipeline = SyntheticPipeline(
                 adf_json=adf_json,
                 expected_snapshot=snapshot,
-                description=f"LLM-generated pipeline targeting {weak_spot_key} (#{i})",
+                description=f"LLM pipeline: {pipeline_name} ({stress_area})" if stress_area else f"LLM pipeline: {pipeline_name}",
                 difficulty="llm",
-            ))
+            )
+            yield {"stage": "complete", "pct": 100, "pipeline": pipeline}
+            return
 
-        return pipelines
+        yield {"stage": "failed", "pct": 100, "error": last_error}
 
-    def _generate_one(self, prompt: str, pipeline_index: int) -> dict | None:
-        """Call LLM and parse JSON response, with retries."""
-        for attempt in range(self._max_retries + 1):
-            try:
-                response = self._provider.judge(prompt, model=self._model)
-                raw_text = response.get("reasoning", "")
-                adf_json = _extract_json(raw_text)
-                if adf_json is None:
-                    continue  # retry — LLM returned non-JSON
-                if not _is_adf_pipeline(adf_json):
-                    continue  # retry — JSON is not an ADF pipeline
-                if "name" not in adf_json:
-                    adf_json["name"] = f"llm_pipeline_{pipeline_index:03d}"
-                return adf_json
-            except Exception:
-                continue
-        return None
+    def _generate_one(self, prompt: str, pipeline_name: str) -> tuple[dict | None, str | None]:
+        """Non-streaming single pipeline generation. Returns (result, error)."""
+        pipeline = None
+        error = None
+        for ev in self._generate_one_staged(prompt, pipeline_name):
+            if ev["stage"] == "complete":
+                pipeline = ev["pipeline"]
+            elif ev["stage"] == "failed":
+                error = ev.get("error")
+        if pipeline:
+            return pipeline.adf_json, None
+        return None, error
+
+    def _complete(self, prompt: str, max_tokens: int = MAX_GENERATION_TOKENS) -> str:
+        """Call the LLM provider for raw text completion."""
+        if hasattr(self._provider, "complete"):
+            return self._provider.complete(prompt, model=self._model, max_tokens=max_tokens)
+        response = self._provider.judge(prompt, model=self._model)
+        return response.get("reasoning", "")
 
     def _predict_ground_truth(self, adf_json: dict) -> dict:
         """Use LLM to predict expected dimension scores."""
@@ -237,26 +427,58 @@ class FailureFeedback:
 # ---------------------------------------------------------------------------
 
 def _extract_json(text: str) -> dict | None:
-    """Extract a JSON object from LLM output, handling markdown code blocks."""
+    """Extract a JSON object from LLM output.
+
+    Handles markdown code blocks, JSON arrays, and structurally broken JSON
+    (e.g. unescaped quotes in ADF SQL expressions) using ``json_repair``.
+    """
     if not text:
         return None
     # Strip markdown code blocks
     text = re.sub(r"```json?\s*", "", text)
     text = re.sub(r"```\s*", "", text)
     text = text.strip()
+
+    # Fast path: try direct parse
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
             return obj
+        if isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, dict):
+                    return item
     except json.JSONDecodeError:
-        # Try to find JSON object in the text
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
+        pass
+
+    # Repair path: use json_repair for LLM-generated malformed JSON
+    # (handles unescaped quotes, missing commas, trailing commas, etc.)
+    try:
+        from json_repair import repair_json
+        repaired = repair_json(text, return_objects=True)
+        if isinstance(repaired, dict):
+            return repaired
+        if isinstance(repaired, list):
+            for item in repaired:
+                if isinstance(item, dict):
+                    return item
+    except Exception:
+        pass
+
+    # Last resort: find a JSON object substring
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        try:
+            obj = json.loads(match.group())
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
             try:
-                obj = json.loads(match.group())
-                if isinstance(obj, dict):
-                    return obj
-            except json.JSONDecodeError:
+                from json_repair import repair_json
+                repaired = repair_json(match.group(), return_objects=True)
+                if isinstance(repaired, dict):
+                    return repaired
+            except Exception:
                 pass
     return None
 

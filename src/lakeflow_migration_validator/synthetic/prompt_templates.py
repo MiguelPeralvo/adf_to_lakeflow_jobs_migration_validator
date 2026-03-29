@@ -94,6 +94,29 @@ unsupported activity types. This tests placeholder generation and activity_cover
 Output ONLY valid ADF pipeline JSON.""",
     },
 
+    "pipeline_invocation": {
+        "label": "Pipeline Invocation",
+        "icon": "share",
+        "description": "Parent pipelines invoking child pipelines via ExecutePipeline — tests cross-pipeline orchestration",
+        "prompt": """Generate {count} ADF pipelines that model parent-child orchestration
+patterns using ExecutePipeline activities. These stress-test how the migration
+tool handles cross-pipeline invocation, parameter pass-through, and nested
+execution contexts. Each pipeline should:
+- Include 1-3 ExecutePipeline activities that invoke other pipelines by name
+- Pass parent pipeline parameters down to child pipelines via
+  @pipeline().parameters.env, @pipeline().parameters.batch_id, etc.
+- Chain ExecutePipeline with Lookup or SetVariable activities to pass dynamic
+  values: invoke child with output from upstream activity
+  (e.g., @activity('GetConfig').output.firstRow.target_pipeline)
+- Mix ExecutePipeline with regular activities (DatabricksNotebook, Copy) to model
+  realistic orchestration: lookup config → execute child → copy results
+- Include waitOnCompletion: true and false variants
+- Include pipeline parameters: env, batch_id, child_pipeline_name, run_mode
+- Have {max_activities} activities with dependency chains
+
+Output ONLY valid ADF pipeline JSON.""",
+    },
+
     "full_coverage": {
         "label": "Full Coverage",
         "icon": "verified",
