@@ -24,7 +24,7 @@ interface BatchReport {
   cases: CaseResult[];
 }
 
-type SourceMode = "folder" | "golden_set";
+type SourceMode = "folder" | "golden_set" | "adf_download";
 
 function scoreColor(s: number): string {
   if (s >= 90) return "#27e199";
@@ -46,6 +46,14 @@ const DIM_LABELS: Record<string, { label: string; icon: string }> = {
 export function BatchPage() {
   const [sourceMode, setSourceMode] = useState<SourceMode>("folder");
   const [folderPath, setFolderPath] = useState("");
+  // ADF download config
+  const [adfTenantId, setAdfTenantId] = useState("");
+  const [adfClientId, setAdfClientId] = useState("");
+  const [adfClientSecret, setAdfClientSecret] = useState("");
+  const [adfSubscriptionId, setAdfSubscriptionId] = useState("");
+  const [adfResourceGroup, setAdfResourceGroup] = useState("");
+  const [adfFactoryName, setAdfFactoryName] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const [goldenSetPath, setGoldenSetPath] = useState("golden_sets/pipelines.json");
   const [globPattern, setGlobPattern] = useState("*.json");
   const [threshold, setThreshold] = useState(90);
@@ -159,6 +167,54 @@ export function BatchPage() {
           }
         }
         if (finalReport) setReport(finalReport); else throw new Error("Stream ended without results");
+      } else if (sourceMode === "adf_download") {
+        // Step 1: Download from ADF
+        setDownloading(true);
+        const dlRes = await fetch("/api/adf/download?stream=true", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_id: adfTenantId, client_id: adfClientId, client_secret: adfClientSecret,
+            subscription_id: adfSubscriptionId, resource_group: adfResourceGroup, factory_name: adfFactoryName,
+          }),
+        });
+        if (!dlRes.ok) { const err = await dlRes.json().catch(() => ({ detail: dlRes.statusText })); throw new Error(err.detail || `HTTP ${dlRes.status}`); }
+        const dlReader = dlRes.body!.getReader(); const dlDecoder = new TextDecoder();
+        let dlBuffer = "", downloadedFolder = "";
+        while (true) {
+          const { done, value } = await dlReader.read(); if (done) break;
+          dlBuffer += dlDecoder.decode(value, { stream: true });
+          const lines = dlBuffer.split("\n"); dlBuffer = lines.pop()!;
+          for (const line of lines) { if (!line.trim()) continue;
+            try { const ev = JSON.parse(line);
+              if (ev.type === "progress") { setProgressCompleted(ev.completed); setProgressTotal(ev.total); setLastPipeline(ev.pipeline_name); }
+              else if (ev.type === "complete") { downloadedFolder = ev.result.folder; }
+            } catch {} }
+        }
+        setDownloading(false);
+        if (!downloadedFolder) throw new Error("Download produced no folder");
+        setFolderPath(downloadedFolder);
+        // Step 2: Validate the downloaded folder
+        setProgressCompleted(0); setProgressTotal(0);
+        const vRes = await fetch("/api/validate/folder?stream=true", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folder_path: downloadedFolder, threshold, agent_analysis: agentAnalysis }),
+        });
+        if (!vRes.ok) { const err = await vRes.json().catch(() => ({ detail: vRes.statusText })); throw new Error(err.detail || `HTTP ${vRes.status}`); }
+        const vReader = vRes.body!.getReader(); const vDecoder = new TextDecoder();
+        let vBuffer = ""; let finalReport: BatchReport | null = null;
+        while (true) {
+          const { done, value } = await vReader.read(); if (done) break;
+          vBuffer += vDecoder.decode(value, { stream: true });
+          const lines = vBuffer.split("\n"); vBuffer = lines.pop()!;
+          for (const line of lines) { if (!line.trim()) continue;
+            try { const ev = JSON.parse(line);
+              if (ev.type === "progress") { setProgressCompleted(ev.completed); setProgressTotal(ev.total); setLastPipeline(ev.pipeline_name); setLastScore(ev.score); }
+              else if (ev.type === "analysis_start") { setAnalyzingPipeline(ev.pipeline_name); }
+              else if (ev.type === "analysis") { setAnalyzingDimension(ev.dimension); setLiveAnalyses(prev => ({ ...prev, [ev.pipeline_name]: [...(prev[ev.pipeline_name] || []), { dimension: ev.dimension, score: ev.score, diagnosis: ev.diagnosis }] })); }
+              else if (ev.type === "complete") { finalReport = ev.result; setAnalyzingPipeline(null); }
+            } catch {} }
+        }
+        if (finalReport) setReport(finalReport);
       } else {
         const res = await fetch("/api/validate/batch", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -202,14 +258,36 @@ export function BatchPage() {
               <span className="material-symbols-outlined text-sm align-middle mr-1.5">folder_open</span>
               ADF Pipeline Folder
             </button>
+            <button onClick={() => setSourceMode("adf_download")}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${sourceMode === "adf_download" ? "text-primary border-b-2 border-primary bg-surface-container-high/30" : "text-outline hover:text-on-surface"}`}>
+              <span className="material-symbols-outlined text-sm align-middle mr-1.5">cloud_download</span>
+              Download from ADF
+            </button>
             <button onClick={() => setSourceMode("golden_set")}
               className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${sourceMode === "golden_set" ? "text-primary border-b-2 border-primary bg-surface-container-high/30" : "text-outline hover:text-on-surface"}`}>
               <span className="material-symbols-outlined text-sm align-middle mr-1.5">verified</span>
               Golden Set JSON
             </button>
           </div>
-          <div className="p-6 flex gap-6 items-end">
-            {sourceMode === "folder" ? (<>
+          <div className="p-6 flex flex-wrap gap-4 items-end">
+            {sourceMode === "adf_download" ? (
+              <div className="w-full grid grid-cols-3 gap-3">
+                {[
+                  { label: "Tenant ID", value: adfTenantId, set: setAdfTenantId },
+                  { label: "Client ID", value: adfClientId, set: setAdfClientId },
+                  { label: "Client Secret", value: adfClientSecret, set: setAdfClientSecret, type: "password" },
+                  { label: "Subscription ID", value: adfSubscriptionId, set: setAdfSubscriptionId },
+                  { label: "Resource Group", value: adfResourceGroup, set: setAdfResourceGroup },
+                  { label: "Factory Name", value: adfFactoryName, set: setAdfFactoryName },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">{f.label}</label>
+                    <input type={(f as any).type || "text"} value={f.value} onChange={e => f.set(e.target.value)}
+                      className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-2 px-3 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all" />
+                  </div>
+                ))}
+              </div>
+            ) : sourceMode === "folder" ? (<>
               <div className="flex-1">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 font-mono">Folder Path</label>
                 <input value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/path/to/adf_pipelines/"
@@ -335,7 +413,10 @@ export function BatchPage() {
               <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-mono text-on-surface">
-                  {analyzingPipeline ? (
+                  {downloading ? (
+                    <>Downloading <span className="text-primary font-bold">{progressCompleted}</span><span className="text-outline">/{progressTotal}</span>
+                    {lastPipeline && <span className="text-outline ml-2">— <span className="text-on-surface-variant">{lastPipeline}</span></span>}</>
+                  ) : analyzingPipeline ? (
                     <><span className="text-primary font-semibold">Analyzing</span> {analyzingPipeline}{analyzingDimension && <span className="text-outline"> — {analyzingDimension}</span>}</>
                   ) : (
                     <>Validating <span className="text-primary font-bold">{progressCompleted}</span><span className="text-outline">/{progressTotal}</span>

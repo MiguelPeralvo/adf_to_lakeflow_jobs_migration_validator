@@ -297,38 +297,44 @@ class AgentPipelineGenerator:
         """Yield stage events during single pipeline generation.
 
         Stages: preparing → generating → parsing → validating → complete/failed.
-        Each event is a dict with ``stage``, ``pct`` (0-100), and optional metadata.
+
+        Percentage allocation reflects actual time spent:
+        - preparing (0–5%): prompt construction — instant
+        - generating (5–90%): LLM call — this is where all the time goes
+        - parsing (90–94%): JSON extraction — instant
+        - validating (94–97%): ADF structure check — instant
+        - building_snapshot (97–100%): snapshot construction — instant
         """
         max_attempts = self._max_retries + 1
-        yield {"stage": "preparing", "pct": 0}
+        yield {"stage": "preparing", "pct": 5}
 
         last_error: str | None = None
         for attempt in range(max_attempts):
-            yield {"stage": "generating", "pct": 10, "attempt": attempt + 1, "max_attempts": max_attempts}
+            yield {"stage": "generating", "pct": 5, "attempt": attempt + 1, "max_attempts": max_attempts}
             try:
                 raw_text = self._complete(prompt, max_tokens=MAX_GENERATION_TOKENS)
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
-                yield {"stage": "retry", "pct": 10, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {"stage": "retry", "pct": 5, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
                 continue
 
-            yield {"stage": "parsing", "pct": 70}
+            yield {"stage": "parsing", "pct": 90}
             adf_json = _extract_json(raw_text)
             if adf_json is None:
                 last_error = f"LLM returned non-JSON (attempt {attempt + 1}/{max_attempts})"
-                yield {"stage": "retry", "pct": 75, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {"stage": "retry", "pct": 90, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
                 continue
 
-            yield {"stage": "validating", "pct": 85}
+            yield {"stage": "validating", "pct": 94}
             if not _is_adf_pipeline(adf_json):
                 last_error = f"Not a valid ADF pipeline (attempt {attempt + 1}/{max_attempts})"
-                yield {"stage": "retry", "pct": 88, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {"stage": "retry", "pct": 94, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
                 continue
 
             if "name" not in adf_json:
                 adf_json["name"] = pipeline_name
 
-            yield {"stage": "building_snapshot", "pct": 92}
+            yield {"stage": "building_snapshot", "pct": 97}
             try:
                 snapshot = _build_expected_snapshot(adf_json)
             except Exception as snap_exc:

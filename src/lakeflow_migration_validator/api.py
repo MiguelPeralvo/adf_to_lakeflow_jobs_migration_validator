@@ -186,6 +186,19 @@ class ValidateFolderRequest(BaseModel):
     agent_analysis: bool = False  # run LLM agent analysis on failing dimensions
 
 
+class DownloadPipelinesRequest(BaseModel):
+    """Request payload for /api/adf/download — fetch pipelines from Azure Data Factory."""
+
+    tenant_id: str = Field(min_length=1)
+    client_id: str = Field(min_length=1)
+    client_secret: str = Field(min_length=1)
+    subscription_id: str = Field(min_length=1)
+    resource_group: str = Field(min_length=1)
+    factory_name: str = Field(min_length=1)
+    pipeline_names: list[str] | None = None  # None = download all
+    output_folder: str | None = None         # None = auto-generate in temp
+
+
 class HarnessRunRequest(BaseModel):
     """Request payload for /api/harness/run."""
 
@@ -519,6 +532,143 @@ def create_app(
             "iterations": result.iterations,
             "fix_suggestions": list(result.fix_suggestions),
         }
+
+    # ------------------------------------------------------------------
+    # ADF pipeline download
+    # ------------------------------------------------------------------
+
+    @app.post("/api/adf/download")
+    def post_adf_download(
+        request: DownloadPipelinesRequest,
+        stream: bool = Query(False),
+    ):
+        """Download ADF pipelines from Azure Data Factory to a local folder.
+
+        Uses wkmigrate's FactoryClient with the provided Azure credentials.
+        Returns the folder path ready for batch validation.
+        """
+        try:
+            from wkmigrate.clients.factory_client import FactoryClient
+        except ImportError:
+            raise HTTPException(status_code=503, detail="wkmigrate is not installed — FactoryClient unavailable")
+
+        try:
+            client = FactoryClient(
+                tenant_id=request.tenant_id,
+                client_id=request.client_id,
+                client_secret=request.client_secret,
+                subscription_id=request.subscription_id,
+                resource_group_name=request.resource_group,
+                factory_name=request.factory_name,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to connect to ADF: {type(exc).__name__}: {exc}")
+
+        # Determine output folder
+        if request.output_folder:
+            out_dir = Path(request.output_folder)
+        else:
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+            out_dir = Path(tempfile.gettempdir()) / "lmv_adf_download" / f"{request.factory_name}_{ts}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get pipeline list
+        if request.pipeline_names:
+            pipeline_names = request.pipeline_names
+        else:
+            try:
+                pipeline_names = client.list_pipelines()
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"Failed to list pipelines: {exc}")
+
+        if stream:
+            return StreamingResponse(
+                _download_pipelines_stream(client, pipeline_names, out_dir),
+                media_type="application/x-ndjson",
+            )
+
+        # Non-streaming
+        downloaded = []
+        errors = []
+        for name in pipeline_names:
+            try:
+                pipeline_json = client.get_pipeline(name)
+                pipeline_json["name"] = name
+                safe = name.replace("/", "_").replace(" ", "_")[:60]
+                pipe_dir = out_dir / safe
+                pipe_dir.mkdir(parents=True, exist_ok=True)
+                with open(pipe_dir / "adf_pipeline.json", "w", encoding="utf-8") as fh:
+                    _json.dump(pipeline_json, fh, indent=2)
+                downloaded.append(name)
+            except Exception as exc:
+                errors.append({"pipeline": name, "error": f"{type(exc).__name__}: {exc}"})
+
+        return {
+            "folder": str(out_dir),
+            "factory_name": request.factory_name,
+            "total": len(pipeline_names),
+            "downloaded": len(downloaded),
+            "errors": errors,
+            "pipelines": downloaded,
+        }
+
+    def _download_pipelines_stream(client, pipeline_names: list[str], out_dir: Path):
+        """Stream NDJSON progress while downloading ADF pipelines."""
+        total = len(pipeline_names)
+        downloaded = []
+        errors = []
+        for i, name in enumerate(pipeline_names):
+            try:
+                pipeline_json = client.get_pipeline(name)
+                pipeline_json["name"] = name
+                safe = name.replace("/", "_").replace(" ", "_")[:60]
+                pipe_dir = out_dir / safe
+                pipe_dir.mkdir(parents=True, exist_ok=True)
+                with open(pipe_dir / "adf_pipeline.json", "w", encoding="utf-8") as fh:
+                    _json.dump(pipeline_json, fh, indent=2)
+                downloaded.append(name)
+                yield _json.dumps({
+                    "type": "progress", "completed": i + 1, "total": total,
+                    "pipeline_name": name, "ok": True,
+                }) + "\n"
+            except Exception as exc:
+                errors.append({"pipeline": name, "error": f"{type(exc).__name__}: {exc}"})
+                yield _json.dumps({
+                    "type": "progress", "completed": i + 1, "total": total,
+                    "pipeline_name": name, "ok": False, "error": str(exc),
+                }) + "\n"
+
+        yield _json.dumps({
+            "type": "complete",
+            "result": {
+                "folder": str(out_dir),
+                "total": total,
+                "downloaded": len(downloaded),
+                "errors": errors,
+                "pipelines": downloaded,
+            },
+        }) + "\n"
+
+    @app.get("/api/adf/list")
+    def get_adf_list_pipelines(
+        tenant_id: str = Query(...), client_id: str = Query(...),
+        client_secret: str = Query(...), subscription_id: str = Query(...),
+        resource_group: str = Query(...), factory_name: str = Query(...),
+    ) -> list[str]:
+        """List all pipeline names in an Azure Data Factory."""
+        try:
+            from wkmigrate.clients.factory_client import FactoryClient
+        except ImportError:
+            raise HTTPException(status_code=503, detail="wkmigrate not installed")
+        try:
+            client = FactoryClient(
+                tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
+                subscription_id=subscription_id, resource_group_name=resource_group,
+                factory_name=factory_name,
+            )
+            return client.list_pipelines()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to list pipelines: {exc}")
 
     # ------------------------------------------------------------------
     # wkmigrate repo/branch configuration

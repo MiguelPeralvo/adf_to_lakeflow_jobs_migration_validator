@@ -144,9 +144,11 @@ export function SyntheticPage() {
     window.location.hash = `#/validate?pipeline=${encodeURIComponent(p.name)}`;
   }
 
-  // Overall % includes sub-pipeline progress: (completed + currentPct/100) / total
+  // Overall %: during "generating" (LLM call), estimate 50% since we can't track it.
+  // For other stages, use the actual pct.
+  const pipelineFraction = currentStage === "generating" ? 0.5 : (currentStagePct / 100);
   const overallPct = progressTotal > 0
-    ? ((progressCompleted + (currentStagePct / 100)) / progressTotal) * 100
+    ? ((progressCompleted + pipelineFraction) / progressTotal) * 100
     : 0;
   const hasSpec = spec.trim().length > 10;
   const busy = specLoading || generating;
@@ -232,11 +234,19 @@ export function SyntheticPage() {
                   <div className="bg-surface-container-high/40 rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono text-on-surface font-medium truncate">{lastPipelineName}</span>
-                      <span className="text-[10px] font-mono text-outline">{currentStagePct}%</span>
+                      <span className="text-[10px] font-mono text-outline">
+                        {currentStage === "generating" ? "Waiting for LLM..." : `${currentStagePct}%`}
+                      </span>
                     </div>
                     {/* Per-pipeline stage progress bar */}
                     <div className="h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                      <div className="h-full bg-primary-container transition-all duration-300 ease-out rounded-full" style={{ width: `${currentStagePct}%` }} />
+                      {currentStage === "generating" ? (
+                        /* Indeterminate shimmer while waiting for LLM */
+                        <div className="h-full w-1/3 bg-primary-container rounded-full animate-[shimmer_1.5s_ease-in-out_infinite]"
+                          style={{ animationName: "shimmer" }} />
+                      ) : (
+                        <div className="h-full bg-primary-container transition-all duration-300 ease-out rounded-full" style={{ width: `${currentStagePct}%` }} />
+                      )}
                     </div>
                     {/* Stage indicators */}
                     <div className="flex items-center gap-1">
