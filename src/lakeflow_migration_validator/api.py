@@ -26,22 +26,46 @@ from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 
 @dataclass(slots=True)
 class InMemoryHistoryStore:
-    """Simple in-memory history store for scorecards."""
+    """In-memory history store for scorecards and activity log."""
 
     _history: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    _activity_log: list[dict[str, Any]] = field(default_factory=list)
 
     def append(self, pipeline_name: str, scorecard: dict[str, Any]) -> None:
         entries = self._history.setdefault(pipeline_name, [])
-        entries.append(
-            {
-                "pipeline_name": pipeline_name,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "scorecard": scorecard,
-            }
-        )
+        entry = {
+            "pipeline_name": pipeline_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "scorecard": scorecard,
+        }
+        entries.append(entry)
+        self._activity_log.append({"type": "validation", **entry})
+
+    def log_batch(self, folder: str, total: int, mean_score: float, below: int, threshold: float) -> None:
+        self._activity_log.append({
+            "type": "batch_validation",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "folder": folder,
+            "total": total,
+            "mean_score": mean_score,
+            "below_threshold": below,
+            "threshold": threshold,
+        })
+
+    def log_synthetic(self, output_path: str, count: int, mode: str) -> None:
+        self._activity_log.append({
+            "type": "synthetic_generation",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "output_path": output_path,
+            "count": count,
+            "mode": mode,
+        })
 
     def get(self, pipeline_name: str) -> list[dict[str, Any]]:
         return list(self._history.get(pipeline_name, []))
+
+    def get_activity_log(self, limit: int = 100) -> list[dict[str, Any]]:
+        return list(reversed(self._activity_log[-limit:]))
 
 
 class ValidateRequest(BaseModel):
@@ -187,6 +211,11 @@ def create_app(
     @app.get("/api/history/{pipeline_name}")
     def get_history(pipeline_name: str) -> list[dict[str, Any]]:
         return history.get(pipeline_name)
+
+    @app.get("/api/history")
+    def get_activity_log(limit: int = Query(100)) -> list[dict[str, Any]]:
+        """Return the unified activity log — validations, batch runs, synthetic generations."""
+        return history.get_activity_log(limit)
 
     @app.post("/api/validate/batch")
     def post_validate_batch(request: ValidateBatchRequest) -> dict[str, Any]:
@@ -391,6 +420,8 @@ def create_app(
             cases.append(case)
 
         mean = sum(scores) / len(scores) if scores else 0.0
+        folder_path = str(files[0].parent) if files else ""
+        history.log_batch(folder_path, len(cases), mean, below, threshold)
         yield _json.dumps({
             "type": "complete",
             "result": {
@@ -784,6 +815,7 @@ def create_app(
 
         persist_path = _persist_suite(suite, request.output_path)
         result = _build_result(suite, persist_path, fallback_note, request.generate_test_data)
+        history.log_synthetic(persist_path, result["count"], request.mode)
         yield _json.dumps({"type": "complete", "result": result}) + "\n"
 
     @app.post("/api/synthetic/generate")
@@ -862,6 +894,7 @@ def create_app(
             )
 
         persist_path = _persist_suite(suite, request.output_path)
+        history.log_synthetic(persist_path, len(suite.pipelines), request.mode)
         return _build_result(suite, persist_path, fallback_note, request.generate_test_data)
 
     @app.post("/api/parallel/run")
