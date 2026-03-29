@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from lakeflow_migration_validator.api import create_app as create_service_app
@@ -178,6 +179,60 @@ def _mount_frontend(app: FastAPI):
 # App assembly
 # ---------------------------------------------------------------------------
 
+_WKMIGRATE_CACHE = Path(tempfile.gettempdir()) / "lmv_wkmigrate_cache"
+
+
+def _hot_swap_wkmigrate(repo_url: str, branch: str) -> str:
+    """Clone repo, checkout branch, pip install -e, reload modules.
+
+    Returns a status message. Raises on failure.
+    """
+    import importlib
+    import subprocess
+    import sys
+
+    parts = repo_url.rstrip("/").split("/")
+    owner, repo = parts[-2], parts[-1]
+    clone_dir = _WKMIGRATE_CACHE / f"{owner}__{repo}"
+
+    # Clone or fetch
+    if (clone_dir / ".git").is_dir():
+        logger.info("Fetching %s/%s...", owner, repo)
+        subprocess.run(["git", "fetch", "--all", "--prune"], cwd=clone_dir, check=True,
+                       capture_output=True, timeout=60)
+    else:
+        clone_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Cloning %s/%s...", owner, repo)
+        subprocess.run(
+            ["git", "clone", "--no-checkout", repo_url, str(clone_dir)],
+            check=True, capture_output=True, timeout=120,
+        )
+
+    # Checkout branch
+    logger.info("Checking out %s...", branch)
+    subprocess.run(["git", "checkout", branch], cwd=clone_dir, check=True,
+                   capture_output=True, timeout=30)
+    subprocess.run(["git", "pull", "--ff-only", "origin", branch], cwd=clone_dir,
+                   capture_output=True, timeout=60)
+
+    # Install in dev mode
+    logger.info("Installing wkmigrate from %s@%s...", owner, branch)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-e", str(clone_dir), "--quiet", "--no-deps"],
+        check=True, capture_output=True, timeout=120,
+    )
+
+    # Reload modules so new code takes effect
+    mods_to_reload = sorted(k for k in sys.modules if k.startswith("wkmigrate"))
+    for mod_name in mods_to_reload:
+        try:
+            importlib.reload(sys.modules[mod_name])
+        except Exception:
+            pass  # some submodules may fail on reload; that's OK
+
+    return f"Switched to {owner}/{repo}@{branch} ({len(mods_to_reload)} modules reloaded)"
+
+
 def create_app() -> FastAPI:
     """Assemble the complete Databricks App."""
     root = FastAPI(
@@ -195,19 +250,44 @@ def create_app() -> FastAPI:
     judge = _build_judge_provider()
     harness = _build_harness_runner(judge_provider=judge)
     parallel = _build_parallel_runner()
-    convert = _build_convert_fn()
+
+    # Mutable convert_fn wrapper — allows hot-swapping wkmigrate at runtime
+    convert_holder: dict[str, Any] = {"fn": _build_convert_fn()}
+
+    def convert_proxy(payload: dict) -> Any:
+        fn = convert_holder["fn"]
+        if fn is None:
+            from lakeflow_migration_validator.serialization import snapshot_from_adf_payload
+            return snapshot_from_adf_payload(payload)
+        return fn(payload)
 
     # Include the REST API routes directly (they're already prefixed with /api/)
     service_app = create_service_app(
-        convert_fn=convert,
+        convert_fn=convert_proxy,
         judge_provider=judge,
         harness_runner=harness,
         parallel_runner=parallel,
     )
     root.router.include_router(service_app.router)
 
+    # Hot-swap endpoint — apply repo/branch change without restart
+    @root.post("/api/config/wkmigrate/apply")
+    def apply_wkmigrate_config(request: dict[str, Any]) -> dict[str, Any]:
+        """Clone, install, and reload a wkmigrate repo+branch at runtime."""
+        repo_url = request.get("repo_url", "")
+        branch = request.get("branch", "")
+        if not repo_url or not branch:
+            raise HTTPException(status_code=422, detail="repo_url and branch are required")
+        try:
+            msg = _hot_swap_wkmigrate(repo_url, branch)
+            convert_holder["fn"] = _build_convert_fn()
+            return {"status": "ok", "message": msg}
+        except Exception as exc:
+            logger.exception("Failed to hot-swap wkmigrate")
+            raise HTTPException(status_code=500, detail=f"Hot-swap failed: {exc}") from exc
+
     # Mount MCP SSE at /mcp
-    _mount_mcp(root, judge_provider=judge, convert_fn=convert)
+    _mount_mcp(root, judge_provider=judge, convert_fn=convert_proxy)
 
     # Serve frontend static files (catch-all, must be last)
     _mount_frontend(root)

@@ -23,7 +23,8 @@ Additional repositories can be added via the API.
 2. Click the **wkmigrate** config bar (shows current repo @ branch)
 3. Select a repository from the dropdown — branches load automatically from GitHub
 4. Select a branch (ordered by recency)
-5. Click **Save Config**
+5. Click **Apply & Reload** — this clones the repo, installs it, and reloads
+   the modules at runtime (no server restart needed)
 
 ### Via the API
 
@@ -51,15 +52,24 @@ curl -X POST http://localhost:8000/api/config/wkmigrate \
 
 ## Applying Changes
 
-**Important:** Changing the repo/branch in the config stores the selection but
-does NOT hot-swap the running wkmigrate package. To apply changes:
+Clicking **Apply & Reload** in the UI (or calling the API endpoint) performs
+the following steps automatically — no server restart needed:
 
-1. Save the config via the UI or API
-2. Install the desired version:
-   ```bash
-   pip install -e "git+https://github.com/MiguelPeralvo/wkmigrate@alpha#egg=wkmigrate"
-   ```
-3. Restart the server
+1. Clones the repo (or fetches if already cached) to `{tempdir}/lmv_wkmigrate_cache/`
+2. Checks out the selected branch
+3. Runs `pip install -e` (editable, no-deps) from the clone
+4. Reloads all `wkmigrate.*` modules in the running process
+5. Rebuilds the `convert_fn` used by validation endpoints
+
+```bash
+# Via API:
+curl -X POST http://localhost:8000/api/config/wkmigrate/apply \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_url": "https://github.com/MiguelPeralvo/wkmigrate", "branch": "alpha"}'
+```
+
+The clone is cached, so subsequent switches to the same repo are fast (fetch-only).
+Switching branches within the same repo is near-instant.
 
 ## Synthetic Output Folder Structure
 
@@ -91,6 +101,7 @@ on the Batch Validation page — click any run to select it.
 |---|---|---|
 | `/api/config/wkmigrate` | GET | Current repo/branch config |
 | `/api/config/wkmigrate` | POST | Update active repo/branch |
+| `/api/config/wkmigrate/apply` | POST | Hot-swap: clone, install, reload (no restart) |
 | `/api/config/wkmigrate/branches` | GET | List GitHub branches for a repo |
 | `/api/synthetic/runs` | GET | List past synthetic generation runs |
 | `/api/validate/folder` | POST | Batch validate all JSON files in a folder |

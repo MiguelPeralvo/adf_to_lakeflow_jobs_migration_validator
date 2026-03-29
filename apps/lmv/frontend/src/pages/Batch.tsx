@@ -99,11 +99,34 @@ export function BatchPage() {
       .finally(() => setBranchesLoading(false));
   }, [activeRepo]);
 
-  function saveConfig() {
-    fetch("/api/config/wkmigrate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active_repo: activeRepo, active_branch: activeBranch }),
-    }).catch(() => {});
+  const [configApplying, setConfigApplying] = useState(false);
+  const [configStatus, setConfigStatus] = useState<string | null>(null);
+
+  async function applyConfig() {
+    setConfigApplying(true);
+    setConfigStatus(null);
+    try {
+      // Save config
+      await fetch("/api/config/wkmigrate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active_repo: activeRepo, active_branch: activeBranch }),
+      });
+      // Hot-swap: clone, install, reload
+      const res = await fetch("/api/config/wkmigrate/apply", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo_url: activeRepo, branch: activeBranch }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setConfigStatus(data.message || "Applied successfully");
+    } catch (err) {
+      setConfigStatus(`Failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    } finally {
+      setConfigApplying(false);
+    }
   }
 
   async function handleRun() {
@@ -279,11 +302,21 @@ export function BatchPage() {
                   {branches.length === 0 && <option value={activeBranch}>{activeBranch}</option>}
                 </select>
               </div>
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-[10px] text-outline">Changing repo/branch requires server restart to take effect.</p>
-                <button onClick={saveConfig}
-                  className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-mono font-bold hover:bg-primary/20 transition-colors border border-primary/20">
-                  Save Config
+              <div className="flex items-center justify-between pt-1 gap-3">
+                {configStatus && (
+                  <p className={`text-[10px] font-mono flex-1 truncate ${configStatus.startsWith("Failed") ? "text-error" : "text-tertiary"}`}>{configStatus}</p>
+                )}
+                {!configStatus && <p className="text-[10px] text-outline flex-1">Clones repo, installs, reloads — no restart needed.</p>}
+                <button onClick={applyConfig} disabled={configApplying}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors border flex items-center gap-1.5 shrink-0 ${
+                    configApplying ? "bg-primary/10 text-slate-500 border-outline-variant/20 cursor-wait"
+                                   : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                  }`}>
+                  {configApplying ? (
+                    <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> Applying...</>
+                  ) : (
+                    <><span className="material-symbols-outlined text-[14px]">sync</span> Apply &amp; Reload</>
+                  )}
                 </button>
               </div>
             </div>
