@@ -199,6 +199,19 @@ class DownloadPipelinesRequest(BaseModel):
     output_folder: str | None = None         # None = auto-generate in temp
 
 
+class UploadPipelinesRequest(BaseModel):
+    """Request payload for /api/adf/upload — push local ADF JSON pipelines to Azure Data Factory."""
+
+    tenant_id: str = Field(min_length=1)
+    client_id: str = Field(min_length=1)
+    client_secret: str = Field(min_length=1)
+    subscription_id: str = Field(min_length=1)
+    resource_group: str = Field(min_length=1)
+    factory_name: str = Field(min_length=1)
+    folder_path: str = Field(min_length=1)   # local folder with pipeline subfolders or *.json
+    name_prefix: str = ""                    # optional prefix for uploaded pipeline names
+
+
 class HarnessRunRequest(BaseModel):
     """Request payload for /api/harness/run."""
 
@@ -648,6 +661,99 @@ def create_app(
                 "pipelines": downloaded,
             },
         }) + "\n"
+
+    @app.post("/api/adf/upload")
+    def post_adf_upload(
+        request: UploadPipelinesRequest,
+        stream: bool = Query(False),
+    ):
+        """Upload local ADF pipeline JSONs to an Azure Data Factory.
+
+        Reads pipeline JSON files from a local folder (synthetic output or
+        downloaded pipelines) and creates/updates them in the target factory.
+        Useful for setting up parallel testing or E2E harness runs.
+        """
+        try:
+            from wkmigrate.clients.factory_client import FactoryClient
+            from azure.mgmt.datafactory.models import PipelineResource
+        except ImportError:
+            raise HTTPException(status_code=503, detail="wkmigrate/azure SDK not installed")
+
+        try:
+            client = FactoryClient(
+                tenant_id=request.tenant_id,
+                client_id=request.client_id,
+                client_secret=request.client_secret,
+                subscription_id=request.subscription_id,
+                resource_group_name=request.resource_group,
+                factory_name=request.factory_name,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to connect to ADF: {exc}")
+
+        # Discover pipeline files (same logic as folder validation)
+        folder = Path(request.folder_path)
+        if not folder.is_dir():
+            raise HTTPException(status_code=422, detail=f"Not a directory: {request.folder_path}")
+        subfolder_files = sorted(folder.glob("*/adf_pipeline.json"))
+        if subfolder_files:
+            files = subfolder_files
+        else:
+            files = sorted(f for f in folder.glob("*.json") if f.is_file() and f.name != "suite.json")
+        if not files:
+            raise HTTPException(status_code=422, detail=f"No ADF pipeline files found in {request.folder_path}")
+
+        if stream:
+            return StreamingResponse(
+                _upload_pipelines_stream(client, files, request.name_prefix, PipelineResource),
+                media_type="application/x-ndjson",
+            )
+
+        uploaded = []
+        errors = []
+        for file_path in files:
+            with open(file_path, encoding="utf-8") as fh:
+                adf_json = _json.load(fh)
+            name = request.name_prefix + adf_json.get("name", file_path.parent.name)
+            try:
+                props = adf_json.get("properties", adf_json)
+                resource = PipelineResource(**props)
+                client.management_client.pipelines.create_or_update(
+                    client.resource_group_name, client.factory_name, name, resource,
+                )
+                uploaded.append(name)
+            except Exception as exc:
+                errors.append({"pipeline": name, "error": f"{type(exc).__name__}: {exc}"})
+
+        return {
+            "factory_name": request.factory_name,
+            "total": len(files),
+            "uploaded": len(uploaded),
+            "errors": errors,
+            "pipelines": uploaded,
+        }
+
+    def _upload_pipelines_stream(client, files, name_prefix, PipelineResource):
+        total = len(files)
+        uploaded = []
+        errors = []
+        for i, file_path in enumerate(files):
+            with open(file_path, encoding="utf-8") as fh:
+                adf_json = _json.load(fh)
+            name = name_prefix + adf_json.get("name", file_path.parent.name)
+            try:
+                props = adf_json.get("properties", adf_json)
+                resource = PipelineResource(**props)
+                client.management_client.pipelines.create_or_update(
+                    client.resource_group_name, client.factory_name, name, resource,
+                )
+                uploaded.append(name)
+                yield _json.dumps({"type": "progress", "completed": i + 1, "total": total, "pipeline_name": name, "ok": True}) + "\n"
+            except Exception as exc:
+                errors.append({"pipeline": name, "error": str(exc)})
+                yield _json.dumps({"type": "progress", "completed": i + 1, "total": total, "pipeline_name": name, "ok": False, "error": str(exc)}) + "\n"
+
+        yield _json.dumps({"type": "complete", "result": {"total": total, "uploaded": len(uploaded), "errors": errors, "pipelines": uploaded}}) + "\n"
 
     @app.get("/api/adf/list")
     def get_adf_list_pipelines(

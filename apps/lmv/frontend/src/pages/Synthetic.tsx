@@ -634,6 +634,12 @@ export function SyntheticPage() {
                   className="px-4 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-mono font-bold hover:bg-primary/20 transition-colors flex items-center gap-1.5 border border-primary/20">
                   <span className="material-symbols-outlined text-sm">monitoring</span> Run Batch Validation
                 </button>
+                <button onClick={() => navigator.clipboard.writeText(
+                  `curl -X POST http://localhost:8000/api/adf/upload -H 'Content-Type: application/json' -d '{"tenant_id":"...","client_id":"...","client_secret":"...","subscription_id":"...","resource_group":"...","factory_name":"...","folder_path":"${result.output_path}"}'`
+                )} title="Copy upload command"
+                  className="px-4 py-1.5 rounded-lg bg-surface-container-high text-outline text-xs font-mono hover:text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-1.5 border border-outline-variant/10">
+                  <span className="material-symbols-outlined text-sm">cloud_upload</span> Copy Upload to ADF Command
+                </button>
               </div>)}
 
             <div className="flex gap-8 border-b border-outline-variant/20">
