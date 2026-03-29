@@ -27,14 +27,14 @@ def test_fmapi_provider_uses_batch_model_by_default():
     result = provider.judge("hello")
 
     assert result == {"score": 0.5, "reasoning": "default route"}
-    assert calls[0][0] == "https://example.test/fmapi"
-    assert calls[0][1]["model"] == "chatgpt-5-4"
+    assert calls[0][0] == "https://example.test/fmapi/chatgpt-5-4/invocations"
+    assert "messages" in calls[0][1]
     assert calls[0][2] == 11
 
 
 def test_fmapi_provider_respects_explicit_model_override():
-    def transport(_endpoint, payload, _timeout):
-        assert payload["model"] == "claude-opus-4-6"
+    def transport(endpoint, payload, _timeout):
+        assert "claude-opus-4-6/invocations" in endpoint
         return {"score": 0.9, "reasoning": "manual override"}
 
     provider = FMAPIJudgeProvider(endpoint="https://example.test/fmapi", transport=transport)
@@ -158,8 +158,8 @@ def test_fmapi_provider_sends_auth_header_on_default_transport(monkeypatch):
 def test_fmapi_provider_judge_high_stakes_uses_high_stakes_model():
     captured = {}
 
-    def transport(_endpoint, payload, _timeout):
-        captured["model"] = payload["model"]
+    def transport(endpoint, payload, _timeout):
+        captured["endpoint"] = endpoint
         return {"score": 0.81, "reasoning": "used high-stakes route"}
 
     provider = FMAPIJudgeProvider(
@@ -171,7 +171,7 @@ def test_fmapi_provider_judge_high_stakes_uses_high_stakes_model():
 
     result = provider.judge_high_stakes("high-stakes prompt")
 
-    assert captured["model"] == "claude-opus-4-6"
+    assert "claude-opus-4-6/invocations" in captured["endpoint"]
     assert result["score"] == 0.81
 
 

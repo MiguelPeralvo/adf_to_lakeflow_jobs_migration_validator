@@ -18,6 +18,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+# Load .env from repo root (gitignored) for local dev; no-op in Databricks Apps
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -42,6 +49,7 @@ def _build_judge_provider():
         return FMAPIJudgeProvider(
             endpoint=f"{host.rstrip('/')}/serving-endpoints",
             token=token,
+            timeout_seconds=60,
         )
     except Exception as exc:
         logger.warning("Failed to build FMAPIJudgeProvider: %s", exc)
@@ -85,6 +93,38 @@ def _build_harness_runner(judge_provider=None):
 def _build_parallel_runner():
     """Parallel runner requires custom wiring — return None by default."""
     return None
+
+
+def _build_convert_fn():
+    """Build a convert_fn that runs wkmigrate translation on ADF JSON.
+
+    Returns a function ``(dict) -> ConversionSnapshot`` that:
+    1. If the payload is already a snapshot (has ``tasks``+``notebooks``), deserializes it
+    2. Otherwise, translates the ADF JSON through wkmigrate and returns a real snapshot
+    """
+    try:
+        from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
+        from wkmigrate.preparers.preparer import prepare_workflow
+        from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
+        from lakeflow_migration_validator.serialization import snapshot_from_dict
+
+        def convert(payload: dict):
+            # Already a snapshot?
+            if "tasks" in payload and "notebooks" in payload:
+                return snapshot_from_dict(payload)
+            # Pre-wrapped with expected_snapshot?
+            if "expected_snapshot" in payload and isinstance(payload.get("expected_snapshot"), dict):
+                return snapshot_from_dict(payload["expected_snapshot"])
+            # Run wkmigrate translation: ADF JSON → Pipeline IR → PreparedWorkflow → ConversionSnapshot
+            pipeline_ir = translate_pipeline(payload)
+            prepared = prepare_workflow(pipeline_ir)
+            return from_wkmigrate(payload, prepared)
+
+        logger.info("wkmigrate converter available — validation will run full ADF→Databricks translation")
+        return convert
+    except (ImportError, Exception) as exc:
+        logger.info("wkmigrate not available (%s) — validation will use passthrough snapshots", exc)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -155,9 +195,11 @@ def create_app() -> FastAPI:
     judge = _build_judge_provider()
     harness = _build_harness_runner(judge_provider=judge)
     parallel = _build_parallel_runner()
+    convert = _build_convert_fn()
 
     # Include the REST API routes directly (they're already prefixed with /api/)
     service_app = create_service_app(
+        convert_fn=convert,
         judge_provider=judge,
         harness_runner=harness,
         parallel_runner=parallel,
@@ -165,7 +207,7 @@ def create_app() -> FastAPI:
     root.router.include_router(service_app.router)
 
     # Mount MCP SSE at /mcp
-    _mount_mcp(root, judge_provider=judge)
+    _mount_mcp(root, judge_provider=judge, convert_fn=convert)
 
     # Serve frontend static files (catch-all, must be last)
     _mount_frontend(root)

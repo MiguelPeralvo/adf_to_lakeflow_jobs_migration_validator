@@ -19,8 +19,8 @@ def test_evaluate_returns_scorecard():
     assert isinstance(scorecard, Scorecard)
 
 
-def test_evaluate_includes_all_7_dimensions():
-    """The scorecard has results for all 7 programmatic dimensions."""
+def test_evaluate_includes_all_8_dimensions():
+    """The scorecard has results for all 8 programmatic dimensions."""
     scorecard = evaluate(make_snapshot())
     assert set(scorecard.results.keys()) == {
         "activity_coverage",
@@ -30,6 +30,7 @@ def test_evaluate_includes_all_7_dimensions():
         "parameter_completeness",
         "secret_completeness",
         "not_translatable_ratio",
+        "control_flow_fidelity",
     }
 
 

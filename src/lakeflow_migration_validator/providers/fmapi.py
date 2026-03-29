@@ -17,8 +17,8 @@ class FMAPIJudgeProvider:
     def __init__(
         self,
         endpoint: str,
-        high_stakes_model: str = "claude-opus-4-6",
-        batch_model: str = "chatgpt-5-4",
+        high_stakes_model: str = "databricks-claude-opus-4-6",
+        batch_model: str = "databricks-chatgpt-5-4",
         timeout_seconds: int = 30,
         max_retries: int = 2,
         token: str | None = None,
@@ -42,15 +42,16 @@ class FMAPIJudgeProvider:
     def judge(self, prompt: str, model: str | None = None) -> dict[str, Any]:
         """Score prompt output with retry and strict response parsing."""
         selected_model = model or self.batch_model
+        endpoint_url = f"{self.endpoint.rstrip('/')}/{selected_model}/invocations"
         payload = {
-            "model": selected_model,
             "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1024,
         }
         last_error: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
-                raw = self._transport(self.endpoint, payload, self.timeout_seconds)
+                raw = self._transport(endpoint_url, payload, self.timeout_seconds)
                 parsed = _parse_judge_response(raw)
                 return {"score": parsed["score"], "reasoning": parsed["reasoning"]}
             except (URLError, TimeoutError, ValueError) as exc:
@@ -65,6 +66,86 @@ class FMAPIJudgeProvider:
     def judge_high_stakes(self, prompt: str) -> dict[str, Any]:
         """Convenience method that always routes to the high-stakes model."""
         return self.judge(prompt, model=self.high_stakes_model)
+
+    def complete(self, prompt: str, model: str | None = None, max_tokens: int = 4096) -> str:
+        """Raw LLM completion — returns text content without score/reasoning parsing.
+
+        Use this for generation tasks (e.g. synthetic pipeline generation) where
+        the LLM output is not a judge response.
+        """
+        selected_model = model or self.high_stakes_model
+        endpoint_url = f"{self.endpoint.rstrip('/')}/{selected_model}/invocations"
+        payload = {
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+        }
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                raw = self._transport(endpoint_url, payload, self.timeout_seconds)
+                return _extract_content(raw)
+            except (URLError, TimeoutError, ValueError) as exc:
+                last_error = exc
+                if attempt < self.max_retries:
+                    backoff = min(0.5 * (2 ** attempt), 8.0)
+                    time.sleep(backoff)
+                continue
+
+        raise RuntimeError(f"FMAPI complete request failed after retries: {last_error}") from last_error
+
+
+def _extract_content(raw: dict[str, Any]) -> str:
+    """Extract raw text content from an FMAPI response.
+
+    Handles both response formats:
+    - Chat Completions: ``{"choices": [{"message": {"content": "..."}}]}``
+    - Anthropic Messages: ``{"content": [{"type": "text", "text": "..."}]}``
+    """
+    if not isinstance(raw, dict):
+        raise ValueError("FMAPI response must be a dict")
+
+    # Chat Completions format (OpenAI-compatible)
+    if "choices" in raw:
+        choices = raw["choices"]
+        if not isinstance(choices, list) or not choices:
+            raise ValueError("FMAPI choices must be a non-empty list")
+        first = choices[0]
+        if not isinstance(first, dict):
+            raise ValueError("FMAPI choice must be an object")
+        message = first.get("message")
+        if not isinstance(message, dict):
+            raise ValueError("FMAPI message must be an object")
+        content = message.get("content", "")
+        if isinstance(content, str):
+            return content
+        # content could be a list of content blocks (multimodal)
+        if isinstance(content, list):
+            return "".join(
+                block.get("text", "") for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+        raise ValueError("FMAPI message content has unexpected type")
+
+    # Anthropic Messages / Responses format
+    if "content" in raw:
+        content = raw["content"]
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(
+                block.get("text", "") for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+        raise ValueError("FMAPI content has unexpected type")
+
+    # Fallback: check for a top-level "text" or "output" field
+    if "text" in raw:
+        return str(raw["text"])
+    if "output" in raw and isinstance(raw["output"], str):
+        return raw["output"]
+
+    raise ValueError(f"Cannot extract content from FMAPI response (keys: {list(raw.keys())})")
 
 
 def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:

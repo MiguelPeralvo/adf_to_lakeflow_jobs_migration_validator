@@ -21,8 +21,8 @@ def _read(path: Path) -> str:
         ("apps/lmv/frontend/src/pages/Parallel.tsx", ("ParallelPage", "parallelRun")),
         ("apps/lmv/frontend/src/pages/Harness.tsx", ("HarnessPage", "harnessRun")),
         ("apps/lmv/frontend/src/pages/History.tsx", ("HistoryPage", "history")),
-        ("apps/lmv/frontend/src/components/DimensionBreakdown.tsx", ("DimensionBreakdown", "DimensionRow")),
-        ("apps/lmv/frontend/src/components/ScorecardGauge.tsx", ("ScorecardGauge", "gaugeReveal")),
+        ("apps/lmv/frontend/src/components/DimensionBreakdown.tsx", ("DimensionBreakdown", "DetailPanel")),
+        ("apps/lmv/frontend/src/components/ScorecardGauge.tsx", ("ScorecardGauge", "MiniGauge")),
         ("apps/lmv/frontend/src/App.tsx", ("App", "Sidebar")),
     ],
 )

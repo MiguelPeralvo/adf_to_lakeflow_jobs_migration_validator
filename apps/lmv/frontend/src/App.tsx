@@ -21,8 +21,9 @@ const PAGES: Record<Page, () => React.JSX.Element> = {
 const VALID_PAGES = new Set(Object.keys(PAGES));
 
 function pageFromHash(): Page {
-  const hash = window.location.hash.replace("#/", "").replace("#", "");
-  return VALID_PAGES.has(hash) ? (hash as Page) : "validate";
+  const raw = window.location.hash.replace("#/", "").replace("#", "");
+  const [pagePart] = raw.split("?");
+  return VALID_PAGES.has(pagePart) ? (pagePart as Page) : "validate";
 }
 
 interface Capabilities {

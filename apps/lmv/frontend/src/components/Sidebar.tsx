@@ -12,9 +12,9 @@ export type Page =
 const NAV: { id: Page; label: string; icon: string }[] = [
   { id: "validate", label: "Validate", icon: "rule" },
   { id: "expression", label: "Expression", icon: "gavel" },
-  { id: "harness", label: "Harness", icon: "settings_input_component" },
-  { id: "parallel", label: "Parallel", icon: "account_tree" },
-  { id: "batch", label: "Regression", icon: "monitoring" },
+  { id: "harness", label: "End to End Harness", icon: "settings_input_component" },
+  { id: "parallel", label: "Parallel Testing", icon: "account_tree" },
+  { id: "batch", label: "Batch Validation", icon: "monitoring" },
   { id: "synthetic", label: "Synthetic", icon: "science" },
   { id: "history", label: "History", icon: "history" },
 ];
@@ -54,8 +54,8 @@ export function Sidebar({
                   : "text-slate-400 hover:text-slate-100 hover:bg-[#1b2029]"
               }`}
             >
-              <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="material-symbols-outlined text-[20px] shrink-0">{item.icon}</span>
+              <span className="text-sm font-medium truncate">{item.label}</span>
             </button>
           );
         })}

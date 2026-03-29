@@ -20,7 +20,7 @@ from lakeflow_migration_validator.contract import (
 )
 from lakeflow_migration_validator.synthetic.expression_generator import ExpressionGenerator
 
-_SUPPORTED_MODES = {"template", "llm", "adversarial"}
+_SUPPORTED_MODES = {"template", "llm", "adversarial", "custom"}
 _SUPPORTED_COMPLEXITIES = {"simple", "nested", "mixed"}
 _DEFAULT_ACTIVITY_TYPES = ("SetVariable", "IfCondition", "DatabricksNotebook", "Copy", "Lookup", "WebActivity", "ForEach")
 
@@ -41,8 +41,8 @@ class PipelineGenerator:
     def __init__(self, mode: str = "template", judge_provider=None):
         if mode not in _SUPPORTED_MODES:
             raise ValueError(f"Unsupported generator mode: {mode}")
-        if mode in {"llm", "adversarial"} and judge_provider is None:
-            raise NotImplementedError("LLM mode requires a judge_provider")
+        if mode in {"llm", "adversarial", "custom"} and judge_provider is None:
+            raise NotImplementedError("Modes requiring LLM (llm, adversarial, custom) need a judge_provider")
         self.mode = mode
         self.judge_provider = judge_provider
         self.expression_generator = ExpressionGenerator()
