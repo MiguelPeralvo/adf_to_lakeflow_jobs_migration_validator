@@ -51,7 +51,7 @@ def test_list_templates_returns_all():
 
 
 def test_six_preset_templates_exist():
-    expected = {"complex_expressions", "deep_nesting", "activity_mix", "math_on_params", "unsupported_types", "full_coverage"}
+    expected = {"complex_expressions", "deep_nesting", "activity_mix", "math_on_params", "unsupported_types", "pipeline_invocation", "full_coverage"}
     assert set(PROMPT_TEMPLATES.keys()) == expected
 
 
