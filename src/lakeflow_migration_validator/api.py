@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -508,6 +511,7 @@ def create_app(
         "activity_mix": ("activity_output_chaining", "unsupported_types"),
         "math_on_params": ("math_on_params",),
         "unsupported_types": ("unsupported_types",),
+        "pipeline_invocation": ("activity_output_chaining", "deep_nesting"),
         "full_coverage": ("nested_expressions", "math_on_params", "deep_nesting", "complex_conditions"),
     }
 
@@ -526,7 +530,7 @@ def create_app(
         if output_path:
             suite.to_json(output_path)
             return output_path
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         batch_dir = Path(tempfile.gettempdir()) / "lmv_synthetic" / ts
         batch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -673,7 +677,8 @@ def create_app(
                     fallback_note = "LLM produced no valid pipelines; using template mode."
                     mode = "template"
             except Exception as exc:
-                fallback_note = f"LLM generation failed: {exc}; using template mode."
+                logger.exception("LLM generation failed in streaming path")
+                fallback_note = "LLM generation failed; using template mode."
                 mode = "template"
 
         if mode == "template":
@@ -724,7 +729,32 @@ def create_app(
                     extra_instructions=request.custom_prompt or "",
                 )
                 agent_gen = AgentPipelineGenerator(judge_provider=judge_provider)
-                pipelines = agent_gen.generate(count=request.count, config=config)
+                pre_plan = None
+                if request.spec and "pipelines" in request.spec:
+                    from lakeflow_migration_validator.synthetic.agent_generator import (
+                        GenerationPlan,
+                        PipelineSpec,
+                    )
+                    pre_specs = []
+                    for item in request.spec["pipelines"]:
+                        pre_specs.append(PipelineSpec(
+                            name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
+                            activity_count=int(item.get("activity_count", 5)),
+                            activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
+                            stress_area=item.get("stress_area", "nested_expressions"),
+                            expression_complexity=item.get("expression_complexity", "nested"),
+                            parameters=tuple(item.get("parameters", ("env",))),
+                        ))
+                    pre_plan = GenerationPlan(
+                        count=len(pre_specs),
+                        specs=tuple(pre_specs),
+                        raw_plan=request.spec,
+                    )
+                pipelines = [
+                    p for ev in agent_gen.generate_stream(count=request.count, config=config, plan=pre_plan)
+                    if ev["type"] == "pipeline" and ev.get("pipeline")
+                    for p in [ev["pipeline"]]
+                ]
                 if pipelines:
                     suite = GroundTruthSuite(pipelines=tuple(pipelines))
                     if len(pipelines) < request.count:
@@ -733,7 +763,8 @@ def create_app(
                     fallback_note = "LLM produced no valid pipelines; using template mode."
                     mode = "template"
             except Exception as exc:
-                fallback_note = f"LLM generation failed: {exc}; using template mode."
+                logger.exception("LLM generation failed in non-streaming path")
+                fallback_note = "LLM generation failed; using template mode."
                 mode = "template"
 
         if mode == "template":

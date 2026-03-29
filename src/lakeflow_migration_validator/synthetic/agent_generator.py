@@ -245,7 +245,10 @@ class AgentPipelineGenerator:
 
     def _create_plan(self, count: int, cfg: GenerationConfig) -> GenerationPlan:
         """Ask the LLM to produce a generation plan, or build a deterministic fallback."""
-        user_request = cfg.extra_instructions or f"Generate {count} ADF pipelines targeting: {', '.join(cfg.target_weak_spots)}"
+        base_request = f"Generate {count} ADF pipelines targeting: {', '.join(cfg.target_weak_spots)}"
+        if cfg.extra_instructions:
+            base_request += f"\n\nAdditional instructions: {cfg.extra_instructions}"
+        user_request = base_request
         prompt = _PLAN_PROMPT.format(user_request=user_request)
 
         try:
@@ -326,7 +329,12 @@ class AgentPipelineGenerator:
                 adf_json["name"] = pipeline_name
 
             yield {"stage": "building_snapshot", "pct": 92}
-            snapshot = _build_expected_snapshot(adf_json)
+            try:
+                snapshot = _build_expected_snapshot(adf_json)
+            except Exception as snap_exc:
+                last_error = f"Snapshot build failed: {type(snap_exc).__name__}: {snap_exc}"
+                yield {"stage": "retry", "pct": 93, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                continue
             pipeline = SyntheticPipeline(
                 adf_json=adf_json,
                 expected_snapshot=snapshot,

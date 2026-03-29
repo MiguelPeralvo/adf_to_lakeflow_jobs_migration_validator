@@ -24,6 +24,8 @@ def _collect_control_flow(activities: list[dict]) -> list[str]:
 def compute_control_flow_fidelity(snapshot: ConversionSnapshot) -> tuple[float, dict]:
     """Fraction of source control-flow activities preserved in the converted workflow."""
     activities = snapshot.source_pipeline.get("properties", {}).get("activities", [])
+    if not activities:
+        activities = snapshot.source_pipeline.get("activities", [])
     cf_names = _collect_control_flow(activities)
     total = len(cf_names)
     if total == 0:

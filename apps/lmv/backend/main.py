@@ -207,7 +207,7 @@ def create_app() -> FastAPI:
     root.router.include_router(service_app.router)
 
     # Mount MCP SSE at /mcp
-    _mount_mcp(root, judge_provider=judge)
+    _mount_mcp(root, judge_provider=judge, convert_fn=convert)
 
     # Serve frontend static files (catch-all, must be last)
     _mount_frontend(root)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { setPendingValidation, setPendingBatchFolder } from "../store";
@@ -62,15 +62,17 @@ export function SyntheticPage() {
   useEffect(() => { fetch("/api/synthetic/templates").then(r => r.json()).then(setTemplates).catch(() => {}); }, []);
 
   /* ---- resolve spec text from template + params ---- */
+  const resolveSpecCounter = useRef(0);
   const resolveSpec = useCallback(async (preset: string | null) => {
     if (!preset || mode === "custom") return;
+    const requestId = ++resolveSpecCounter.current;
     try {
       const res = await fetch("/api/synthetic/resolve-template", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ preset, count, max_activities: maxActivities, difficulty, generate_test_data: generateTestData }),
       });
       const data = await res.json();
-      if (data.prompt) setSpec(data.prompt);
+      if (data.prompt && requestId === resolveSpecCounter.current) setSpec(data.prompt);
     } catch {}
   }, [mode, count, maxActivities, difficulty, generateTestData]);
 
@@ -109,6 +111,7 @@ export function SyntheticPage() {
     setProgressCompleted(0); setProgressTotal(0); setProgressFailed(0);
     setLastPipelineName(null); setPipelineErrors([]); setPhase("planning");
     setCurrentPipelineIdx(-1); setCurrentStage(""); setCurrentStagePct(0); setCurrentAttempt(0); setMaxAttempts(0); setPipelineStatus({});
+    setResultTab("pipelines"); setSelectedPipeline(null);
     try {
       const body: Record<string, unknown> = { count, difficulty, max_activities: maxActivities, mode, generate_test_data: generateTestData };
       if (selectedPreset) body.preset = selectedPreset;

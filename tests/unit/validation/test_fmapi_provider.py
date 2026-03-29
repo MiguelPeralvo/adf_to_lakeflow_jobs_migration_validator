@@ -27,7 +27,7 @@ def test_fmapi_provider_uses_batch_model_by_default():
     result = provider.judge("hello")
 
     assert result == {"score": 0.5, "reasoning": "default route"}
-    assert calls[0][0] == "https://example.test/fmapi/claude-opus-4-6/invocations"
+    assert calls[0][0] == "https://example.test/fmapi/chatgpt-5-4/invocations"
     assert "messages" in calls[0][1]
     assert calls[0][2] == 11
 

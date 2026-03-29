@@ -41,7 +41,7 @@ class FMAPIJudgeProvider:
 
     def judge(self, prompt: str, model: str | None = None) -> dict[str, Any]:
         """Score prompt output with retry and strict response parsing."""
-        selected_model = model or self.high_stakes_model
+        selected_model = model or self.batch_model
         endpoint_url = f"{self.endpoint.rstrip('/')}/{selected_model}/invocations"
         payload = {
             "messages": [{"role": "user", "content": prompt}],
@@ -110,7 +110,12 @@ def _extract_content(raw: dict[str, Any]) -> str:
         choices = raw["choices"]
         if not isinstance(choices, list) or not choices:
             raise ValueError("FMAPI choices must be a non-empty list")
-        message = choices[0].get("message", {})
+        first = choices[0]
+        if not isinstance(first, dict):
+            raise ValueError("FMAPI choice must be an object")
+        message = first.get("message")
+        if not isinstance(message, dict):
+            raise ValueError("FMAPI message must be an object")
         content = message.get("content", "")
         if isinstance(content, str):
             return content

@@ -42,7 +42,7 @@ class PipelineGenerator:
         if mode not in _SUPPORTED_MODES:
             raise ValueError(f"Unsupported generator mode: {mode}")
         if mode in {"llm", "adversarial", "custom"} and judge_provider is None:
-            raise NotImplementedError("LLM mode requires a judge_provider")
+            raise NotImplementedError("Modes requiring LLM (llm, adversarial, custom) need a judge_provider")
         self.mode = mode
         self.judge_provider = judge_provider
         self.expression_generator = ExpressionGenerator()

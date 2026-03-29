@@ -73,5 +73,5 @@ def test_adversarial_mode_marks_difficulty_as_adversarial():
 
 @pytest.mark.parametrize("mode", ["llm", "adversarial"])
 def test_llm_and_adversarial_modes_require_judge_provider(mode):
-    with pytest.raises(NotImplementedError, match="LLM mode requires a judge_provider"):
+    with pytest.raises(NotImplementedError, match="need a judge_provider"):
         PipelineGenerator(mode=mode)

@@ -20,6 +20,7 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
     "parameter_completeness": 0.10,
     "secret_completeness": 0.10,
     "not_translatable_ratio": 0.05,
+    "control_flow_fidelity": 0.0,
     "semantic_equivalence": 0.0,
     "runtime_success": 0.0,
     "parallel_equivalence": 0.0,
