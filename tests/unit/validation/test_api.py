@@ -82,13 +82,14 @@ def test_post_validate_expression_returns_judge_result():
     assert "Equivalent" in payload["reasoning"]
 
 
-def test_get_history_returns_past_scorecards():
+def test_get_history_returns_past_scorecards(tmp_path):
     """GET /api/history/{pipeline_name} returns a list of past scorecards."""
+    from lakeflow_migration_validator.api import HistoryStore
 
     def convert_fn(_adf_json: dict) -> ConversionSnapshot:
         return make_snapshot(tasks=[make_task("task_a")], notebooks=[make_notebook()])
 
-    client = TestClient(create_app(convert_fn=convert_fn))
+    client = TestClient(create_app(convert_fn=convert_fn, history_store=HistoryStore(tmp_path / "test.db")))
 
     client.post("/api/validate", json={"adf_json": {"name": "pipeline_a"}})
     client.post("/api/validate", json={"adf_json": {"name": "pipeline_a"}})

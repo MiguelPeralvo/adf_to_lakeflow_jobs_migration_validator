@@ -24,25 +24,69 @@ from lakeflow_migration_validator.serialization import snapshot_from_adf_payload
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 
 
-@dataclass(slots=True)
-class InMemoryHistoryStore:
-    """In-memory history store for scorecards and activity log."""
+class HistoryStore:
+    """Persistent history store backed by SQLite (JSON file fallback).
 
-    _history: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-    _activity_log: list[dict[str, Any]] = field(default_factory=list)
+    Stores validation scorecards and an activity log that survives server
+    restarts. Falls back to a JSON file if SQLite is unavailable.
+    """
+
+    def __init__(self, db_path: str | Path | None = None):
+        self._db_path = Path(db_path) if db_path else Path(tempfile.gettempdir()) / "lmv_history.db"
+        self._json_path = self._db_path.with_suffix(".json")
+        self._use_sqlite = False
+        self._conn: Any = None
+        try:
+            import sqlite3
+            self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    data TEXT NOT NULL
+                )
+            """)
+            self._conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_log(type)
+            """)
+            self._conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_log(timestamp DESC)
+            """)
+            self._conn.commit()
+            self._use_sqlite = True
+        except Exception:
+            self._use_sqlite = False
+
+    def _write_event(self, event: dict[str, Any]) -> None:
+        if self._use_sqlite:
+            self._conn.execute(
+                "INSERT INTO activity_log (timestamp, type, data) VALUES (?, ?, ?)",
+                (event["timestamp"], event["type"], _json.dumps(event)),
+            )
+            self._conn.commit()
+        else:
+            # JSON file fallback
+            log = []
+            if self._json_path.exists():
+                try:
+                    log = _json.loads(self._json_path.read_text(encoding="utf-8"))
+                except Exception:
+                    log = []
+            log.append(event)
+            self._json_path.write_text(_json.dumps(log, indent=2), encoding="utf-8")
 
     def append(self, pipeline_name: str, scorecard: dict[str, Any]) -> None:
-        entries = self._history.setdefault(pipeline_name, [])
-        entry = {
+        self._write_event({
+            "type": "validation",
             "pipeline_name": pipeline_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "scorecard": scorecard,
-        }
-        entries.append(entry)
-        self._activity_log.append({"type": "validation", **entry})
+        })
 
     def log_batch(self, folder: str, total: int, mean_score: float, below: int, threshold: float) -> None:
-        self._activity_log.append({
+        self._write_event({
             "type": "batch_validation",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "folder": folder,
@@ -53,7 +97,7 @@ class InMemoryHistoryStore:
         })
 
     def log_synthetic(self, output_path: str, count: int, mode: str) -> None:
-        self._activity_log.append({
+        self._write_event({
             "type": "synthetic_generation",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "output_path": output_path,
@@ -62,10 +106,39 @@ class InMemoryHistoryStore:
         })
 
     def get(self, pipeline_name: str) -> list[dict[str, Any]]:
-        return list(self._history.get(pipeline_name, []))
+        if self._use_sqlite:
+            rows = self._conn.execute(
+                "SELECT data FROM activity_log WHERE type = 'validation' AND data LIKE ? ORDER BY timestamp DESC",
+                (f'%"pipeline_name": "{pipeline_name}"%',),
+            ).fetchall()
+            return [_json.loads(row[0]) for row in rows]
+        # JSON fallback
+        if not self._json_path.exists():
+            return []
+        try:
+            log = _json.loads(self._json_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        return [e for e in log if e.get("type") == "validation" and e.get("pipeline_name") == pipeline_name]
 
     def get_activity_log(self, limit: int = 100) -> list[dict[str, Any]]:
-        return list(reversed(self._activity_log[-limit:]))
+        if self._use_sqlite:
+            rows = self._conn.execute(
+                "SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [_json.loads(row[0]) for row in rows]
+        # JSON fallback
+        if not self._json_path.exists():
+            return []
+        try:
+            log = _json.loads(self._json_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        return list(reversed(log[-limit:]))
+
+
+# Backward-compatible alias
+InMemoryHistoryStore = HistoryStore
 
 
 class ValidateRequest(BaseModel):
@@ -151,7 +224,7 @@ def create_app(
     *,
     convert_fn: Callable[[dict], ConversionSnapshot] | None = None,
     judge_provider: JudgeProvider | None = None,
-    history_store: InMemoryHistoryStore | None = None,
+    history_store: HistoryStore | None = None,
     harness_runner=None,
     parallel_runner=None,
 ) -> FastAPI:
@@ -159,7 +232,7 @@ def create_app(
 
     app = FastAPI(title="lakeflow-migration-validator", version="0.1.0")
     convert = convert_fn or snapshot_from_adf_payload
-    history = history_store or InMemoryHistoryStore()
+    history = history_store or HistoryStore()
 
     @app.get("/api/status")
     def get_status() -> dict[str, Any]:
