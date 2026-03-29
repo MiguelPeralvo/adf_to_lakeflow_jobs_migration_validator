@@ -198,16 +198,28 @@ def create_app(
         request: ValidateFolderRequest,
         stream: bool = Query(False),
     ):
-        """Scan a folder of ADF JSON files, translate each through wkmigrate, and evaluate."""
-        import glob as _glob
+        """Scan a folder of ADF JSON files, translate each through wkmigrate, and evaluate.
 
+        Supports two folder layouts:
+        - **Flat**: ``folder/*.json`` — each JSON file is an ADF pipeline
+        - **Synthetic**: ``folder/*/adf_pipeline.json`` — subfolders from synthetic generation
+        """
         folder = Path(request.folder_path)
         if not folder.is_dir():
             raise HTTPException(status_code=422, detail=f"Not a directory: {request.folder_path}")
 
-        files = sorted(folder.glob(request.glob_pattern))
+        # Discover pipeline JSON files — check synthetic subfolder structure first
+        subfolder_files = sorted(folder.glob("*/adf_pipeline.json"))
+        if subfolder_files:
+            files = subfolder_files
+        else:
+            # Flat layout: glob in root, exclude suite.json
+            files = sorted(
+                f for f in folder.glob(request.glob_pattern)
+                if f.is_file() and f.name != "suite.json"
+            )
         if not files:
-            raise HTTPException(status_code=422, detail=f"No {request.glob_pattern} files found in {request.folder_path}")
+            raise HTTPException(status_code=422, detail=f"No ADF pipeline files found in {request.folder_path}")
 
         if stream:
             return StreamingResponse(

@@ -289,25 +289,42 @@ export function SyntheticPage() {
 
         {/* ─── Done banner ─── */}
         {result && !generating && (
-          <div className="sticky top-16 z-30 rounded-xl overflow-hidden bg-surface-container border border-tertiary/20 shadow-xl shadow-emerald-900/10"
+          <div className={`sticky top-16 z-30 rounded-xl overflow-hidden bg-surface-container shadow-xl ${progressFailed > 0 ? "border border-amber-500/20 shadow-amber-900/10" : "border border-tertiary/20 shadow-emerald-900/10"}`}
                style={{ animation: "fade-in-up 0.3s ease both" }}>
-            <div className="h-1 bg-tertiary" />
-            <div className="px-5 py-3 flex items-center gap-4">
-              <span className="material-symbols-outlined text-tertiary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              <div className="flex-1 flex items-center gap-6 flex-wrap">
-                <p className="text-sm font-mono text-on-surface">
-                  <span className="text-tertiary font-bold">{result.count}</span> pipelines generated
-                  {progressFailed > 0 && <span className="text-amber-400 ml-2">({progressFailed} failed)</span>}
-                </p>
-                {result.output_path && (
-                  <div className="flex items-center gap-2 text-[11px] font-mono text-outline">
-                    <span className="material-symbols-outlined text-sm">folder</span>
-                    <span className="truncate max-w-xs" title={result.output_path}>{result.output_path}</span>
-                    <button onClick={() => navigator.clipboard.writeText(result.output_path!)} className="text-primary hover:text-primary-container" title="Copy">
-                      <span className="material-symbols-outlined text-sm">content_copy</span>
-                    </button>
-                  </div>)}
+            <div className={`h-1 ${progressFailed > 0 ? "bg-amber-500" : "bg-tertiary"}`} />
+            <div className="px-5 py-3 space-y-2">
+              <div className="flex items-center gap-4">
+                <span className={`material-symbols-outlined text-xl ${progressFailed > 0 ? "text-amber-400" : "text-tertiary"}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {progressFailed > 0 ? "warning" : "check_circle"}
+                </span>
+                <div className="flex-1 flex items-center gap-6 flex-wrap">
+                  <p className="text-sm font-mono text-on-surface">
+                    <span className="text-tertiary font-bold">{result.count}</span> pipelines generated
+                    {progressFailed > 0 && <span className="text-amber-400 ml-2">({progressFailed} failed)</span>}
+                  </p>
+                  {result.output_path && (
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-outline">
+                      <span className="material-symbols-outlined text-sm">folder</span>
+                      <span className="truncate max-w-xs" title={result.output_path}>{result.output_path}</span>
+                      <button onClick={() => navigator.clipboard.writeText(result.output_path!)} className="text-primary hover:text-primary-container" title="Copy">
+                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                      </button>
+                    </div>)}
+                </div>
               </div>
+              {/* Show error details persistently after generation */}
+              {pipelineErrors.length > 0 && (
+                <details className="ml-9" open>
+                  <summary className="text-[11px] font-mono text-amber-400 cursor-pointer hover:text-amber-300">
+                    {pipelineErrors.length} generation error{pipelineErrors.length > 1 ? "s" : ""} — details
+                  </summary>
+                  <div className="mt-1.5 space-y-1 max-h-40 overflow-auto">
+                    {pipelineErrors.map((e, i) => (
+                      <p key={i} className="text-[11px] font-mono text-amber-300/80 pl-2 border-l-2 border-amber-500/20">{e}</p>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           </div>
         )}
