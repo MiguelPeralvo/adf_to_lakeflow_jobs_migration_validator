@@ -284,28 +284,67 @@ class ValidateFolderRequest(BaseModel):
     agent_analysis: bool = False  # run LLM agent analysis on failing dimensions
 
 
-class DownloadPipelinesRequest(BaseModel):
-    """Request payload for /api/adf/download — fetch pipelines from Azure Data Factory."""
+def _adf_credentials_from_env() -> dict[str, str]:
+    """Read ADF credentials from environment variables.
 
-    tenant_id: str = Field(min_length=1)
-    client_id: str = Field(min_length=1)
-    client_secret: str = Field(min_length=1)
-    subscription_id: str = Field(min_length=1)
-    resource_group: str = Field(min_length=1)
-    factory_name: str = Field(min_length=1)
+    Expected env vars (also usable via .env or CLI ``--env``):
+      ADF_TENANT_ID, ADF_CLIENT_ID, ADF_CLIENT_SECRET,
+      ADF_SUBSCRIPTION_ID, ADF_RESOURCE_GROUP, ADF_FACTORY_NAME
+    """
+    import os
+    return {
+        "tenant_id": os.environ.get("ADF_TENANT_ID", ""),
+        "client_id": os.environ.get("ADF_CLIENT_ID", ""),
+        "client_secret": os.environ.get("ADF_CLIENT_SECRET", ""),
+        "subscription_id": os.environ.get("ADF_SUBSCRIPTION_ID", ""),
+        "resource_group": os.environ.get("ADF_RESOURCE_GROUP", ""),
+        "factory_name": os.environ.get("ADF_FACTORY_NAME", ""),
+    }
+
+
+def _resolve_adf_credentials(request_data: dict[str, Any]) -> dict[str, str]:
+    """Merge request fields over env-var defaults. Raises HTTPException if any are missing."""
+    env = _adf_credentials_from_env()
+    resolved = {}
+    for key in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name"):
+        val = request_data.get(key) or env.get(key, "")
+        if not val:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing ADF credential: {key}. Set ADF_{key.upper()} env var or pass in request.",
+            )
+        resolved[key] = val
+    return resolved
+
+
+class DownloadPipelinesRequest(BaseModel):
+    """Request payload for /api/adf/download — fetch pipelines from Azure Data Factory.
+
+    Credentials are optional — falls back to ADF_* environment variables.
+    """
+
+    tenant_id: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    subscription_id: str | None = None
+    resource_group: str | None = None
+    factory_name: str | None = None
     pipeline_names: list[str] | None = None  # None = download all
     output_folder: str | None = None         # None = auto-generate in temp
 
 
 class UploadPipelinesRequest(BaseModel):
-    """Request payload for /api/adf/upload — push local ADF JSON pipelines to Azure Data Factory."""
+    """Request payload for /api/adf/upload — push local ADF JSON pipelines to Azure Data Factory.
 
-    tenant_id: str = Field(min_length=1)
-    client_id: str = Field(min_length=1)
-    client_secret: str = Field(min_length=1)
-    subscription_id: str = Field(min_length=1)
-    resource_group: str = Field(min_length=1)
-    factory_name: str = Field(min_length=1)
+    Credentials are optional — falls back to ADF_* environment variables.
+    """
+
+    tenant_id: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    subscription_id: str | None = None
+    resource_group: str | None = None
+    factory_name: str | None = None
     folder_path: str = Field(min_length=1)   # local folder with pipeline subfolders or *.json
     name_prefix: str = ""                    # optional prefix for uploaded pipeline names
 
@@ -361,11 +400,29 @@ def create_app(
     @app.get("/api/status")
     def get_status() -> dict[str, Any]:
         """Return which capabilities are active."""
+        adf_env = _adf_credentials_from_env()
+        adf_configured = all(adf_env.get(k) for k in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name"))
         return {
             "validator": True,
             "judge": judge_provider is not None,
             "harness": harness_runner is not None,
             "parallel": parallel_runner is not None,
+            "adf": adf_configured,
+            "adf_factory_name": adf_env.get("factory_name", "") if adf_configured else None,
+        }
+
+    @app.get("/api/adf/config")
+    def get_adf_config() -> dict[str, Any]:
+        """Return ADF connection status — which env vars are set (no secrets exposed)."""
+        env = _adf_credentials_from_env()
+        return {
+            "configured": all(env.get(k) for k in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name")),
+            "factory_name": env.get("factory_name", ""),
+            "resource_group": env.get("resource_group", ""),
+            "subscription_id": env.get("subscription_id", ""),
+            "has_tenant_id": bool(env.get("tenant_id")),
+            "has_client_id": bool(env.get("client_id")),
+            "has_client_secret": bool(env.get("client_secret")),
         }
 
     @app.post("/api/validate")
@@ -679,32 +736,36 @@ def create_app(
     ):
         """Download ADF pipelines from Azure Data Factory to a local folder.
 
-        Uses wkmigrate's FactoryClient with the provided Azure credentials.
-        Returns the folder path ready for batch validation.
+        Credentials are resolved from the request body first, then from
+        ADF_* environment variables. No secrets need to be in the UI.
         """
         try:
             from wkmigrate.clients.factory_client import FactoryClient
         except ImportError:
             raise HTTPException(status_code=503, detail="wkmigrate is not installed — FactoryClient unavailable")
 
+        creds = _resolve_adf_credentials(request.model_dump())
+
         try:
             client = FactoryClient(
-                tenant_id=request.tenant_id,
-                client_id=request.client_id,
-                client_secret=request.client_secret,
-                subscription_id=request.subscription_id,
-                resource_group_name=request.resource_group,
-                factory_name=request.factory_name,
+                tenant_id=creds["tenant_id"],
+                client_id=creds["client_id"],
+                client_secret=creds["client_secret"],
+                subscription_id=creds["subscription_id"],
+                resource_group_name=creds["resource_group"],
+                factory_name=creds["factory_name"],
             )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to connect to ADF: {type(exc).__name__}: {exc}")
+
+        factory_name = creds["factory_name"]
 
         # Determine output folder
         if request.output_folder:
             out_dir = Path(request.output_folder)
         else:
             ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-            out_dir = Path(tempfile.gettempdir()) / "lmv_adf_download" / f"{request.factory_name}_{ts}"
+            out_dir = Path(tempfile.gettempdir()) / "lmv_adf_download" / f"{factory_name}_{ts}"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Get pipeline list
@@ -801,14 +862,16 @@ def create_app(
         except ImportError:
             raise HTTPException(status_code=503, detail="wkmigrate/azure SDK not installed")
 
+        creds = _resolve_adf_credentials(request.model_dump())
+
         try:
             client = FactoryClient(
-                tenant_id=request.tenant_id,
-                client_id=request.client_id,
-                client_secret=request.client_secret,
-                subscription_id=request.subscription_id,
-                resource_group_name=request.resource_group,
-                factory_name=request.factory_name,
+                tenant_id=creds["tenant_id"],
+                client_id=creds["client_id"],
+                client_secret=creds["client_secret"],
+                subscription_id=creds["subscription_id"],
+                resource_group_name=creds["resource_group"],
+                factory_name=creds["factory_name"],
             )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to connect to ADF: {exc}")
@@ -878,21 +941,21 @@ def create_app(
         yield _json.dumps({"type": "complete", "result": {"total": total, "uploaded": len(uploaded), "errors": errors, "pipelines": uploaded}}) + "\n"
 
     @app.get("/api/adf/list")
-    def get_adf_list_pipelines(
-        tenant_id: str = Query(...), client_id: str = Query(...),
-        client_secret: str = Query(...), subscription_id: str = Query(...),
-        resource_group: str = Query(...), factory_name: str = Query(...),
-    ) -> list[str]:
-        """List all pipeline names in an Azure Data Factory."""
+    def get_adf_list_pipelines() -> list[str]:
+        """List all pipeline names in an Azure Data Factory.
+
+        Uses ADF_* environment variables for credentials.
+        """
         try:
             from wkmigrate.clients.factory_client import FactoryClient
         except ImportError:
             raise HTTPException(status_code=503, detail="wkmigrate not installed")
+        creds = _resolve_adf_credentials({})
         try:
             client = FactoryClient(
-                tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
-                subscription_id=subscription_id, resource_group_name=resource_group,
-                factory_name=factory_name,
+                tenant_id=creds["tenant_id"], client_id=creds["client_id"],
+                client_secret=creds["client_secret"], subscription_id=creds["subscription_id"],
+                resource_group_name=creds["resource_group"], factory_name=creds["factory_name"],
             )
             return client.list_pipelines()
         except Exception as exc:

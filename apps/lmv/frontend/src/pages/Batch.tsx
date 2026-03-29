@@ -48,13 +48,11 @@ const DIM_LABELS: Record<string, { label: string; icon: string }> = {
 export function BatchPage({ entityId }: { entityId?: string | null }) {
   const [sourceMode, setSourceMode] = useState<SourceMode>("folder");
   const [folderPath, setFolderPath] = useState("");
-  // ADF download config
-  const [adfTenantId, setAdfTenantId] = useState("");
-  const [adfClientId, setAdfClientId] = useState("");
-  const [adfClientSecret, setAdfClientSecret] = useState("");
-  const [adfSubscriptionId, setAdfSubscriptionId] = useState("");
-  const [adfResourceGroup, setAdfResourceGroup] = useState("");
+  // ADF config (read from backend env vars — no secrets in UI)
+  const [adfConfigured, setAdfConfigured] = useState(false);
   const [adfFactoryName, setAdfFactoryName] = useState("");
+  const [adfResourceGroup, setAdfResourceGroup] = useState("");
+  const [adfPipelineFilter, setAdfPipelineFilter] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [goldenSetPath, setGoldenSetPath] = useState("golden_sets/pipelines.json");
   const [globPattern, setGlobPattern] = useState("*.json");
@@ -106,6 +104,11 @@ export function BatchPage({ entityId }: { entityId?: string | null }) {
       setRepos(cfg.repos || []);
       setActiveRepo(cfg.active_repo || "");
       setActiveBranch(cfg.active_branch || "");
+    }).catch(() => {});
+    fetch("/api/adf/config").then(r => r.json()).then(cfg => {
+      setAdfConfigured(cfg.configured);
+      setAdfFactoryName(cfg.factory_name || "");
+      setAdfResourceGroup(cfg.resource_group || "");
     }).catch(() => {});
     fetch("/api/synthetic/runs").then(r => r.json()).then(setSyntheticRuns).catch(() => {});
     const pending = consumePendingBatchFolder();
@@ -191,12 +194,13 @@ export function BatchPage({ entityId }: { entityId?: string | null }) {
       } else if (sourceMode === "adf_download") {
         // Step 1: Download from ADF
         setDownloading(true);
+        const dlBody: Record<string, unknown> = {};
+        if (adfPipelineFilter.trim()) {
+          dlBody.pipeline_names = adfPipelineFilter.split(",").map(s => s.trim()).filter(Boolean);
+        }
         const dlRes = await fetch("/api/adf/download?stream=true", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenant_id: adfTenantId, client_id: adfClientId, client_secret: adfClientSecret,
-            subscription_id: adfSubscriptionId, resource_group: adfResourceGroup, factory_name: adfFactoryName,
-          }),
+          body: JSON.stringify(dlBody),
         });
         if (!dlRes.ok) { const err = await dlRes.json().catch(() => ({ detail: dlRes.statusText })); throw new Error(err.detail || `HTTP ${dlRes.status}`); }
         const dlReader = dlRes.body!.getReader(); const dlDecoder = new TextDecoder();
@@ -299,21 +303,39 @@ export function BatchPage({ entityId }: { entityId?: string | null }) {
           </div>
           <div className="p-6 flex flex-wrap gap-4 items-end">
             {sourceMode === "adf_download" ? (
-              <div className="w-full grid grid-cols-3 gap-3">
-                {[
-                  { label: "Tenant ID", value: adfTenantId, set: setAdfTenantId },
-                  { label: "Client ID", value: adfClientId, set: setAdfClientId },
-                  { label: "Client Secret", value: adfClientSecret, set: setAdfClientSecret, type: "password" },
-                  { label: "Subscription ID", value: adfSubscriptionId, set: setAdfSubscriptionId },
-                  { label: "Resource Group", value: adfResourceGroup, set: setAdfResourceGroup },
-                  { label: "Factory Name", value: adfFactoryName, set: setAdfFactoryName },
-                ].map(f => (
-                  <div key={f.label}>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">{f.label}</label>
-                    <input type={(f as any).type || "text"} value={f.value} onChange={e => f.set(e.target.value)}
-                      className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-2 px-3 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all" />
+              <div className="w-full space-y-3">
+                {/* ADF connection status */}
+                <div className={`flex items-center gap-3 p-3 rounded-lg ${adfConfigured ? "bg-tertiary/5 border border-tertiary/20" : "bg-error/5 border border-error/20"}`}>
+                  <span className={`material-symbols-outlined text-sm ${adfConfigured ? "text-tertiary" : "text-error"}`}
+                    style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {adfConfigured ? "check_circle" : "error"}
+                  </span>
+                  {adfConfigured ? (
+                    <div className="flex-1">
+                      <p className="text-xs text-on-surface">
+                        Connected to <span className="font-mono font-bold text-tertiary">{adfFactoryName}</span>
+                        <span className="text-outline ml-2">({adfResourceGroup})</span>
+                      </p>
+                      <p className="text-[9px] font-mono text-outline mt-0.5">Credentials loaded from ADF_* environment variables</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1">
+                      <p className="text-xs text-error">ADF credentials not configured</p>
+                      <p className="text-[9px] font-mono text-outline mt-0.5">
+                        Set environment variables: ADF_TENANT_ID, ADF_CLIENT_ID, ADF_CLIENT_SECRET, ADF_SUBSCRIPTION_ID, ADF_RESOURCE_GROUP, ADF_FACTORY_NAME
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {/* Pipeline filter */}
+                {adfConfigured && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">Pipeline Filter (optional)</label>
+                    <input value={adfPipelineFilter} onChange={e => setAdfPipelineFilter(e.target.value)}
+                      placeholder="Leave empty to download all, or comma-separated names: pipeline_a, pipeline_b"
+                      className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-2 px-3 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all placeholder:text-slate-700" />
                   </div>
-                ))}
+                )}
               </div>
             ) : sourceMode === "folder" ? (<>
               <div className="flex-1">
