@@ -25,6 +25,7 @@ from typing import Any, Callable
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions import DimensionResult
 from lakeflow_migration_validator.dimensions.activity_coverage import compute_activity_coverage
+from lakeflow_migration_validator.dimensions.control_flow_fidelity import compute_control_flow_fidelity
 from lakeflow_migration_validator.dimensions.dependency_preservation import compute_dependency_preservation
 from lakeflow_migration_validator.dimensions.execution import ExecutionRunner
 from lakeflow_migration_validator.dimensions.expression_coverage import compute_expression_coverage
@@ -56,6 +57,7 @@ _DEFAULT_WEIGHTS = {
     "parameter_completeness": 0.10,
     "secret_completeness": 0.10,
     "not_translatable_ratio": 0.05,
+    "control_flow_fidelity": 0.0,
     "semantic_equivalence": 0.0,
     "runtime_success": 0.0,
     "parallel_equivalence": 0.0,
@@ -69,6 +71,7 @@ _DIMENSIONS = [
     ProgrammaticCheck("parameter_completeness", lambda _i, s: compute_parameter_completeness(s), threshold=0.9),
     ProgrammaticCheck("secret_completeness", lambda _i, s: compute_secret_completeness(s), threshold=0.9),
     ProgrammaticCheck("not_translatable_ratio", lambda _i, s: compute_not_translatable_ratio(s), threshold=0.8),
+    ProgrammaticCheck("control_flow_fidelity", lambda _i, s: compute_control_flow_fidelity(s), threshold=0.8),
 ]
 
 _PROGRAMMATIC_DIMENSION_NAMES = {dimension.name for dimension in _DIMENSIONS}

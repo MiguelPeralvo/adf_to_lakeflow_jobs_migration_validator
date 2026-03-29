@@ -18,6 +18,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+# Load .env from repo root (gitignored) for local dev; no-op in Databricks Apps
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -42,6 +49,7 @@ def _build_judge_provider():
         return FMAPIJudgeProvider(
             endpoint=f"{host.rstrip('/')}/serving-endpoints",
             token=token,
+            timeout_seconds=60,
         )
     except Exception as exc:
         logger.warning("Failed to build FMAPIJudgeProvider: %s", exc)

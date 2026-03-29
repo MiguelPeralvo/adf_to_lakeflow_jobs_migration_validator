@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json as _json
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 from lakeflow_migration_validator import evaluate, evaluate_batch
@@ -96,6 +100,7 @@ class SyntheticGenerateRequest(BaseModel):
     custom_prompt: str | None = None    # user-edited prompt (for custom mode)
     generate_test_data: bool = False    # also generate test data for parallel testing
     output_path: str | None = None
+    spec: dict[str, Any] | None = None  # pre-generated spec — skips planning
 
 
 class ParallelRunRequest(BaseModel):
@@ -197,39 +202,294 @@ def create_app(
     @app.post("/api/synthetic/resolve-template")
     def post_resolve_template(request: dict[str, Any]) -> dict[str, str]:
         from lakeflow_migration_validator.synthetic.prompt_templates import resolve_template
-        return {
-            "prompt": resolve_template(
-                request.get("preset", "complex_expressions"),
-                count=request.get("count", 10),
-                max_activities=request.get("max_activities", 10),
-            )
-        }
-
-    @app.post("/api/synthetic/generate")
-    def post_synthetic_generate(request: SyntheticGenerateRequest) -> dict[str, Any]:
-        suite = GroundTruthSuite.generate(
-            count=request.count,
-            difficulty=request.difficulty,
-            max_activities=request.max_activities,
-            mode=request.mode,
+        base = resolve_template(
+            request.get("preset", "complex_expressions"),
+            count=request.get("count", 10),
+            max_activities=request.get("max_activities", 10),
         )
-        if request.output_path:
-            suite.to_json(request.output_path)
+        # Append extra params so the spec reflects all user choices
+        extras: list[str] = []
+        difficulty = request.get("difficulty")
+        if difficulty and difficulty != "medium":
+            extras.append(f"Target difficulty: {difficulty}.")
+        if request.get("generate_test_data"):
+            extras.append("Also generate parallel test data (CSV source files + SQL seed scripts) for each pipeline.")
+        if extras:
+            base += "\n\n" + " ".join(extras)
+        return {"prompt": base}
 
+    @app.post("/api/synthetic/spec")
+    def post_synthetic_spec(request: dict[str, Any]) -> dict[str, Any]:
+        """Generate an editable spec from prompt + options, without generating pipelines."""
+        req_count = int(request.get("count", 10))
+        req_mode = request.get("mode", "template")
+        req_preset = request.get("preset")
+        req_prompt = request.get("custom_prompt", "")
+        req_difficulty = request.get("difficulty", "medium")
+        req_max_activities = int(request.get("max_activities", 20))
+
+        if req_mode in ("llm", "custom") and judge_provider is not None:
+            from lakeflow_migration_validator.synthetic.agent_generator import (
+                AgentPipelineGenerator,
+                GenerationConfig,
+            )
+            weak_spots = _PRESET_WEAK_SPOTS.get(req_preset or "", ("nested_expressions",))
+            config = GenerationConfig(
+                target_weak_spots=weak_spots,
+                extra_instructions=req_prompt,
+            )
+            agent = AgentPipelineGenerator(judge_provider=judge_provider)
+            plan = agent._create_plan(req_count, config)
+            return {
+                "count": plan.count,
+                "pipelines": [
+                    {
+                        "name": s.name,
+                        "activity_count": s.activity_count,
+                        "activity_types": list(s.activity_types),
+                        "stress_area": s.stress_area,
+                        "expression_complexity": s.expression_complexity,
+                        "parameters": list(s.parameters),
+                    }
+                    for s in plan.specs
+                ],
+            }
+        # Template / fallback: deterministic spec
+        from lakeflow_migration_validator.synthetic.pipeline_generator import _DEFAULT_ACTIVITY_TYPES
+        specs = []
+        for i in range(req_count):
+            specs.append({
+                "name": f"synthetic_pipeline_{i:03d}",
+                "activity_count": 1 + (i % req_max_activities),
+                "activity_types": list(_DEFAULT_ACTIVITY_TYPES),
+                "stress_area": req_difficulty,
+                "expression_complexity": "mixed",
+                "parameters": ["param1", "param2"],
+            })
+        return {"count": req_count, "pipelines": specs}
+
+    _PRESET_WEAK_SPOTS: dict[str, tuple[str, ...]] = {
+        "complex_expressions": ("nested_expressions", "math_on_params"),
+        "deep_nesting": ("deep_nesting", "complex_conditions"),
+        "activity_mix": ("activity_output_chaining", "unsupported_types"),
+        "math_on_params": ("math_on_params",),
+        "unsupported_types": ("unsupported_types",),
+        "full_coverage": ("nested_expressions", "math_on_params", "deep_nesting", "complex_conditions"),
+    }
+
+    def _persist_suite(suite: GroundTruthSuite, output_path: str | None = None) -> str:
+        if output_path:
+            suite.to_json(output_path)
+            return output_path
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        out_dir = Path(tempfile.gettempdir()) / "lmv_synthetic" / ts
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = str(out_dir / "suite.json")
+        suite.to_json(path)
+        return path
+
+    def _build_result(
+        suite: GroundTruthSuite,
+        persist_path: str,
+        fallback_note: str | None,
+        generate_test_data: bool,
+    ) -> dict[str, Any]:
+        pipelines_payload = [
+            {
+                "name": p.adf_json.get("name", "<unknown>"),
+                "adf_json": p.adf_json,
+                "description": p.description,
+                "difficulty": p.difficulty,
+            }
+            for p in suite.pipelines
+        ]
         result: dict[str, Any] = {
             "count": len(suite.pipelines),
-            "pipelines": [pipeline.adf_json.get("name", "<unknown>") for pipeline in suite.pipelines],
-            "output_path": request.output_path,
+            "pipelines": pipelines_payload,
+            "output_path": persist_path,
         }
-
-        # Optionally generate test data for parallel testing
-        if request.generate_test_data:
+        if fallback_note:
+            result["fallback_note"] = fallback_note
+        if generate_test_data:
             from lakeflow_migration_validator.synthetic.test_data_generator import TestDataGenerator
             gen = TestDataGenerator()
             test_data = gen.generate_for_suite([p.adf_json for p in suite.pipelines])
             result["test_data"] = [td.to_dict() for td in test_data]
-
         return result
+
+    def _generate_stream(request: SyntheticGenerateRequest):
+        """Yield NDJSON lines with per-pipeline progress."""
+        mode = request.mode
+        fallback_note: str | None = None
+
+        if mode in ("llm", "custom") and judge_provider is None:
+            fallback_note = f"Mode '{mode}' requires an LLM provider; using 'template' mode."
+            mode = "template"
+
+        suite = None
+
+        if mode in ("llm", "custom") and judge_provider is not None:
+            try:
+                from lakeflow_migration_validator.synthetic.agent_generator import (
+                    AgentPipelineGenerator,
+                    GenerationConfig,
+                )
+                weak_spots = _PRESET_WEAK_SPOTS.get(request.preset or "", ("nested_expressions",))
+                config = GenerationConfig(
+                    target_weak_spots=weak_spots,
+                    extra_instructions=request.custom_prompt or "",
+                )
+                agent_gen = AgentPipelineGenerator(judge_provider=judge_provider)
+                # Build pre-built plan from spec if provided
+                pre_plan = None
+                if request.spec and "pipelines" in request.spec:
+                    from lakeflow_migration_validator.synthetic.agent_generator import (
+                        GenerationPlan,
+                        PipelineSpec,
+                    )
+                    pre_specs = []
+                    for item in request.spec["pipelines"]:
+                        pre_specs.append(PipelineSpec(
+                            name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
+                            activity_count=int(item.get("activity_count", 5)),
+                            activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
+                            stress_area=item.get("stress_area", "nested_expressions"),
+                            expression_complexity=item.get("expression_complexity", "nested"),
+                            parameters=tuple(item.get("parameters", ("env",))),
+                        ))
+                    pre_plan = GenerationPlan(
+                        count=len(pre_specs),
+                        specs=tuple(pre_specs),
+                        raw_plan=request.spec,
+                    )
+                collected = []
+                for ev in agent_gen.generate_stream(
+                    count=request.count, config=config, plan=pre_plan,
+                ):
+                    if ev["type"] == "plan":
+                        plan = ev["plan"]
+                        plan_specs = [
+                            {"name": s.name, "stress_area": s.stress_area,
+                             "activity_count": s.activity_count}
+                            for s in plan.specs
+                        ]
+                        yield _json.dumps({
+                            "type": "plan",
+                            "count": plan.count,
+                            "specs": plan_specs,
+                        }) + "\n"
+                    elif ev["type"] == "stage":
+                        stage_event: dict[str, Any] = {
+                            "type": "stage",
+                            "pipeline_index": ev["pipeline_index"],
+                            "pipeline_name": ev["pipeline_name"],
+                            "stage": ev["stage"],
+                            "pct": ev.get("pct", 0),
+                            "total": ev["total"],
+                        }
+                        if ev.get("attempt"):
+                            stage_event["attempt"] = ev["attempt"]
+                            stage_event["max_attempts"] = ev.get("max_attempts", 1)
+                        if ev.get("error"):
+                            stage_event["error"] = ev["error"]
+                        yield _json.dumps(stage_event) + "\n"
+                    elif ev["type"] == "pipeline":
+                        pipeline = ev.get("pipeline")
+                        name = pipeline.adf_json.get("name") if pipeline else ev.get("spec_name")
+                        event: dict[str, Any] = {
+                            "type": "progress",
+                            "completed": ev["completed"],
+                            "total": ev["total"],
+                            "pipeline_name": name,
+                            "ok": pipeline is not None,
+                        }
+                        if ev.get("error"):
+                            event["error"] = ev["error"]
+                        yield _json.dumps(event) + "\n"
+                        if pipeline:
+                            collected.append(pipeline)
+
+                if collected:
+                    suite = GroundTruthSuite(pipelines=tuple(collected))
+                    if len(collected) < plan.count:
+                        fallback_note = f"LLM generated {len(collected)}/{plan.count} pipelines."
+                else:
+                    fallback_note = "LLM produced no valid pipelines; using template mode."
+                    mode = "template"
+            except Exception as exc:
+                fallback_note = f"LLM generation failed: {exc}; using template mode."
+                mode = "template"
+
+        if mode == "template":
+            suite = GroundTruthSuite.generate(
+                count=request.count,
+                difficulty=request.difficulty,
+                max_activities=request.max_activities,
+                mode="template",
+            )
+            yield _json.dumps({
+                "type": "progress",
+                "completed": len(suite.pipelines),
+                "total": request.count,
+                "pipeline_name": None,
+                "ok": True,
+            }) + "\n"
+
+        persist_path = _persist_suite(suite, request.output_path)
+        result = _build_result(suite, persist_path, fallback_note, request.generate_test_data)
+        yield _json.dumps({"type": "complete", "result": result}) + "\n"
+
+    @app.post("/api/synthetic/generate")
+    def post_synthetic_generate(
+        request: SyntheticGenerateRequest,
+        stream: bool = Query(False),
+    ):
+        if stream:
+            return StreamingResponse(
+                _generate_stream(request),
+                media_type="application/x-ndjson",
+            )
+        mode = request.mode
+        fallback_note: str | None = None
+
+        if mode in ("llm", "custom") and judge_provider is None:
+            fallback_note = f"Mode '{mode}' requires an LLM provider; using 'template' mode."
+            mode = "template"
+
+        if mode in ("llm", "custom") and judge_provider is not None:
+            try:
+                from lakeflow_migration_validator.synthetic.agent_generator import (
+                    AgentPipelineGenerator,
+                    GenerationConfig,
+                )
+                weak_spots = _PRESET_WEAK_SPOTS.get(request.preset or "", ("nested_expressions",))
+                config = GenerationConfig(
+                    target_weak_spots=weak_spots,
+                    extra_instructions=request.custom_prompt or "",
+                )
+                agent_gen = AgentPipelineGenerator(judge_provider=judge_provider)
+                pipelines = agent_gen.generate(count=request.count, config=config)
+                if pipelines:
+                    suite = GroundTruthSuite(pipelines=tuple(pipelines))
+                    if len(pipelines) < request.count:
+                        fallback_note = f"LLM generated {len(pipelines)}/{request.count} pipelines."
+                else:
+                    fallback_note = "LLM produced no valid pipelines; using template mode."
+                    mode = "template"
+            except Exception as exc:
+                fallback_note = f"LLM generation failed: {exc}; using template mode."
+                mode = "template"
+
+        if mode == "template":
+            suite = GroundTruthSuite.generate(
+                count=request.count,
+                difficulty=request.difficulty,
+                max_activities=request.max_activities,
+                mode="template",
+            )
+
+        persist_path = _persist_suite(suite, request.output_path)
+        return _build_result(suite, persist_path, fallback_note, request.generate_test_data)
 
     @app.post("/api/parallel/run")
     def post_parallel_run(request: ParallelRunRequest) -> dict[str, Any]:
