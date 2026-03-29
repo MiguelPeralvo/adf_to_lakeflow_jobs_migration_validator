@@ -86,6 +86,7 @@ class ValidateFolderRequest(BaseModel):
     folder_path: str = Field(min_length=1)
     threshold: float = 90.0
     glob_pattern: str = "*.json"
+    agent_analysis: bool = False  # run LLM agent analysis on failing dimensions
 
 
 class HarnessRunRequest(BaseModel):
@@ -223,7 +224,10 @@ def create_app(
 
         if stream:
             return StreamingResponse(
-                _validate_folder_stream(files, convert, request.threshold),
+                _validate_folder_stream(
+                    files, convert, request.threshold,
+                    agent=judge_provider if request.agent_analysis else None,
+                ),
                 media_type="application/x-ndjson",
             )
 
@@ -266,14 +270,25 @@ def create_app(
             "cases": cases,
         }
 
-    def _validate_folder_stream(files: list, convert_fn, threshold: float):
-        """Yield NDJSON progress events for folder validation."""
+    def _validate_folder_stream(files: list, convert_fn, threshold: float, agent=None):
+        """Yield NDJSON progress events for folder validation.
+
+        When ``agent`` (a JudgeProvider) is provided, failing pipelines get
+        an additional LLM analysis phase that diagnoses each failing dimension
+        and suggests concrete fixes.
+
+        Event types:
+          progress — per-pipeline programmatic score
+          analysis — per-pipeline agent diagnosis (only when agent is set)
+          complete — final report with all cases
+        """
         total = len(files)
         cases = []
         scores = []
         below = 0
         for i, file_path in enumerate(files):
             name = file_path.stem
+            snapshot = None
             try:
                 with open(file_path, encoding="utf-8") as f:
                     adf_json = _json.load(f)
@@ -288,6 +303,7 @@ def create_app(
                 score = 0.0
                 label = "ERROR"
                 dims = {}
+                adf_json = {}
                 error = f"{type(exc).__name__}: {exc}"
 
             is_below = score < threshold
@@ -295,7 +311,7 @@ def create_app(
                 below += 1
             scores.append(score)
 
-            case = {
+            case: dict[str, Any] = {
                 "pipeline_name": name,
                 "file": str(file_path),
                 "score": score,
@@ -303,7 +319,6 @@ def create_app(
                 "ccs_below_threshold": is_below,
                 "dimensions": dims,
             }
-            cases.append(case)
 
             yield _json.dumps({
                 "type": "progress",
@@ -315,6 +330,65 @@ def create_app(
                 "ok": error is None,
                 "error": error,
             }) + "\n"
+
+            # Agent analysis for failing pipelines
+            if agent is not None and is_below and dims and snapshot is not None:
+                yield _json.dumps({
+                    "type": "analysis_start",
+                    "pipeline_name": name,
+                    "pipeline_index": i,
+                }) + "\n"
+
+                failing_dims = {
+                    k: v for k, v in dims.items()
+                    if not v.get("passed", True)
+                }
+                analyses = []
+                for dim_name, dim_data in failing_dims.items():
+                    try:
+                        source_acts = adf_json.get("properties", {}).get("activities", adf_json.get("activities", []))
+                        prompt = (
+                            f"You are an ADF-to-Databricks migration expert.\n\n"
+                            f"Pipeline: {name}\n"
+                            f"Dimension: {dim_name} — score: {dim_data['score']:.2f}\n"
+                            f"Details: {_json.dumps(dim_data.get('details', {}))}\n\n"
+                            f"Source ADF activities ({len(source_acts)}):\n"
+                            f"{_json.dumps([a.get('name', '?') + ' (' + a.get('type', '?') + ')' for a in source_acts[:20]])}\n\n"
+                            f"Converted tasks ({len(snapshot.tasks)}):\n"
+                            f"{_json.dumps([t.task_key + (' [placeholder]' if t.is_placeholder else '') for t in snapshot.tasks[:20]])}\n\n"
+                            f"1. Diagnose WHY this dimension scored {dim_data['score']:.2f}. "
+                            f"What specifically was lost or broken in the translation?\n"
+                            f"2. Suggest a concrete fix — either in wkmigrate's translator/preparer "
+                            f"code or in the ADF pipeline structure.\n\n"
+                            f"Be specific and actionable. Reference actual activity names and types."
+                        )
+                        if hasattr(agent, "complete"):
+                            reasoning = agent.complete(prompt, max_tokens=2048)
+                        else:
+                            resp = agent.judge(prompt)
+                            reasoning = resp.get("reasoning", "")
+                    except Exception as exc:
+                        reasoning = f"Analysis failed: {type(exc).__name__}"
+
+                    analysis_entry = {
+                        "dimension": dim_name,
+                        "score": dim_data["score"],
+                        "diagnosis": reasoning,
+                    }
+                    analyses.append(analysis_entry)
+
+                    yield _json.dumps({
+                        "type": "analysis",
+                        "pipeline_name": name,
+                        "pipeline_index": i,
+                        "dimension": dim_name,
+                        "score": dim_data["score"],
+                        "diagnosis": reasoning,
+                    }) + "\n"
+
+                case["agent_analysis"] = analyses
+
+            cases.append(case)
 
         mean = sum(scores) / len(scores) if scores else 0.0
         yield _json.dumps({

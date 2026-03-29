@@ -4,6 +4,7 @@ import { ErrorBanner } from "../components/ErrorBanner";
 import { consumePendingBatchFolder } from "../store";
 
 interface DimResult { score: number; passed: boolean; details?: Record<string, unknown> }
+interface AgentDiagnosis { dimension: string; score: number; diagnosis: string }
 interface CaseResult {
   pipeline_name: string;
   file?: string;
@@ -11,6 +12,7 @@ interface CaseResult {
   label: string;
   ccs_below_threshold: boolean;
   dimensions?: Record<string, DimResult>;
+  agent_analysis?: AgentDiagnosis[];
 }
 interface BatchReport {
   total: number;
@@ -57,6 +59,10 @@ export function BatchPage() {
   const [progressTotal, setProgressTotal] = useState(0);
   const [lastPipeline, setLastPipeline] = useState<string | null>(null);
   const [lastScore, setLastScore] = useState<number | null>(null);
+  const [agentAnalysis, setAgentAnalysis] = useState(false);
+  const [analyzingPipeline, setAnalyzingPipeline] = useState<string | null>(null);
+  const [analyzingDimension, setAnalyzingDimension] = useState<string | null>(null);
+  const [liveAnalyses, setLiveAnalyses] = useState<Record<string, AgentDiagnosis[]>>({});
 
   // wkmigrate config
   const [repos, setRepos] = useState<Array<{ url: string; default_branch: string }>>([]);
@@ -103,13 +109,13 @@ export function BatchPage() {
   async function handleRun() {
     setError(null); setReport(null); setLoading(true);
     setProgressCompleted(0); setProgressTotal(0); setLastPipeline(null); setLastScore(null);
-    setExpandedRow(null);
+    setExpandedRow(null); setAnalyzingPipeline(null); setAnalyzingDimension(null); setLiveAnalyses({});
     try {
       if (sourceMode === "folder") {
         if (!folderPath.trim()) throw new Error("Enter a folder path");
         const res = await fetch("/api/validate/folder?stream=true", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folder_path: folderPath, threshold, glob_pattern: globPattern }),
+          body: JSON.stringify({ folder_path: folderPath, threshold, glob_pattern: globPattern, agent_analysis: agentAnalysis }),
         });
         if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(err.detail || `HTTP ${res.status}`); }
         const reader = res.body!.getReader(); const decoder = new TextDecoder();
@@ -122,8 +128,10 @@ export function BatchPage() {
             if (!line.trim()) continue;
             try {
               const ev = JSON.parse(line);
-              if (ev.type === "progress") { setProgressCompleted(ev.completed); setProgressTotal(ev.total); setLastPipeline(ev.pipeline_name); setLastScore(ev.score); }
-              else if (ev.type === "complete") { finalReport = ev.result; }
+              if (ev.type === "progress") { setProgressCompleted(ev.completed); setProgressTotal(ev.total); setLastPipeline(ev.pipeline_name); setLastScore(ev.score); setAnalyzingPipeline(null); setAnalyzingDimension(null); }
+              else if (ev.type === "analysis_start") { setAnalyzingPipeline(ev.pipeline_name); setAnalyzingDimension(null); }
+              else if (ev.type === "analysis") { setAnalyzingDimension(ev.dimension); setLiveAnalyses(prev => ({ ...prev, [ev.pipeline_name]: [...(prev[ev.pipeline_name] || []), { dimension: ev.dimension, score: ev.score, diagnosis: ev.diagnosis }] })); }
+              else if (ev.type === "complete") { finalReport = ev.result; setAnalyzingPipeline(null); }
             } catch {}
           }
         }
@@ -200,6 +208,16 @@ export function BatchPage() {
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 font-mono">Threshold</label>
               <input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}
                 className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-lg py-3 px-4 text-slate-100 font-mono text-sm outline-none focus:border-primary transition-all" />
+            </div>
+            <div className="flex items-center gap-3 pb-1">
+              <div className="text-right">
+                <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Agent Analysis</span>
+                <span className="block text-[9px] text-outline">LLM diagnoses failures</span>
+              </div>
+              <button onClick={() => setAgentAnalysis(!agentAnalysis)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${agentAnalysis ? "bg-primary-container" : "bg-surface-container-highest"}`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${agentAnalysis ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
             </div>
           </div>
         </div>
@@ -282,11 +300,17 @@ export function BatchPage() {
             </div>
             <div className="px-5 py-3 flex items-center gap-4">
               <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
-              <p className="text-sm font-mono text-on-surface flex-1">
-                Validating <span className="text-primary font-bold">{progressCompleted}</span><span className="text-outline">/{progressTotal}</span>
-                {lastPipeline && <span className="text-outline ml-2">— <span className="text-on-surface-variant">{lastPipeline}</span></span>}
-                {lastScore != null && <span className="ml-2 font-bold" style={{ color: scoreColor(lastScore) }}>{Math.round(lastScore)}%</span>}
-              </p>
+              <div className="flex-1">
+                <p className="text-sm font-mono text-on-surface">
+                  {analyzingPipeline ? (
+                    <><span className="text-primary font-semibold">Analyzing</span> {analyzingPipeline}{analyzingDimension && <span className="text-outline"> — {analyzingDimension}</span>}</>
+                  ) : (
+                    <>Validating <span className="text-primary font-bold">{progressCompleted}</span><span className="text-outline">/{progressTotal}</span>
+                    {lastPipeline && <span className="text-outline ml-2">— <span className="text-on-surface-variant">{lastPipeline}</span></span>}
+                    {lastScore != null && <span className="ml-2 font-bold" style={{ color: scoreColor(lastScore) }}>{Math.round(lastScore)}%</span>}</>
+                  )}
+                </p>
+              </div>
               <span className="text-xs font-mono text-outline">{Math.round(pct)}%</span>
             </div>
           </div>
@@ -466,6 +490,33 @@ export function BatchPage() {
                             ) : (
                               <p className="text-sm text-outline font-mono">No dimension details available for this pipeline.</p>
                             )}
+                            {/* Agent analysis */}
+                            {(() => {
+                              const analyses = c.agent_analysis || liveAnalyses[c.pipeline_name];
+                              if (!analyses || analyses.length === 0) return null;
+                              return (
+                                <div className="mt-4 space-y-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-sm">psychology</span>
+                                    <h4 className="text-xs font-headline font-semibold text-on-surface uppercase tracking-wider">Agent Diagnosis</h4>
+                                  </div>
+                                  {analyses.map((a: AgentDiagnosis, ai: number) => (
+                                    <div key={ai} className="rounded-lg border border-primary/15 bg-primary/3 p-3">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-symbols-outlined text-error text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>cancel</span>
+                                        <span className="text-xs font-mono font-bold text-on-surface">
+                                          {(DIM_LABELS[a.dimension] || { label: a.dimension }).label}
+                                        </span>
+                                        <span className="text-xs font-mono text-error">{(a.score * 100).toFixed(0)}%</span>
+                                      </div>
+                                      <p className="text-xs text-on-surface/80 leading-relaxed whitespace-pre-line pl-6">
+                                        {a.diagnosis || "Analysis pending..."}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       )}
