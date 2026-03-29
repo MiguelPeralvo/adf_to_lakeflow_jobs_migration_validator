@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../api";
 import type { HarnessResult } from "../types";
 import { TopHeader } from "../components/TopHeader";
 import { ScorecardGauge } from "../components/ScorecardGauge";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 
 const DIM_META: Record<string, { label: string; icon: string }> = {
   activity_coverage:       { label: "Activity Coverage",       icon: "widgets" },
@@ -19,18 +20,45 @@ const DIM_META: Record<string, { label: string; icon: string }> = {
   parallel_equivalence:    { label: "Parallel Equivalence",     icon: "compare_arrows" },
 };
 
-export function HarnessPage() {
+export function HarnessPage({ entityId }: { entityId?: string | null }) {
   const [pipelineName, setPipelineName] = useState("");
   const [result, setResult] = useState<HarnessResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(entityId ?? null);
+
+  // Load entity from URL
+  useEffect(() => {
+    if (!entityId) return;
+    setLoading(true);
+    api.getEntity(entityId)
+      .then((data) => {
+        const results = (data.results as Record<string, unknown>) || data;
+        setResult(results as unknown as HarnessResult);
+        setPipelineName((results.pipeline_name as string) || (data.pipeline_name as string) || "");
+        setCurrentEntityId(entityId);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"))
+      .finally(() => setLoading(false));
+  }, [entityId]);
 
   async function handleRun() {
     if (!pipelineName.trim()) return;
     setError(null); setResult(null); setLoading(true);
-    try { setResult(await api.harnessRun(pipelineName.trim())); }
+    try {
+      const res = await api.harnessRun(pipelineName.trim());
+      setResult(res);
+      if (res.entity_id) {
+        setCurrentEntityId(res.entity_id);
+        window.history.replaceState(null, "", `#/harness/${res.entity_id}`);
+      }
+    }
     catch (err) { setError(err instanceof Error ? err.message : "Harness failed"); }
     finally { setLoading(false); }
+  }
+
+  function handlePastRunSelect(eid: string) {
+    window.location.hash = `#/harness/${eid}`;
   }
 
   const dims = result ? Object.entries(result.scorecard.dimensions) : [];
@@ -62,6 +90,9 @@ export function HarnessPage() {
             </div>
           )}
         </section>
+
+        {/* Past runs panel */}
+        <PastRunsPanel type="harness" onSelect={handlePastRunSelect} currentEntityId={currentEntityId} />
 
         {/* Input */}
         <div className="bg-surface-container rounded-xl border border-outline-variant/10 overflow-hidden">
@@ -118,6 +149,12 @@ export function HarnessPage() {
                     <span className="text-outline">Failing</span>
                     <span className={`font-mono ${failingDims.length > 0 ? "text-error" : "text-tertiary"}`}>{failingDims.length} dimensions</span>
                   </div>
+                  {currentEntityId && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-outline">Run ID</span>
+                      <span className="font-mono text-outline/60">{currentEntityId.slice(0, 8)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

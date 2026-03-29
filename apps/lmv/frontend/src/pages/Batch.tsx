@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { api } from "../api";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 import { consumePendingBatchFolder } from "../store";
 
 interface DimResult { score: number; passed: boolean; details?: Record<string, unknown> }
@@ -43,7 +45,7 @@ const DIM_LABELS: Record<string, { label: string; icon: string }> = {
   control_flow_fidelity:   { label: "Control Flow Fidelity",  icon: "alt_route" },
 };
 
-export function BatchPage() {
+export function BatchPage({ entityId }: { entityId?: string | null }) {
   const [sourceMode, setSourceMode] = useState<SourceMode>("folder");
   const [folderPath, setFolderPath] = useState("");
   // ADF download config
@@ -82,9 +84,24 @@ export function BatchPage() {
 
   // Past synthetic runs
   const [syntheticRuns, setSyntheticRuns] = useState<Array<{ path: string; name: string; pipeline_count: number }>>([]);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
 
-  // Load config + runs + check pending folder
+  // Load entity from URL
   useEffect(() => {
+    if (entityId) {
+      setLoading(true);
+      api.getEntity(entityId)
+        .then((data) => {
+          const results = (data.results as Record<string, unknown>) || data;
+          setReport(results as unknown as BatchReport);
+          setCurrentEntityId(entityId);
+          if (data.folder) setFolderPath(data.folder as string);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"))
+        .finally(() => setLoading(false));
+      return;
+    }
+    // Load config + runs + check pending folder
     fetch("/api/config/wkmigrate").then(r => r.json()).then(cfg => {
       setRepos(cfg.repos || []);
       setActiveRepo(cfg.active_repo || "");
@@ -96,7 +113,7 @@ export function BatchPage() {
       setFolderPath(pending);
       setSourceMode("folder");
     }
-  }, []);
+  }, [entityId]);
 
   // Fetch branches when repo changes
   useEffect(() => {
@@ -166,7 +183,11 @@ export function BatchPage() {
             } catch {}
           }
         }
-        if (finalReport) setReport(finalReport); else throw new Error("Stream ended without results");
+        if (finalReport) {
+          setReport(finalReport);
+          const eid = (finalReport as unknown as Record<string, unknown>).entity_id as string | undefined;
+          if (eid) { setCurrentEntityId(eid); window.history.replaceState(null, "", `#/batch/${eid}`); }
+        } else throw new Error("Stream ended without results");
       } else if (sourceMode === "adf_download") {
         // Step 1: Download from ADF
         setDownloading(true);
@@ -214,7 +235,11 @@ export function BatchPage() {
               else if (ev.type === "complete") { finalReport = ev.result; setAnalyzingPipeline(null); }
             } catch {} }
         }
-        if (finalReport) setReport(finalReport);
+        if (finalReport) {
+          setReport(finalReport);
+          const eid = (finalReport as unknown as Record<string, unknown>).entity_id as string | undefined;
+          if (eid) { setCurrentEntityId(eid); window.history.replaceState(null, "", `#/batch/${eid}`); }
+        }
       } else {
         const res = await fetch("/api/validate/batch", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -249,6 +274,9 @@ export function BatchPage() {
             {loading ? "Validating..." : "Run Batch Validation"}
           </button>
         </div>
+
+        {/* Past runs panel */}
+        <PastRunsPanel type="batch_validation" onSelect={(eid) => { window.location.hash = `#/batch/${eid}`; }} currentEntityId={currentEntityId} />
 
         {/* Source config */}
         <div className="bg-surface-container rounded-xl border border-outline-variant/10 overflow-hidden">

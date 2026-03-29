@@ -7,6 +7,7 @@ import { ScorecardGauge } from "../components/ScorecardGauge";
 import { DimensionBreakdown } from "../components/DimensionBreakdown";
 import { LoadingOverlay } from "../components/LoadingOverlay";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 
 type InputMode = "adf_json" | "adf_yaml" | "snapshot";
 
@@ -47,16 +48,31 @@ const MODE_INFO: Record<InputMode, { label: string; dot: string; hint: string }>
   snapshot: { label: "Snapshot", dot: "bg-[#27e199]", hint: "Pre-converted from wkmigrate — most accurate" },
 };
 
-export function ValidatePage() {
+export function ValidatePage({ entityId }: { entityId?: string | null }) {
   const [mode, setMode] = useState<InputMode>("adf_json");
   const [input, setInput] = useState(PLACEHOLDERS.adf_json);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourcePipeline, setSourcePipeline] = useState<string | null>(null);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(entityId ?? null);
 
-  // Auto-load pipeline from Synthetic page navigation
+  // Load entity from URL
   useEffect(() => {
+    if (entityId) {
+      setLoading(true);
+      api.getEntity(entityId)
+        .then((data) => {
+          const results = (data.results as Record<string, unknown>) || data;
+          setScorecard(results as unknown as Scorecard);
+          setSourcePipeline((data.pipeline_name as string) || null);
+          setCurrentEntityId(entityId);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"))
+        .finally(() => setLoading(false));
+      return;
+    }
+    // Auto-load pipeline from Synthetic page navigation
     const pending = consumePendingValidation();
     if (pending) {
       setMode("adf_json");
@@ -64,11 +80,17 @@ export function ValidatePage() {
       setSourcePipeline(pending.pipeline_name);
       setLoading(true);
       api.validate({ adf_json: pending.adf_json as object, pipeline_name: pending.pipeline_name })
-        .then(setScorecard)
+        .then((result) => {
+          setScorecard(result);
+          if (result.entity_id) {
+            setCurrentEntityId(result.entity_id);
+            window.history.replaceState(null, "", `#/validate/${result.entity_id}`);
+          }
+        })
         .catch((err: unknown) => setError(err instanceof Error ? err.message : "Validation failed"))
         .finally(() => setLoading(false));
     }
-  }, []);
+  }, [entityId]);
 
   function handleModeChange(m: InputMode) {
     setMode(m);
@@ -91,11 +113,19 @@ export function ValidatePage() {
       }
       const result = await api.validate(payload);
       setScorecard(result);
+      if (result.entity_id) {
+        setCurrentEntityId(result.entity_id);
+        window.history.replaceState(null, "", `#/validate/${result.entity_id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Validation failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handlePastRunSelect(eid: string) {
+    window.location.hash = `#/validate/${eid}`;
   }
 
   return (
@@ -141,6 +171,9 @@ export function ValidatePage() {
           </div>
         </section>
 
+        {/* Past runs panel */}
+        <PastRunsPanel type="validation" onSelect={handlePastRunSelect} currentEntityId={currentEntityId} />
+
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
         {/* Source banner when navigating from Synthetic */}
@@ -151,6 +184,11 @@ export function ValidatePage() {
               <span className="text-[10px] font-mono text-outline uppercase tracking-wider">From Synthetic Engine</span>
               <p className="text-sm font-mono text-on-surface font-medium">{sourcePipeline}</p>
             </div>
+            {currentEntityId && (
+              <span className="ml-auto machined-chip border-outline-variant/30 text-outline px-2 py-0.5 rounded text-[9px] font-mono">
+                {currentEntityId.slice(0, 8)}
+              </span>
+            )}
           </div>
         )}
 

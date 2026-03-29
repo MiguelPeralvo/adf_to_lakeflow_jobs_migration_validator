@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../api";
 import type { ParallelResult, ComparisonRow } from "../types";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 
 function eqColor(pct: number): string {
   if (pct >= 90) return "#27e199";
@@ -10,21 +11,46 @@ function eqColor(pct: number): string {
   return "#ff5c5c";
 }
 
-export function ParallelPage() {
+export function ParallelPage({ entityId }: { entityId?: string | null }) {
   const [pipelineName, setPipelineName] = useState("");
   const [paramsJson, setParamsJson] = useState('{ "env": "dev" }');
   const [result, setResult] = useState<ParallelResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(entityId ?? null);
+
+  // Load entity from URL
+  useEffect(() => {
+    if (!entityId) return;
+    setLoading(true);
+    api.getEntity(entityId)
+      .then((data) => {
+        const results = (data.results as Record<string, unknown>) || data;
+        setResult(results as unknown as ParallelResult);
+        setPipelineName((results.pipeline_name as string) || (data.pipeline_name as string) || "");
+        setCurrentEntityId(entityId);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"))
+      .finally(() => setLoading(false));
+  }, [entityId]);
 
   async function handleRun() {
     if (!pipelineName.trim()) return;
     setError(null); setResult(null); setLoading(true);
     try {
       const params = JSON.parse(paramsJson);
-      setResult(await api.parallelRun(pipelineName.trim(), params));
+      const res = await api.parallelRun(pipelineName.trim(), params);
+      setResult(res);
+      if (res.entity_id) {
+        setCurrentEntityId(res.entity_id);
+        window.history.replaceState(null, "", `#/parallel/${res.entity_id}`);
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Parallel run failed"); }
     finally { setLoading(false); }
+  }
+
+  function handlePastRunSelect(eid: string) {
+    window.location.hash = `#/parallel/${eid}`;
   }
 
   const eqPct = result ? Math.round(result.equivalence_score * 100) : 0;
@@ -56,6 +82,9 @@ export function ParallelPage() {
             </div>
           )}
         </section>
+
+        {/* Past runs panel */}
+        <PastRunsPanel type="parallel" onSelect={handlePastRunSelect} currentEntityId={currentEntityId} />
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 

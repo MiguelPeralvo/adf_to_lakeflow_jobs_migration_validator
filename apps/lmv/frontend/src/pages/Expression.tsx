@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../api";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 
-interface JudgeResult { score: number; reasoning: string }
+interface JudgeResult { entity_id?: string; score: number; reasoning: string; adf_expression?: string; python_code?: string }
 
 const QUICK_TESTS = [
   { id: "4012", label: "Substring", adf: "@substring(item().name, 0, 5)", python: "row['name'][:5]", expect: true },
@@ -20,23 +21,55 @@ function scoreColor(s: number): string {
   return "#ff5c5c";
 }
 
-export function ExpressionPage() {
+export function ExpressionPage({ entityId }: { entityId?: string | null }) {
   const [adfExpr, setAdfExpr] = useState("");
   const [pythonCode, setPythonCode] = useState("");
   const [result, setResult] = useState<JudgeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(entityId ?? null);
+
+  // Load entity from URL
+  useEffect(() => {
+    if (!entityId) return;
+    setLoading(true);
+    api.getEntity(entityId)
+      .then((data) => {
+        const results = (data.results as Record<string, unknown>) || data;
+        setAdfExpr((results.adf_expression as string) || (data.adf_expression as string) || "");
+        setPythonCode((results.python_code as string) || (data.python_code as string) || "");
+        setResult({
+          score: (results.score as number) ?? 0,
+          reasoning: (results.reasoning as string) || "",
+          entity_id: entityId,
+        });
+        setCurrentEntityId(entityId);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"))
+      .finally(() => setLoading(false));
+  }, [entityId]);
 
   async function handleJudge() {
     if (!adfExpr.trim() || !pythonCode.trim()) return;
     setError(null); setResult(null); setLoading(true);
-    try { setResult(await api.validateExpression(adfExpr.trim(), pythonCode.trim())); }
+    try {
+      const res = await api.validateExpression(adfExpr.trim(), pythonCode.trim());
+      setResult(res);
+      if (res.entity_id) {
+        setCurrentEntityId(res.entity_id);
+        window.history.replaceState(null, "", `#/expression/${res.entity_id}`);
+      }
+    }
     catch (err) { setError(err instanceof Error ? err.message : "Judge failed"); }
     finally { setLoading(false); }
   }
 
   function loadQuickTest(t: typeof QUICK_TESTS[0]) {
     setAdfExpr(t.adf); setPythonCode(t.python); setResult(null); setError(null);
+  }
+
+  function handlePastRunSelect(eid: string) {
+    window.location.hash = `#/expression/${eid}`;
   }
 
   return (
@@ -63,6 +96,9 @@ export function ExpressionPage() {
               : <><span className="material-symbols-outlined text-sm">gavel</span> Judge Equivalence</>}
           </button>
         </section>
+
+        {/* Past runs panel */}
+        <PastRunsPanel type="expression" onSelect={handlePastRunSelect} currentEntityId={currentEntityId} />
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 

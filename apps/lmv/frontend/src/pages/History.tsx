@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
-import { setPendingBatchFolder } from "../store";
+import { setPendingBatchFolder, navigateToEntity, TYPE_TO_PAGE } from "../store";
 
 interface ActivityEntry {
-  type: "validation" | "batch_validation" | "synthetic_generation";
+  type: "validation" | "batch_validation" | "synthetic_generation" | "expression" | "harness" | "parallel";
   timestamp: string;
+  entity_id?: string;
   // validation
   pipeline_name?: string;
   scorecard?: { score: number; label: string; dimensions: Record<string, { score: number; passed: boolean }> };
@@ -19,6 +20,14 @@ interface ActivityEntry {
   output_path?: string;
   count?: number;
   mode?: string;
+  // expression
+  adf_expression?: string;
+  python_code?: string;
+  score?: number;
+  // harness
+  iterations?: number;
+  // parallel
+  equivalence_score?: number;
 }
 
 interface SyntheticRun {
@@ -45,7 +54,7 @@ function relativeTime(ts: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export function HistoryPage() {
+export function HistoryPage({ entityId: _entityId }: { entityId?: string | null }) {
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
   const [syntheticRuns, setSyntheticRuns] = useState<SyntheticRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,17 +77,32 @@ export function HistoryPage() {
     validation: "rule",
     batch_validation: "monitoring",
     synthetic_generation: "science",
+    expression: "gavel",
+    harness: "settings_input_component",
+    parallel: "account_tree",
   };
   const typeLabel: Record<string, string> = {
     validation: "Validation",
     batch_validation: "Batch Validation",
     synthetic_generation: "Synthetic Generation",
+    expression: "Expression",
+    harness: "E2E Harness",
+    parallel: "Parallel Test",
   };
   const typeColor: Record<string, string> = {
     validation: "text-primary",
     batch_validation: "text-on-surface",
     synthetic_generation: "text-tertiary",
+    expression: "text-[#ffb547]",
+    harness: "text-primary",
+    parallel: "text-primary",
   };
+
+  function viewEntity(entry: ActivityEntry) {
+    if (!entry.entity_id) return;
+    const page = TYPE_TO_PAGE[entry.type];
+    if (page) navigateToEntity(page, entry.entity_id);
+  }
 
   return (
     <>
@@ -87,7 +111,7 @@ export function HistoryPage() {
         <section>
           <h2 className="text-4xl font-bold font-headline text-on-surface tracking-tight">Activity History</h2>
           <p className="text-slate-500 font-body mt-2">
-            Timeline of validations, batch runs, and synthetic generation sessions.
+            Timeline of validations, batch runs, and synthetic generation sessions. Click any entry to view full results.
           </p>
         </section>
 
@@ -126,6 +150,7 @@ export function HistoryPage() {
                 const icon = typeIcon[entry.type] || "help";
                 const label = typeLabel[entry.type] || entry.type;
                 const color = typeColor[entry.type] || "text-outline";
+                const hasEntity = !!entry.entity_id;
 
                 return (
                   <div key={i} className="bg-surface-container rounded-xl border border-outline-variant/10 overflow-hidden">
@@ -161,7 +186,41 @@ export function HistoryPage() {
                             <span className="text-outline">{entry.mode} mode</span>
                           </p>
                         )}
+                        {entry.type === "expression" && (
+                          <p className="text-sm text-on-surface">
+                            <span className="font-mono font-medium truncate">{entry.adf_expression?.slice(0, 50)}</span>
+                            {entry.score != null && (
+                              <span className="ml-2 font-mono font-bold" style={{ color: scoreColor(entry.score * 100) }}>
+                                {Math.round(entry.score * 100)}%
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {entry.type === "harness" && (
+                          <p className="text-sm text-on-surface">
+                            <span className="font-mono font-medium">{entry.pipeline_name}</span>
+                            <span className="text-outline ml-2">— {entry.iterations} iterations</span>
+                          </p>
+                        )}
+                        {entry.type === "parallel" && (
+                          <p className="text-sm text-on-surface">
+                            <span className="font-mono font-medium">{entry.pipeline_name}</span>
+                            {entry.equivalence_score != null && (
+                              <span className="ml-2 font-mono font-bold" style={{ color: scoreColor(entry.equivalence_score * 100) }}>
+                                {Math.round(entry.equivalence_score * 100)}% equiv
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
+
+                      {hasEntity && (
+                        <button onClick={(e) => { e.stopPropagation(); viewEntity(entry); }}
+                          className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-mono font-bold hover:bg-primary/20 border border-primary/20 flex items-center gap-1 shrink-0">
+                          <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                          View
+                        </button>
+                      )}
 
                       <span className="machined-chip px-2 py-0.5 rounded text-[9px] font-mono border-outline-variant/30 text-outline">{label}</span>
                       <span className="text-[10px] font-mono text-outline w-16 text-right shrink-0">{relativeTime(entry.timestamp)}</span>
@@ -170,8 +229,15 @@ export function HistoryPage() {
 
                     {isOpen && (
                       <div className="px-5 pb-4 pt-1 border-t border-outline-variant/5 space-y-3">
-                        <div className="text-[10px] font-mono text-outline">
-                          {new Date(entry.timestamp).toLocaleString()}
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-mono text-outline">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </span>
+                          {entry.entity_id && (
+                            <span className="text-[9px] font-mono text-outline/50">
+                              ID: {entry.entity_id.slice(0, 8)}
+                            </span>
+                          )}
                         </div>
 
                         {entry.type === "validation" && entry.scorecard && (
@@ -209,6 +275,15 @@ export function HistoryPage() {
                               Validate
                             </button>
                           </div>
+                        )}
+
+                        {/* View full results button for all types */}
+                        {hasEntity && (
+                          <button onClick={() => viewEntity(entry)}
+                            className="text-xs font-mono text-primary hover:text-primary-fixed flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                            View full results
+                          </button>
                         )}
                       </div>
                     )}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { api } from "../api";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { PastRunsPanel } from "../components/PastRunsPanel";
 import { setPendingValidation, setPendingBatchFolder } from "../store";
 
 /* ------------------------------------------------------------------ */
@@ -18,7 +20,7 @@ interface PlanSpec { name: string; stress_area: string; activity_count: number }
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
 
-export function SyntheticPage() {
+export function SyntheticPage({ entityId }: { entityId?: string | null }) {
   /* ---- config ---- */
   const [mode, setMode] = useState<Mode>("llm");
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
@@ -58,8 +60,23 @@ export function SyntheticPage() {
   const [maxAttempts, setMaxAttempts] = useState(0);
   const [pipelineStatus, setPipelineStatus] = useState<Record<number, "ok" | "fail">>({});
 
-  /* ---- load templates ---- */
-  useEffect(() => { fetch("/api/synthetic/templates").then(r => r.json()).then(setTemplates).catch(() => {}); }, []);
+  const [currentEntityId, setCurrentEntityId] = useState<string | null>(null);
+
+  /* ---- load entity or templates ---- */
+  useEffect(() => {
+    if (entityId) {
+      api.getEntity(entityId)
+        .then((data) => {
+          const results = (data.results as Record<string, unknown>) || data;
+          setResult(results as unknown as GenerateResult);
+          setCurrentEntityId(entityId);
+          setPhase("done");
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load entity"));
+      return;
+    }
+    fetch("/api/synthetic/templates").then(r => r.json()).then(setTemplates).catch(() => {});
+  }, [entityId]);
 
   /* ---- resolve spec text from template + params ---- */
   const resolveSpecCounter = useRef(0);
@@ -130,7 +147,7 @@ export function SyntheticPage() {
             if (ev.type === "plan") { setPlanSpecs(ev.specs || []); setProgressTotal(ev.count); setPhase("generating"); }
             else if (ev.type === "stage") { setCurrentPipelineIdx(ev.pipeline_index); setCurrentStage(ev.stage); setCurrentStagePct(ev.pct ?? 0); setLastPipelineName(ev.pipeline_name); if (ev.attempt) { setCurrentAttempt(ev.attempt); setMaxAttempts(ev.max_attempts ?? 1); } }
             else if (ev.type === "progress") { setProgressCompleted(ev.completed); setProgressTotal(ev.total); setCurrentStage(""); setCurrentStagePct(0); if (ev.pipeline_name) setLastPipelineName(ev.pipeline_name); const idx = ev.completed - 1; setPipelineStatus(prev => ({ ...prev, [idx]: ev.ok ? "ok" : "fail" })); if (ev.ok === false) { failed++; setProgressFailed(failed); if (ev.error) setPipelineErrors(p => [...p, `Pipeline ${ev.completed}: ${ev.error}`]); } }
-            else if (ev.type === "complete") { finalResult = ev.result; setResult(ev.result); }
+            else if (ev.type === "complete") { finalResult = ev.result; setResult(ev.result); if (ev.result?.entity_id) { setCurrentEntityId(ev.result.entity_id); window.history.replaceState(null, "", `#/synthetic/${ev.result.entity_id}`); } }
           } catch {} }
       }
       if (!finalResult) throw new Error("Generation stream ended unexpectedly");
@@ -199,6 +216,9 @@ export function SyntheticPage() {
             })}
           </div>
         </section>
+
+        {/* Past runs panel */}
+        <PastRunsPanel type="synthetic_generation" onSelect={(eid) => { window.location.hash = `#/synthetic/${eid}`; }} currentEntityId={currentEntityId} />
 
         {/* ─── Progress banner ─── */}
         {generating && (

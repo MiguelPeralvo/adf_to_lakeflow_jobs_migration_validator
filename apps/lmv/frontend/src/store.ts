@@ -30,3 +30,18 @@ export function consumePendingBatchFolder(): string | null {
   _pendingBatchFolder = null;
   return p;
 }
+
+/** Navigate to an entity detail view by page + entity ID. */
+export function navigateToEntity(page: string, entityId: string): void {
+  window.location.hash = `#/${page}/${entityId}`;
+}
+
+/** Map backend event types to frontend page names. */
+export const TYPE_TO_PAGE: Record<string, string> = {
+  validation: "validate",
+  expression: "expression",
+  harness: "harness",
+  parallel: "parallel",
+  batch_validation: "batch",
+  synthetic_generation: "synthetic",
+};

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import tempfile
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,22 +49,30 @@ class HistoryStore:
                     data TEXT NOT NULL
                 )
             """)
-            self._conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_log(type)
-            """)
-            self._conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_log(timestamp DESC)
-            """)
+            # Migrate: add entity_id and results columns if missing
+            try:
+                self._conn.execute("ALTER TABLE activity_log ADD COLUMN entity_id TEXT")
+            except Exception:
+                pass
+            try:
+                self._conn.execute("ALTER TABLE activity_log ADD COLUMN results TEXT")
+            except Exception:
+                pass
+            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_log(type)")
+            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_log(timestamp DESC)")
+            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_entity_id ON activity_log(entity_id)")
             self._conn.commit()
             self._use_sqlite = True
         except Exception:
             self._use_sqlite = False
 
-    def _write_event(self, event: dict[str, Any]) -> None:
+    def _write_event(self, event: dict[str, Any], entity_id: str, results: dict[str, Any] | None = None) -> None:
+        event["entity_id"] = entity_id
         if self._use_sqlite:
             self._conn.execute(
-                "INSERT INTO activity_log (timestamp, type, data) VALUES (?, ?, ?)",
-                (event["timestamp"], event["type"], _json.dumps(event)),
+                "INSERT INTO activity_log (timestamp, type, data, entity_id, results) VALUES (?, ?, ?, ?, ?)",
+                (event["timestamp"], event["type"], _json.dumps(event), entity_id,
+                 _json.dumps(results) if results is not None else None),
             )
             self._conn.commit()
         else:
@@ -74,18 +83,23 @@ class HistoryStore:
                     log = _json.loads(self._json_path.read_text(encoding="utf-8"))
                 except Exception:
                     log = []
+            if results is not None:
+                event["_results"] = results
             log.append(event)
             self._json_path.write_text(_json.dumps(log, indent=2), encoding="utf-8")
 
-    def append(self, pipeline_name: str, scorecard: dict[str, Any]) -> None:
+    def append(self, pipeline_name: str, scorecard: dict[str, Any], full_result: dict[str, Any] | None = None) -> str:
+        eid = str(uuid.uuid4())
         self._write_event({
             "type": "validation",
             "pipeline_name": pipeline_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "scorecard": scorecard,
-        })
+        }, entity_id=eid, results=full_result or scorecard)
+        return eid
 
-    def log_batch(self, folder: str, total: int, mean_score: float, below: int, threshold: float) -> None:
+    def log_batch(self, folder: str, total: int, mean_score: float, below: int, threshold: float, full_result: dict[str, Any] | None = None) -> str:
+        eid = str(uuid.uuid4())
         self._write_event({
             "type": "batch_validation",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -94,16 +108,51 @@ class HistoryStore:
             "mean_score": mean_score,
             "below_threshold": below,
             "threshold": threshold,
-        })
+        }, entity_id=eid, results=full_result)
+        return eid
 
-    def log_synthetic(self, output_path: str, count: int, mode: str) -> None:
+    def log_synthetic(self, output_path: str, count: int, mode: str, full_result: dict[str, Any] | None = None) -> str:
+        eid = str(uuid.uuid4())
         self._write_event({
             "type": "synthetic_generation",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "output_path": output_path,
             "count": count,
             "mode": mode,
-        })
+        }, entity_id=eid, results=full_result)
+        return eid
+
+    def log_expression(self, adf_expression: str, python_code: str, result: dict[str, Any]) -> str:
+        eid = str(uuid.uuid4())
+        self._write_event({
+            "type": "expression",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "adf_expression": adf_expression,
+            "python_code": python_code,
+            "score": result.get("score", 0),
+        }, entity_id=eid, results=result)
+        return eid
+
+    def log_harness(self, pipeline_name: str, result: dict[str, Any]) -> str:
+        eid = str(uuid.uuid4())
+        self._write_event({
+            "type": "harness",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pipeline_name": pipeline_name,
+            "iterations": result.get("iterations", 0),
+            "score": result.get("scorecard", {}).get("score", 0),
+        }, entity_id=eid, results=result)
+        return eid
+
+    def log_parallel(self, pipeline_name: str, result: dict[str, Any]) -> str:
+        eid = str(uuid.uuid4())
+        self._write_event({
+            "type": "parallel",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pipeline_name": pipeline_name,
+            "equivalence_score": result.get("equivalence_score", 0),
+        }, entity_id=eid, results=result)
+        return eid
 
     def get(self, pipeline_name: str) -> list[dict[str, Any]]:
         if self._use_sqlite:
@@ -135,6 +184,55 @@ class HistoryStore:
         except Exception:
             return []
         return list(reversed(log[-limit:]))
+
+    def get_entity(self, entity_id: str) -> dict[str, Any] | None:
+        """Retrieve a single entity by its UUID, including full results."""
+        if self._use_sqlite:
+            row = self._conn.execute(
+                "SELECT data, results FROM activity_log WHERE entity_id = ?", (entity_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            event = _json.loads(row[0])
+            if row[1]:
+                event["results"] = _json.loads(row[1])
+            return event
+        # JSON fallback
+        if not self._json_path.exists():
+            return None
+        try:
+            log = _json.loads(self._json_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        for e in log:
+            if e.get("entity_id") == entity_id:
+                if "_results" in e:
+                    e["results"] = e.pop("_results")
+                return e
+        return None
+
+    def list_entities(self, entity_type: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        """List entities, optionally filtered by type. Returns metadata (no full results)."""
+        if self._use_sqlite:
+            if entity_type:
+                rows = self._conn.execute(
+                    "SELECT data FROM activity_log WHERE type = ? ORDER BY id DESC LIMIT ?",
+                    (entity_type, limit),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)
+                ).fetchall()
+            return [_json.loads(row[0]) for row in rows]
+        # JSON fallback
+        if not self._json_path.exists():
+            return []
+        try:
+            log = _json.loads(self._json_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        filtered = [e for e in log if entity_type is None or e.get("type") == entity_type]
+        return list(reversed(filtered[-limit:]))
 
 
 # Backward-compatible alias
@@ -285,7 +383,8 @@ def create_app(
             pipeline_name = "<snapshot>"
 
         payload = scorecard.to_dict()
-        history.append(pipeline_name, payload)
+        entity_id = history.append(pipeline_name, payload)
+        payload["entity_id"] = entity_id
         return payload
 
     @app.post("/api/validate/expression")
@@ -302,10 +401,15 @@ def create_app(
             score = float(response.get("score", 0.0))
         except (TypeError, ValueError):
             score = 0.0
-        return {
+        result = {
             "score": max(0.0, min(1.0, score)),
             "reasoning": str(response.get("reasoning", "")),
+            "adf_expression": request.adf_expression,
+            "python_code": request.python_code,
         }
+        entity_id = history.log_expression(request.adf_expression, request.python_code, result)
+        result["entity_id"] = entity_id
+        return result
 
     @app.get("/api/history/{pipeline_name}")
     def get_history(pipeline_name: str) -> list[dict[str, Any]]:
@@ -315,6 +419,19 @@ def create_app(
     def get_activity_log(limit: int = Query(100)) -> list[dict[str, Any]]:
         """Return the unified activity log — validations, batch runs, synthetic generations."""
         return history.get_activity_log(limit)
+
+    @app.get("/api/entities/{entity_id}")
+    def get_entity(entity_id: str) -> dict[str, Any]:
+        """Retrieve a past run by entity ID, including full results."""
+        result = history.get_entity(entity_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Entity not found")
+        return result
+
+    @app.get("/api/entities")
+    def list_entities(type: str | None = Query(None), limit: int = Query(20)) -> list[dict[str, Any]]:
+        """List past runs, optionally filtered by type."""
+        return history.list_entities(entity_type=type, limit=limit)
 
     @app.post("/api/validate/batch")
     def post_validate_batch(request: ValidateBatchRequest) -> dict[str, Any]:
@@ -520,18 +637,20 @@ def create_app(
 
         mean = sum(scores) / len(scores) if scores else 0.0
         folder_path = str(files[0].parent) if files else ""
-        history.log_batch(folder_path, len(cases), mean, below, threshold)
+        batch_result = {
+            "total": len(cases),
+            "threshold": threshold,
+            "mean_score": mean,
+            "min_score": min(scores) if scores else 0.0,
+            "max_score": max(scores) if scores else 0.0,
+            "below_threshold": below,
+            "cases": cases,
+        }
+        entity_id = history.log_batch(folder_path, len(cases), mean, below, threshold, full_result=batch_result)
+        batch_result["entity_id"] = entity_id
         yield _json.dumps({
             "type": "complete",
-            "result": {
-                "total": len(cases),
-                "threshold": threshold,
-                "mean_score": mean,
-                "min_score": min(scores) if scores else 0.0,
-                "max_score": max(scores) if scores else 0.0,
-                "below_threshold": below,
-                "cases": cases,
-            },
+            "result": batch_result,
         }) + "\n"
 
     @app.post("/api/harness/run")
@@ -539,12 +658,15 @@ def create_app(
         if harness_runner is None:
             raise HTTPException(status_code=503, detail="harness_runner is not configured")
         result = harness_runner.run(request.pipeline_name)
-        return {
+        payload = {
             "pipeline_name": result.pipeline_name,
             "scorecard": result.scorecard.to_dict(),
             "iterations": result.iterations,
             "fix_suggestions": list(result.fix_suggestions),
         }
+        entity_id = history.log_harness(request.pipeline_name, payload)
+        payload["entity_id"] = entity_id
+        return payload
 
     # ------------------------------------------------------------------
     # ADF pipeline download
@@ -1144,7 +1266,8 @@ def create_app(
 
         persist_path = _persist_suite(suite, request.output_path)
         result = _build_result(suite, persist_path, fallback_note, request.generate_test_data)
-        history.log_synthetic(persist_path, result["count"], request.mode)
+        entity_id = history.log_synthetic(persist_path, result["count"], request.mode, full_result=result)
+        result["entity_id"] = entity_id
         yield _json.dumps({"type": "complete", "result": result}) + "\n"
 
     @app.post("/api/synthetic/generate")
@@ -1223,8 +1346,10 @@ def create_app(
             )
 
         persist_path = _persist_suite(suite, request.output_path)
-        history.log_synthetic(persist_path, len(suite.pipelines), request.mode)
-        return _build_result(suite, persist_path, fallback_note, request.generate_test_data)
+        result = _build_result(suite, persist_path, fallback_note, request.generate_test_data)
+        entity_id = history.log_synthetic(persist_path, len(suite.pipelines), request.mode, full_result=result)
+        result["entity_id"] = entity_id
+        return result
 
     @app.post("/api/parallel/run")
     def post_parallel_run(request: ParallelRunRequest) -> dict[str, Any]:
@@ -1236,7 +1361,10 @@ def create_app(
             parameters=request.parameters,
             snapshot=snapshot,
         )
-        return result.to_dict()
+        payload = result.to_dict()
+        entity_id = history.log_parallel(request.pipeline_name, payload)
+        payload["entity_id"] = entity_id
+        return payload
 
     return app
 

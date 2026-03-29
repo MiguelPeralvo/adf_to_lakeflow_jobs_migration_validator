@@ -1,4 +1,4 @@
-import type { Scorecard, HarnessResult, ParallelResult, HistoryEntry } from "./types";
+import type { Scorecard, HarnessResult, ParallelResult, HistoryEntry, ExpressionResult, EntitySummary } from "./types";
 
 const BASE = "/api";
 
@@ -28,8 +28,8 @@ export const api = {
   validate(payload: { adf_json?: object; adf_yaml?: string; snapshot?: object; pipeline_name?: string }): Promise<Scorecard> {
     return post("/validate", payload);
   },
-  validateExpression(adf_expression: string, python_code: string) {
-    return post<{ score: number; reasoning: string }>("/validate/expression", { adf_expression, python_code });
+  validateExpression(adf_expression: string, python_code: string): Promise<ExpressionResult> {
+    return post("/validate/expression", { adf_expression, python_code });
   },
   harnessRun(pipeline_name: string): Promise<HarnessResult> {
     return post("/harness/run", { pipeline_name });
@@ -39,5 +39,14 @@ export const api = {
   },
   history(pipeline_name: string): Promise<HistoryEntry[]> {
     return get(`/history/${encodeURIComponent(pipeline_name)}`);
+  },
+  getEntity(entityId: string): Promise<Record<string, unknown>> {
+    return get(`/entities/${encodeURIComponent(entityId)}`);
+  },
+  listEntities(type?: string, limit = 10): Promise<EntitySummary[]> {
+    const params = new URLSearchParams();
+    if (type) params.set("type", type);
+    params.set("limit", String(limit));
+    return get(`/entities?${params.toString()}`);
   },
 };

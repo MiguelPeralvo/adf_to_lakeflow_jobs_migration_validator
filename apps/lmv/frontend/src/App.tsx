@@ -8,7 +8,7 @@ import { BatchPage } from "./pages/Batch";
 import { SyntheticPage } from "./pages/Synthetic";
 import { HistoryPage } from "./pages/History";
 
-const PAGES: Record<Page, () => React.JSX.Element> = {
+const PAGES: Record<Page, React.FC<{ entityId?: string | null }>> = {
   validate: ValidatePage,
   expression: ExpressionPage,
   harness: HarnessPage,
@@ -20,10 +20,18 @@ const PAGES: Record<Page, () => React.JSX.Element> = {
 
 const VALID_PAGES = new Set(Object.keys(PAGES));
 
-function pageFromHash(): Page {
+interface RouteState {
+  page: Page;
+  entityId: string | null;
+}
+
+function routeFromHash(): RouteState {
   const raw = window.location.hash.replace("#/", "").replace("#", "");
-  const [pagePart] = raw.split("?");
-  return VALID_PAGES.has(pagePart) ? (pagePart as Page) : "validate";
+  const [pathPart] = raw.split("?");
+  const segments = pathPart.split("/");
+  const page = VALID_PAGES.has(segments[0]) ? (segments[0] as Page) : "validate";
+  const entityId = segments[1] || null;
+  return { page, entityId };
 }
 
 interface Capabilities {
@@ -33,17 +41,18 @@ interface Capabilities {
 }
 
 export function App() {
-  const [page, setPage] = useState<Page>(pageFromHash);
+  const [route, setRoute] = useState<RouteState>(routeFromHash);
   const [capabilities, setCapabilities] = useState<Capabilities>({});
 
-  const navigate = useCallback((p: Page) => {
-    window.location.hash = `#/${p}`;
-    setPage(p);
+  const navigate = useCallback((p: Page, entityId?: string | null) => {
+    const hash = entityId ? `#/${p}/${entityId}` : `#/${p}`;
+    window.location.hash = hash;
+    setRoute({ page: p, entityId: entityId ?? null });
   }, []);
 
   useEffect(() => {
     function onHashChange() {
-      setPage(pageFromHash());
+      setRoute(routeFromHash());
     }
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -63,13 +72,13 @@ export function App() {
       .catch(() => {});
   }, []);
 
-  const ActivePage = PAGES[page];
+  const ActivePage = PAGES[route.page];
 
   return (
     <div className="flex min-h-screen bg-base">
-      <Sidebar active={page} onNavigate={navigate} capabilities={capabilities} />
+      <Sidebar active={route.page} onNavigate={(p) => navigate(p)} capabilities={capabilities} />
       <main className="flex-1 ml-[220px] h-screen overflow-y-auto">
-        <ActivePage />
+        <ActivePage key={route.entityId || "fresh"} entityId={route.entityId} />
       </main>
     </div>
   );
