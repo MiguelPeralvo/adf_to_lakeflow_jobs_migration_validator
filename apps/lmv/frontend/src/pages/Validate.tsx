@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../api";
+import { consumePendingValidation } from "../store";
 import type { Scorecard } from "../types";
 import { TopHeader } from "../components/TopHeader";
 import { ScorecardGauge } from "../components/ScorecardGauge";
@@ -52,6 +53,22 @@ export function ValidatePage() {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourcePipeline, setSourcePipeline] = useState<string | null>(null);
+
+  // Auto-load pipeline from Synthetic page navigation
+  useEffect(() => {
+    const pending = consumePendingValidation();
+    if (pending) {
+      setMode("adf_json");
+      setInput(JSON.stringify(pending.adf_json, null, 2));
+      setSourcePipeline(pending.pipeline_name);
+      setLoading(true);
+      api.validate({ adf_json: pending.adf_json as object, pipeline_name: pending.pipeline_name })
+        .then(setScorecard)
+        .catch((err: unknown) => setError(err instanceof Error ? err.message : "Validation failed"))
+        .finally(() => setLoading(false));
+    }
+  }, []);
 
   function handleModeChange(m: InputMode) {
     setMode(m);
@@ -125,6 +142,17 @@ export function ValidatePage() {
         </section>
 
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
+        {/* Source banner when navigating from Synthetic */}
+        {sourcePipeline && (
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-primary/5 border border-primary/20">
+            <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>science</span>
+            <div>
+              <span className="text-[10px] font-mono text-outline uppercase tracking-wider">From Synthetic Engine</span>
+              <p className="text-sm font-mono text-on-surface font-medium">{sourcePipeline}</p>
+            </div>
+          </div>
+        )}
 
         {/* Editor + Gauge grid */}
         <div className="grid grid-cols-12 gap-6">
