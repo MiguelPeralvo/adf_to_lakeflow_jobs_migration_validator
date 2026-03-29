@@ -14,7 +14,7 @@ const NAV: { id: Page; label: string; icon: string }[] = [
   { id: "expression", label: "Expression", icon: "gavel" },
   { id: "harness", label: "End to End Harness", icon: "settings_input_component" },
   { id: "parallel", label: "Parallel Testing", icon: "account_tree" },
-  { id: "batch", label: "Regression", icon: "monitoring" },
+  { id: "batch", label: "Batch Validation", icon: "monitoring" },
   { id: "synthetic", label: "Synthetic", icon: "science" },
   { id: "history", label: "History", icon: "history" },
 ];

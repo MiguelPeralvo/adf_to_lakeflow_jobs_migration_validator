@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { TopHeader } from "../components/TopHeader";
 import { ErrorBanner } from "../components/ErrorBanner";
-import { setPendingValidation } from "../store";
+import { setPendingValidation, setPendingBatchFolder } from "../store";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -596,6 +596,13 @@ export function SyntheticPage() {
                 <button onClick={() => navigator.clipboard.writeText(result.output_path!)}
                   className="px-3 py-1.5 rounded-lg bg-surface-container-high text-xs font-mono text-primary hover:bg-surface-container-highest transition-colors flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-sm">content_copy</span> Copy
+                </button>
+                <button onClick={() => {
+                  setPendingBatchFolder(result.output_path!);
+                  window.location.hash = "#/batch";
+                }}
+                  className="px-4 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-mono font-bold hover:bg-primary/20 transition-colors flex items-center gap-1.5 border border-primary/20">
+                  <span className="material-symbols-outlined text-sm">monitoring</span> Run Batch Validation
                 </button>
               </div>)}
 

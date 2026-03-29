@@ -136,7 +136,7 @@ export function ValidatePage() {
               disabled={loading}
               className="px-5 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary-container font-bold font-body text-sm shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-transform"
             >
-              Run Deep Scan
+              Validate
             </button>
           </div>
         </section>

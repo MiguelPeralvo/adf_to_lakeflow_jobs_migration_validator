@@ -17,3 +17,16 @@ export function consumePendingValidation(): PendingValidation | null {
   _pending = null;
   return data;
 }
+
+/** Cross-page: pass a folder path to the Batch Validation page. */
+let _pendingBatchFolder: string | null = null;
+
+export function setPendingBatchFolder(path: string): void {
+  _pendingBatchFolder = path;
+}
+
+export function consumePendingBatchFolder(): string | null {
+  const p = _pendingBatchFolder;
+  _pendingBatchFolder = null;
+  return p;
+}

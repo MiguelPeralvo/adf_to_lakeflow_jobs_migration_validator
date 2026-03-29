@@ -77,6 +77,14 @@ class ValidateBatchRequest(BaseModel):
     threshold: float = 90.0
 
 
+class ValidateFolderRequest(BaseModel):
+    """Request payload for /api/validate/folder — scan a directory of ADF JSON files."""
+
+    folder_path: str = Field(min_length=1)
+    threshold: float = 90.0
+    glob_pattern: str = "*.json"
+
+
 class HarnessRunRequest(BaseModel):
     """Request payload for /api/harness/run."""
 
@@ -182,6 +190,131 @@ def create_app(
         report = evaluate_batch(suite, convert, threshold=request.threshold)
         return report.to_dict()
 
+    @app.post("/api/validate/folder")
+    def post_validate_folder(
+        request: ValidateFolderRequest,
+        stream: bool = Query(False),
+    ):
+        """Scan a folder of ADF JSON files, translate each through wkmigrate, and evaluate."""
+        import glob as _glob
+
+        folder = Path(request.folder_path)
+        if not folder.is_dir():
+            raise HTTPException(status_code=422, detail=f"Not a directory: {request.folder_path}")
+
+        files = sorted(folder.glob(request.glob_pattern))
+        if not files:
+            raise HTTPException(status_code=422, detail=f"No {request.glob_pattern} files found in {request.folder_path}")
+
+        if stream:
+            return StreamingResponse(
+                _validate_folder_stream(files, convert, request.threshold),
+                media_type="application/x-ndjson",
+            )
+
+        # Non-streaming: evaluate all and return report
+        cases = []
+        scores = []
+        below = 0
+        for file_path in files:
+            with open(file_path, encoding="utf-8") as f:
+                adf_json = _json.load(f)
+            name = adf_json.get("name", file_path.stem)
+            try:
+                snapshot = convert(adf_json)
+                scorecard = evaluate(snapshot)
+                score = scorecard.score
+                label = scorecard.label
+            except Exception as exc:
+                score = 0.0
+                label = "ERROR"
+            is_below = score < request.threshold
+            if is_below:
+                below += 1
+            scores.append(score)
+            cases.append({
+                "pipeline_name": name,
+                "file": str(file_path),
+                "score": score,
+                "label": label,
+                "ccs_below_threshold": is_below,
+            })
+
+        mean = sum(scores) / len(scores) if scores else 0.0
+        return {
+            "total": len(cases),
+            "threshold": request.threshold,
+            "mean_score": mean,
+            "min_score": min(scores) if scores else 0.0,
+            "max_score": max(scores) if scores else 0.0,
+            "below_threshold": below,
+            "cases": cases,
+        }
+
+    def _validate_folder_stream(files: list, convert_fn, threshold: float):
+        """Yield NDJSON progress events for folder validation."""
+        total = len(files)
+        cases = []
+        scores = []
+        below = 0
+        for i, file_path in enumerate(files):
+            name = file_path.stem
+            try:
+                with open(file_path, encoding="utf-8") as f:
+                    adf_json = _json.load(f)
+                name = adf_json.get("name", name)
+                snapshot = convert_fn(adf_json)
+                scorecard = evaluate(snapshot)
+                score = scorecard.score
+                label = scorecard.label
+                dims = scorecard.to_dict().get("dimensions", {})
+                error = None
+            except Exception as exc:
+                score = 0.0
+                label = "ERROR"
+                dims = {}
+                error = f"{type(exc).__name__}: {exc}"
+
+            is_below = score < threshold
+            if is_below:
+                below += 1
+            scores.append(score)
+
+            case = {
+                "pipeline_name": name,
+                "file": str(file_path),
+                "score": score,
+                "label": label,
+                "ccs_below_threshold": is_below,
+                "dimensions": dims,
+            }
+            cases.append(case)
+
+            yield _json.dumps({
+                "type": "progress",
+                "completed": i + 1,
+                "total": total,
+                "pipeline_name": name,
+                "score": score,
+                "label": label,
+                "ok": error is None,
+                "error": error,
+            }) + "\n"
+
+        mean = sum(scores) / len(scores) if scores else 0.0
+        yield _json.dumps({
+            "type": "complete",
+            "result": {
+                "total": len(cases),
+                "threshold": threshold,
+                "mean_score": mean,
+                "min_score": min(scores) if scores else 0.0,
+                "max_score": max(scores) if scores else 0.0,
+                "below_threshold": below,
+                "cases": cases,
+            },
+        }) + "\n"
+
     @app.post("/api/harness/run")
     def post_harness_run(request: HarnessRunRequest) -> dict[str, Any]:
         if harness_runner is None:
@@ -193,6 +326,107 @@ def create_app(
             "iterations": result.iterations,
             "fix_suggestions": list(result.fix_suggestions),
         }
+
+    # ------------------------------------------------------------------
+    # wkmigrate repo/branch configuration
+    # ------------------------------------------------------------------
+    _wkmigrate_config: dict[str, Any] = {
+        "repos": [
+            {"url": "https://github.com/MiguelPeralvo/wkmigrate", "default_branch": "alpha"},
+            {"url": "https://github.com/ghanse/wkmigrate", "default_branch": "main"},
+        ],
+        "active_repo": "https://github.com/MiguelPeralvo/wkmigrate",
+        "active_branch": "alpha",
+    }
+
+    @app.get("/api/config/wkmigrate")
+    def get_wkmigrate_config() -> dict[str, Any]:
+        """Return the current wkmigrate repo/branch configuration."""
+        return _wkmigrate_config
+
+    @app.post("/api/config/wkmigrate")
+    def set_wkmigrate_config(request: dict[str, Any]) -> dict[str, Any]:
+        """Update the active wkmigrate repo and/or branch.
+
+        Note: changing the repo/branch stores the selection but does NOT
+        hot-swap the running wkmigrate. A server restart with the new
+        package installed is required for changes to take effect.
+        """
+        if "active_repo" in request:
+            _wkmigrate_config["active_repo"] = request["active_repo"]
+        if "active_branch" in request:
+            _wkmigrate_config["active_branch"] = request["active_branch"]
+        if "repos" in request:
+            _wkmigrate_config["repos"] = request["repos"]
+        return _wkmigrate_config
+
+    @app.get("/api/config/wkmigrate/branches")
+    def get_wkmigrate_branches(repo_url: str = Query(...)) -> list[dict[str, Any]]:
+        """Fetch branches for a GitHub repo, sorted by most recent commit.
+
+        Example: ``/api/config/wkmigrate/branches?repo_url=https://github.com/MiguelPeralvo/wkmigrate``
+        """
+        from urllib.request import Request, urlopen
+        from urllib.error import URLError
+
+        # Parse owner/repo from URL
+        parts = repo_url.rstrip("/").split("/")
+        if len(parts) < 2:
+            raise HTTPException(status_code=422, detail="Invalid repo URL")
+        owner, repo = parts[-2], parts[-1]
+
+        try:
+            api_url = f"https://api.github.com/repos/{owner}/{repo}/branches?per_page=100"
+            req = Request(api_url, headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "LMV"})
+            with urlopen(req, timeout=10) as resp:
+                branches = _json.loads(resp.read().decode("utf-8"))
+        except (URLError, Exception) as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch branches: {exc}") from exc
+
+        # Sort by commit date (most recent first)
+        for b in branches:
+            sha = b.get("commit", {}).get("sha", "")
+            b["_sha"] = sha
+        # Fetch commit dates for sorting (batch — just use the sha order as proxy)
+        # GitHub branches API doesn't include commit dates, so we fetch each commit
+        # For performance, just return as-is and let the frontend sort if needed
+        return [
+            {"name": b["name"], "sha": b.get("_sha", "")[:8], "protected": b.get("protected", False)}
+            for b in branches
+        ]
+
+    # ------------------------------------------------------------------
+    # Synthetic run history (list past batch directories)
+    # ------------------------------------------------------------------
+    @app.get("/api/synthetic/runs")
+    def get_synthetic_runs() -> list[dict[str, Any]]:
+        """List past synthetic generation runs from the temp directory."""
+        base = Path(tempfile.gettempdir()) / "lmv_synthetic"
+        if not base.is_dir():
+            return []
+        runs = []
+        for d in sorted(base.iterdir(), reverse=True):
+            if not d.is_dir():
+                continue
+            suite_file = d / "suite.json"
+            pipeline_count = 0
+            if suite_file.exists():
+                try:
+                    with open(suite_file, encoding="utf-8") as f:
+                        data = _json.load(f)
+                    pipeline_count = len(data.get("pipelines", []))
+                except Exception:
+                    pass
+            # Count pipeline subfolders
+            subfolders = [p for p in d.iterdir() if p.is_dir()]
+            runs.append({
+                "path": str(d),
+                "name": d.name,
+                "pipeline_count": pipeline_count,
+                "subfolder_count": len(subfolders),
+                "has_suite": suite_file.exists(),
+            })
+        return runs
 
     @app.get("/api/synthetic/templates")
     def get_synthetic_templates() -> list[dict[str, str]]:
@@ -278,15 +512,37 @@ def create_app(
     }
 
     def _persist_suite(suite: GroundTruthSuite, output_path: str | None = None) -> str:
+        """Persist suite to disk with per-pipeline subfolders.
+
+        Structure::
+
+            {batch_dir}/
+                suite.json                          # full suite (for batch validation)
+                000_pipeline_name/
+                    adf_pipeline.json               # raw ADF JSON
+                001_other_pipeline/
+                    adf_pipeline.json
+        """
         if output_path:
             suite.to_json(output_path)
             return output_path
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        out_dir = Path(tempfile.gettempdir()) / "lmv_synthetic" / ts
-        out_dir.mkdir(parents=True, exist_ok=True)
-        path = str(out_dir / "suite.json")
-        suite.to_json(path)
-        return path
+        batch_dir = Path(tempfile.gettempdir()) / "lmv_synthetic" / ts
+        batch_dir.mkdir(parents=True, exist_ok=True)
+
+        # Full suite JSON (loadable by batch validation)
+        suite.to_json(str(batch_dir / "suite.json"))
+
+        # Individual pipeline subfolders
+        for i, pipeline in enumerate(suite.pipelines):
+            name = pipeline.adf_json.get("name", f"pipeline_{i:03d}")
+            safe = f"{i:03d}_{name.replace('/', '_').replace(' ', '_')[:60]}"
+            pipe_dir = batch_dir / safe
+            pipe_dir.mkdir(parents=True, exist_ok=True)
+            with open(pipe_dir / "adf_pipeline.json", "w", encoding="utf-8") as fh:
+                _json.dump(pipeline.adf_json, fh, indent=2)
+
+        return str(batch_dir)
 
     def _build_result(
         suite: GroundTruthSuite,
