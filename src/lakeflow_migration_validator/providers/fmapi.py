@@ -18,7 +18,7 @@ class FMAPIJudgeProvider:
         self,
         endpoint: str,
         high_stakes_model: str = "databricks-claude-opus-4-6",
-        batch_model: str = "databricks-chatgpt-5-4",
+        batch_model: str = "databricks-gpt-5-4",
         timeout_seconds: int = 30,
         max_retries: int = 2,
         token: str | None = None,

@@ -26,6 +26,46 @@ try:
 except ImportError:
     pass
 
+import sys
+import types as _types
+
+# ---------------------------------------------------------------------------
+# Mock azure + autopep8 — only needed for local dev when these aren't
+# installed.  The mocks are harmless: wkmigrate's JSON-based translation
+# path never calls into the real Azure SDK.
+# ---------------------------------------------------------------------------
+def _ensure_azure_mocks():
+    if "azure" in sys.modules:
+        return
+    _az = _types.ModuleType("azure")
+    for _sub in (
+        "identity", "common", "common.credentials", "mgmt",
+        "mgmt.datafactory", "mgmt.datafactory.models", "mgmt.core",
+        "core", "core.exceptions",
+    ):
+        _mod = _types.ModuleType(f"azure.{_sub}")
+        sys.modules[f"azure.{_sub}"] = _mod
+        _parts = _sub.split(".")
+        _parent = _az
+        for _p in _parts[:-1]:
+            _parent = getattr(_parent, _p)
+        setattr(_parent, _parts[-1], _mod)
+    sys.modules["azure"] = _az
+    sys.modules["azure.identity"].ClientSecretCredential = type("ClientSecretCredential", (), {})
+    sys.modules["azure.mgmt.datafactory"].DataFactoryManagementClient = type("DataFactoryManagementClient", (), {})
+
+    if "autopep8" not in sys.modules:
+        _ap = _types.ModuleType("autopep8")
+        _ap.fix_code = lambda code, **kw: code
+        sys.modules["autopep8"] = _ap
+
+_ensure_azure_mocks()
+
+# Add wkmigrate alpha src to path if available locally
+_WKMIGRATE_LOCAL = Path(__file__).resolve().parents[4] / "wkmigrate-wip" / "src"
+if _WKMIGRATE_LOCAL.is_dir() and str(_WKMIGRATE_LOCAL) not in sys.path:
+    sys.path.insert(0, str(_WKMIGRATE_LOCAL))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
@@ -37,6 +77,17 @@ logger = logging.getLogger(__name__)
 # Provider factories — read environment, build what's available
 # ---------------------------------------------------------------------------
 
+def _normalize_host(host: str) -> str:
+    """Extract scheme + authority from a Databricks workspace URL.
+
+    Handles URLs like ``https://adb-123.azuredatabricks.net/compute/apps?o=123``
+    by stripping the path and query components.
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(host)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _build_judge_provider():
     """Build FMAPIJudgeProvider if DATABRICKS_HOST is set."""
     host = os.environ.get("DATABRICKS_HOST")
@@ -46,9 +97,11 @@ def _build_judge_provider():
     try:
         from lakeflow_migration_validator.providers.fmapi import FMAPIJudgeProvider
 
+        base = _normalize_host(host)
         token = os.environ.get("DATABRICKS_TOKEN")
+        logger.info("Building FMAPIJudgeProvider with endpoint %s/serving-endpoints", base)
         return FMAPIJudgeProvider(
-            endpoint=f"{host.rstrip('/')}/serving-endpoints",
+            endpoint=f"{base}/serving-endpoints",
             token=token,
             timeout_seconds=60,
         )
@@ -101,10 +154,11 @@ def _build_convert_fn():
 
     Returns a function ``(dict) -> ConversionSnapshot`` that:
     1. If the payload is already a snapshot (has ``tasks``+``notebooks``), deserializes it
-    2. Otherwise, translates the ADF JSON through wkmigrate and returns a real snapshot
+    2. Otherwise, translates the ADF JSON through wkmigrate (with camelCase
+       normalization via JsonDefinitionStore) and returns a real snapshot
     """
     try:
-        from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
+        from wkmigrate.definition_stores.json_definition_store import JsonDefinitionStore
         from wkmigrate.preparers.preparer import prepare_workflow
         from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
         from lakeflow_migration_validator.serialization import snapshot_from_dict
@@ -116,10 +170,19 @@ def _build_convert_fn():
             # Pre-wrapped with expected_snapshot?
             if "expected_snapshot" in payload and isinstance(payload.get("expected_snapshot"), dict):
                 return snapshot_from_dict(payload["expected_snapshot"])
-            # Run wkmigrate translation: ADF JSON → Pipeline IR → PreparedWorkflow → ConversionSnapshot
-            pipeline_ir = translate_pipeline(payload)
-            prepared = prepare_workflow(pipeline_ir)
-            return from_wkmigrate(payload, prepared)
+            # Run wkmigrate translation via JsonDefinitionStore (handles camelCase normalization)
+            # Write JSON to temp file, load through store, prepare, adapt
+            import json as _json
+            import tempfile
+            name = payload.get("name", "pipeline")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pipelines_dir = Path(tmpdir) / "pipelines"
+                pipelines_dir.mkdir()
+                (pipelines_dir / f"{name}.json").write_text(_json.dumps(payload))
+                store = JsonDefinitionStore(source_directory=tmpdir)
+                pipeline_ir = store.load(name)
+                prepared = prepare_workflow(pipeline_ir)
+                return from_wkmigrate(payload, prepared)
 
         logger.info("wkmigrate converter available — validation will run full ADF→Databricks translation")
         return convert

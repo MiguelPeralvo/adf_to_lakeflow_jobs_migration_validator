@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
-from lakeflow_migration_validator import evaluate, evaluate_batch
+from lakeflow_migration_validator import evaluate, evaluate_batch, evaluate_full
 from lakeflow_migration_validator.contract import ConversionSnapshot
 from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
 from lakeflow_migration_validator.golden_set import load_pipeline_golden_set
@@ -428,7 +428,7 @@ def create_app(
     @app.post("/api/validate")
     def post_validate(request: ValidateRequest) -> dict[str, Any]:
         snapshot = _resolve_snapshot(request, convert)
-        scorecard = evaluate(snapshot)
+        scorecard = evaluate_full(snapshot, judge_provider=judge_provider)
 
         if request.pipeline_name:
             pipeline_name = request.pipeline_name
@@ -543,7 +543,7 @@ def create_app(
             name = adf_json.get("name", file_path.stem)
             try:
                 snapshot = convert(adf_json)
-                scorecard = evaluate(snapshot)
+                scorecard = evaluate_full(snapshot, judge_provider=judge_provider)
                 score = scorecard.score
                 label = scorecard.label
             except Exception as exc:
@@ -577,10 +577,11 @@ def create_app(
 
         When ``agent`` (a JudgeProvider) is provided, failing pipelines get
         an additional LLM analysis phase that diagnoses each failing dimension
-        and suggests concrete fixes.
+        and suggests concrete fixes.  The LLM judge also scores expression
+        pairs via ``evaluate_full``.
 
         Event types:
-          progress — per-pipeline programmatic score
+          progress — per-pipeline programmatic + LLM score
           analysis — per-pipeline agent diagnosis (only when agent is set)
           complete — final report with all cases
         """
@@ -596,7 +597,7 @@ def create_app(
                     adf_json = _json.load(f)
                 name = adf_json.get("name", name)
                 snapshot = convert_fn(adf_json)
-                scorecard = evaluate(snapshot)
+                scorecard = evaluate_full(snapshot, judge_provider=agent)
                 score = scorecard.score
                 label = scorecard.label
                 dims = scorecard.to_dict().get("dimensions", {})
@@ -633,8 +634,9 @@ def create_app(
                 "error": error,
             }) + "\n"
 
-            # Agent analysis for failing pipelines
-            if agent is not None and is_below and dims and snapshot is not None:
+            # Agent analysis — run whenever any dimension is imperfect (not just below threshold)
+            has_imperfect = any(not v.get("passed", True) for v in dims.values()) if dims else False
+            if agent is not None and (is_below or has_imperfect) and dims and snapshot is not None:
                 yield _json.dumps({
                     "type": "analysis_start",
                     "pipeline_name": name,

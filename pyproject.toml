@@ -17,7 +17,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-wkmigrate = { path = "../wkmigrate_codex", develop = true }
+wkmigrate = { path = "../wkmigrate-wip", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"

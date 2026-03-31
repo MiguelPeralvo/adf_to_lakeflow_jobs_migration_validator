@@ -55,7 +55,7 @@ def create_semantic_equivalence_judge(
     provider: JudgeProvider,
     *,
     threshold: float = 0.7,
-    model: str = "claude-opus-4-6",
+    model: str = "databricks-claude-opus-4-6",
     calibration_path: str | Path = _DEFAULT_CALIBRATION_PATH,
     calibration_sample_size: int = 20,
 ) -> LLMJudge:
