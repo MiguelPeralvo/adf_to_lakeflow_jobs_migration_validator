@@ -30,13 +30,42 @@ import sys
 import types as _types
 
 # ---------------------------------------------------------------------------
-# Mock azure + autopep8 — only needed for local dev when these aren't
-# installed.  The mocks are harmless: wkmigrate's JSON-based translation
-# path never calls into the real Azure SDK.
+# Mock azure + autopep8 — only for local dev/CI when these packages aren't
+# installed.  In production (Databricks Apps with the real azure SDK
+# installed) we leave the real modules alone so authentication and ADF
+# operations work properly.  The mocks are harmless because wkmigrate's
+# JSON-based translation path never calls into the real Azure SDK.
+#
+# We probe each submodule wkmigrate actually needs.  The ``azure`` top-level
+# is a namespace package, so just checking ``find_spec("azure")`` is not
+# enough — a partial install (e.g. only ``azure-identity``) makes the parent
+# spec resolve while the wkmigrate dependencies are still missing.  When all
+# required pieces are present we leave the real SDK alone so the
+# graceful-degradation ImportError handlers downstream stay quiescent.
 # ---------------------------------------------------------------------------
+def _real_azure_sdk_available() -> bool:
+    """True iff every azure submodule wkmigrate needs is actually importable."""
+    try:
+        import azure.identity  # noqa: F401
+        import azure.mgmt.datafactory  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _real_autopep8_available() -> bool:
+    """True iff the real ``autopep8`` package is importable."""
+    try:
+        import autopep8  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _ensure_azure_mocks():
-    if "azure" in sys.modules:
-        return
+    """Install minimal stubs for ``azure.*`` only when the real SDK is missing."""
+    if _real_azure_sdk_available():
+        return  # real azure SDK is installed — never shadow it
     _az = _types.ModuleType("azure")
     for _sub in (
         "identity", "common", "common.credentials", "mgmt",
@@ -56,10 +85,12 @@ def _ensure_azure_mocks():
 
 
 def _ensure_autopep8_mock():
-    if "autopep8" not in sys.modules:
-        _ap = _types.ModuleType("autopep8")
-        _ap.fix_code = lambda code, **kw: code
-        sys.modules["autopep8"] = _ap
+    """Install a no-op ``autopep8`` stub only when the real package is missing."""
+    if _real_autopep8_available():
+        return  # real autopep8 is installed — never shadow it
+    _ap = _types.ModuleType("autopep8")
+    _ap.fix_code = lambda code, **kw: code
+    sys.modules["autopep8"] = _ap
 
 
 _ensure_azure_mocks()
@@ -85,10 +116,19 @@ def _normalize_host(host: str) -> str:
     """Extract scheme + authority from a Databricks workspace URL.
 
     Handles URLs like ``https://adb-123.azuredatabricks.net/compute/apps?o=123``
-    by stripping the path and query components.
+    by stripping the path and query components.  Scheme-less inputs like
+    ``adb-123.azuredatabricks.net`` get a default ``https://`` prefix so
+    ``urlparse`` can split them correctly (otherwise the whole string lands in
+    ``path`` and we'd return ``"://"``).
     """
     from urllib.parse import urlparse
-    parsed = urlparse(host)
+    candidate = host.strip().rstrip("/")
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+    parsed = urlparse(candidate)
+    if not parsed.netloc:
+        # Couldn't parse — fall back to the cleaned original rather than ""
+        return host.rstrip("/")
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
@@ -178,13 +218,19 @@ def _build_convert_fn():
             # Write JSON to temp file, load through store, prepare, adapt
             import json as _json
             import tempfile
-            name = payload.get("name", "pipeline")
+            # Untrusted input — sanitize before using as a filesystem path so a
+            # crafted name like "../../etc/passwd" can't escape the temp dir.
+            raw_name = str(payload.get("name", "pipeline"))
+            safe_name = Path(raw_name).name or "pipeline"
             with tempfile.TemporaryDirectory() as tmpdir:
-                pipelines_dir = Path(tmpdir) / "pipelines"
+                pipelines_dir = (Path(tmpdir) / "pipelines").resolve()
                 pipelines_dir.mkdir()
-                (pipelines_dir / f"{name}.json").write_text(_json.dumps(payload))
-                store = JsonDefinitionStore(source_directory=tmpdir)
-                pipeline_ir = store.load(name)
+                pipeline_file = (pipelines_dir / f"{safe_name}.json").resolve()
+                if pipeline_file.parent != pipelines_dir:
+                    raise ValueError(f"invalid pipeline name: {raw_name!r}")
+                pipeline_file.write_text(_json.dumps(payload), encoding="utf-8")
+                store = JsonDefinitionStore(source_directory=str(pipelines_dir.parent))
+                pipeline_ir = store.load(safe_name)
                 prepared = prepare_workflow(pipeline_ir)
                 return from_wkmigrate(payload, prepared)
 
