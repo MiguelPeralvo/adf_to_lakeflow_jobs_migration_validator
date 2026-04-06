@@ -32,7 +32,7 @@ def test_llm_judge_passes_when_score_meets_threshold():
     assert result.passed is True
     assert result.score == 0.9
     assert result.details["reasoning"] == "Looks equivalent"
-    assert provider.calls[0]["model"] == "claude-opus-4-6"
+    assert provider.calls[0]["model"] == "databricks-claude-opus-4-6"
 
 
 def test_llm_judge_fails_when_score_below_threshold():

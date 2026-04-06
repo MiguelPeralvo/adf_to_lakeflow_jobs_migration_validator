@@ -54,12 +54,16 @@ def _ensure_azure_mocks():
     sys.modules["azure.identity"].ClientSecretCredential = type("ClientSecretCredential", (), {})
     sys.modules["azure.mgmt.datafactory"].DataFactoryManagementClient = type("DataFactoryManagementClient", (), {})
 
+
+def _ensure_autopep8_mock():
     if "autopep8" not in sys.modules:
         _ap = _types.ModuleType("autopep8")
         _ap.fix_code = lambda code, **kw: code
         sys.modules["autopep8"] = _ap
 
+
 _ensure_azure_mocks()
+_ensure_autopep8_mock()
 
 # Add wkmigrate alpha src to path if available locally
 _WKMIGRATE_LOCAL = Path(__file__).resolve().parents[4] / "wkmigrate-wip" / "src"
