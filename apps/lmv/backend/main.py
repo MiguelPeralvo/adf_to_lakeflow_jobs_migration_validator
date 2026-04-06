@@ -26,6 +26,81 @@ try:
 except ImportError:
     pass
 
+import sys
+import types as _types
+
+# ---------------------------------------------------------------------------
+# Mock azure + autopep8 — only for local dev/CI when these packages aren't
+# installed.  In production (Databricks Apps with the real azure SDK
+# installed) we leave the real modules alone so authentication and ADF
+# operations work properly.  The mocks are harmless because wkmigrate's
+# JSON-based translation path never calls into the real Azure SDK.
+#
+# We probe each submodule wkmigrate actually needs.  The ``azure`` top-level
+# is a namespace package, so just checking ``find_spec("azure")`` is not
+# enough — a partial install (e.g. only ``azure-identity``) makes the parent
+# spec resolve while the wkmigrate dependencies are still missing.  When all
+# required pieces are present we leave the real SDK alone so the
+# graceful-degradation ImportError handlers downstream stay quiescent.
+# ---------------------------------------------------------------------------
+def _real_azure_sdk_available() -> bool:
+    """True iff every azure submodule wkmigrate needs is actually importable."""
+    try:
+        import azure.identity  # noqa: F401
+        import azure.mgmt.datafactory  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _real_autopep8_available() -> bool:
+    """True iff the real ``autopep8`` package is importable."""
+    try:
+        import autopep8  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _ensure_azure_mocks():
+    """Install minimal stubs for ``azure.*`` only when the real SDK is missing."""
+    if _real_azure_sdk_available():
+        return  # real azure SDK is installed — never shadow it
+    _az = _types.ModuleType("azure")
+    for _sub in (
+        "identity", "common", "common.credentials", "mgmt",
+        "mgmt.datafactory", "mgmt.datafactory.models", "mgmt.core",
+        "core", "core.exceptions",
+    ):
+        _mod = _types.ModuleType(f"azure.{_sub}")
+        sys.modules[f"azure.{_sub}"] = _mod
+        _parts = _sub.split(".")
+        _parent = _az
+        for _p in _parts[:-1]:
+            _parent = getattr(_parent, _p)
+        setattr(_parent, _parts[-1], _mod)
+    sys.modules["azure"] = _az
+    sys.modules["azure.identity"].ClientSecretCredential = type("ClientSecretCredential", (), {})
+    sys.modules["azure.mgmt.datafactory"].DataFactoryManagementClient = type("DataFactoryManagementClient", (), {})
+
+
+def _ensure_autopep8_mock():
+    """Install a no-op ``autopep8`` stub only when the real package is missing."""
+    if _real_autopep8_available():
+        return  # real autopep8 is installed — never shadow it
+    _ap = _types.ModuleType("autopep8")
+    _ap.fix_code = lambda code, **kw: code
+    sys.modules["autopep8"] = _ap
+
+
+_ensure_azure_mocks()
+_ensure_autopep8_mock()
+
+# Add wkmigrate alpha src to path if available locally
+_WKMIGRATE_LOCAL = Path(__file__).resolve().parents[4] / "wkmigrate-wip" / "src"
+if _WKMIGRATE_LOCAL.is_dir() and str(_WKMIGRATE_LOCAL) not in sys.path:
+    sys.path.insert(0, str(_WKMIGRATE_LOCAL))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
@@ -37,6 +112,26 @@ logger = logging.getLogger(__name__)
 # Provider factories — read environment, build what's available
 # ---------------------------------------------------------------------------
 
+def _normalize_host(host: str) -> str:
+    """Extract scheme + authority from a Databricks workspace URL.
+
+    Handles URLs like ``https://adb-123.azuredatabricks.net/compute/apps?o=123``
+    by stripping the path and query components.  Scheme-less inputs like
+    ``adb-123.azuredatabricks.net`` get a default ``https://`` prefix so
+    ``urlparse`` can split them correctly (otherwise the whole string lands in
+    ``path`` and we'd return ``"://"``).
+    """
+    from urllib.parse import urlparse
+    candidate = host.strip().rstrip("/")
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+    parsed = urlparse(candidate)
+    if not parsed.netloc:
+        # Couldn't parse — fall back to the cleaned original rather than ""
+        return host.rstrip("/")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _build_judge_provider():
     """Build FMAPIJudgeProvider if DATABRICKS_HOST is set."""
     host = os.environ.get("DATABRICKS_HOST")
@@ -46,9 +141,11 @@ def _build_judge_provider():
     try:
         from lakeflow_migration_validator.providers.fmapi import FMAPIJudgeProvider
 
+        base = _normalize_host(host)
         token = os.environ.get("DATABRICKS_TOKEN")
+        logger.info("Building FMAPIJudgeProvider with endpoint %s/serving-endpoints", base)
         return FMAPIJudgeProvider(
-            endpoint=f"{host.rstrip('/')}/serving-endpoints",
+            endpoint=f"{base}/serving-endpoints",
             token=token,
             timeout_seconds=60,
         )
@@ -101,10 +198,11 @@ def _build_convert_fn():
 
     Returns a function ``(dict) -> ConversionSnapshot`` that:
     1. If the payload is already a snapshot (has ``tasks``+``notebooks``), deserializes it
-    2. Otherwise, translates the ADF JSON through wkmigrate and returns a real snapshot
+    2. Otherwise, translates the ADF JSON through wkmigrate (with camelCase
+       normalization via JsonDefinitionStore) and returns a real snapshot
     """
     try:
-        from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
+        from wkmigrate.definition_stores.json_definition_store import JsonDefinitionStore
         from wkmigrate.preparers.preparer import prepare_workflow
         from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
         from lakeflow_migration_validator.serialization import snapshot_from_dict
@@ -116,10 +214,25 @@ def _build_convert_fn():
             # Pre-wrapped with expected_snapshot?
             if "expected_snapshot" in payload and isinstance(payload.get("expected_snapshot"), dict):
                 return snapshot_from_dict(payload["expected_snapshot"])
-            # Run wkmigrate translation: ADF JSON → Pipeline IR → PreparedWorkflow → ConversionSnapshot
-            pipeline_ir = translate_pipeline(payload)
-            prepared = prepare_workflow(pipeline_ir)
-            return from_wkmigrate(payload, prepared)
+            # Run wkmigrate translation via JsonDefinitionStore (handles camelCase normalization)
+            # Write JSON to temp file, load through store, prepare, adapt
+            import json as _json
+            import tempfile
+            # Untrusted input — sanitize before using as a filesystem path so a
+            # crafted name like "../../etc/passwd" can't escape the temp dir.
+            raw_name = str(payload.get("name", "pipeline"))
+            safe_name = Path(raw_name).name or "pipeline"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pipelines_dir = (Path(tmpdir) / "pipelines").resolve()
+                pipelines_dir.mkdir()
+                pipeline_file = (pipelines_dir / f"{safe_name}.json").resolve()
+                if pipeline_file.parent != pipelines_dir:
+                    raise ValueError(f"invalid pipeline name: {raw_name!r}")
+                pipeline_file.write_text(_json.dumps(payload), encoding="utf-8")
+                store = JsonDefinitionStore(source_directory=str(pipelines_dir.parent))
+                pipeline_ir = store.load(safe_name)
+                prepared = prepare_workflow(pipeline_ir)
+                return from_wkmigrate(payload, prepared)
 
         logger.info("wkmigrate converter available — validation will run full ADF→Databricks translation")
         return convert

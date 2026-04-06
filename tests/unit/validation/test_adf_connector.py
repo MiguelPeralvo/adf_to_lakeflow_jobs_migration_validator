@@ -51,7 +51,7 @@ def test_unconfigured_translate_raises():
 
 
 def test_from_credentials_raises_without_wkmigrate(monkeypatch):
-    """from_credentials raises ImportError when wkmigrate is not installed."""
+    """from_credentials raises NotImplementedError with install hint when wkmigrate is missing."""
     import builtins
     real_import = builtins.__import__
 
@@ -62,7 +62,7 @@ def test_from_credentials_raises_without_wkmigrate(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", mock_import)
 
-    with pytest.raises(ImportError, match="wkmigrate"):
+    with pytest.raises(NotImplementedError, match="wkmigrate"):
         ADFConnector.from_credentials(
             tenant_id="t", client_id="c", client_secret="s",
             subscription_id="sub", resource_group="rg", factory_name="f",

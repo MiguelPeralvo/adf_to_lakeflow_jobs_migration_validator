@@ -31,7 +31,7 @@ class LLMJudge:
     provider: JudgeProvider
     calibration_examples: tuple[dict, ...] = ()
     threshold: float = 0.7
-    model: str = "claude-opus-4-6"
+    model: str = "databricks-claude-opus-4-6"
 
     def evaluate(self, input: Any, output: Any) -> DimensionResult:
         prompt = self._build_prompt(input, output)
