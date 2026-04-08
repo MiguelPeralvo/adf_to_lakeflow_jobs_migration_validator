@@ -27,6 +27,208 @@ if TYPE_CHECKING:
 _PLACEHOLDER_PATH = "/UNSUPPORTED_ADF_ACTIVITY"
 
 
+def _coerce_resolved_value(value: Any) -> str | None:
+    """Coerce a wkmigrate IR value into a plain Python source string.
+
+    wkmigrate IR fields hold either:
+    - plain ``str`` (most resolved Python output, e.g. ``DatabricksNotebookActivity.base_parameters[k]``)
+    - ``ResolvedExpression`` instances (used by ``WebActivity`` for url/body/headers
+      since pr/27-3) — these have a ``.code: str`` attribute carrying the actual code
+    - ``None`` (the field was not populated)
+    - other types (defensive — return None)
+
+    Returns the underlying code string, or None if the value isn't usable.
+    """
+    if value is None:
+        return None
+    # Lazy import to keep the LA-3 graceful-degradation invariant: importing
+    # this adapter module must not fail when wkmigrate isn't installed.
+    from wkmigrate.parsers.expression_parsers import ResolvedExpression
+
+    if isinstance(value, ResolvedExpression):
+        return value.code or None
+    if isinstance(value, str):
+        return value or None
+    return None
+
+
+def _build_source_activity_index(source_pipeline: dict) -> dict[str, dict]:
+    """Walk the source ADF JSON once and return ``{activity_name → activity_dict}``.
+
+    Tolerates both the flattened ``{activities: [...]}`` shape and the
+    Azure-native wrapped ``{properties: {activities: [...]}}`` shape, in
+    case the caller hasn't already passed it through ``unwrap_adf_pipeline``.
+    """
+    activities = source_pipeline.get("activities")
+    if activities is None:
+        activities = source_pipeline.get("properties", {}).get("activities", [])
+    if not isinstance(activities, list):
+        return {}
+    index: dict[str, dict] = {}
+    for activity in activities:
+        if isinstance(activity, dict):
+            name = activity.get("name")
+            if isinstance(name, str) and name:
+                index[name] = activity
+    return index
+
+
+def _source_expression_at(source_activity: dict | None, *property_path: str) -> str | None:
+    """Look up the original ADF expression text at *source_activity[path...]*.
+
+    Walks the source dict following ``property_path``. Returns the inner
+    ``value`` if the leaf is the canonical ``{type: "Expression", value: "@..."}``
+    shape, otherwise None.
+    """
+    if not isinstance(source_activity, dict):
+        return None
+    cursor: Any = source_activity
+    for key in property_path:
+        if not isinstance(cursor, dict):
+            return None
+        cursor = cursor.get(key)
+    if isinstance(cursor, dict) and cursor.get("type") == "Expression":
+        value = cursor.get("value")
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _extract_resolved_expression_pairs(prepared_pipeline: Any, source_pipeline: dict) -> list[ExpressionPair]:
+    """L-F17: walk every IR activity type that exposes expression-bearing properties.
+
+    Before this function was introduced, the adapter only extracted
+    ``ExpressionPair`` entries from ``SetVariableActivity`` (variable_name +
+    variable_value), so all other activity types adopted by wkmigrate
+    (Notebook.base_parameters, WebActivity.url/body/headers,
+    IfCondition.expression, ForEach.items, Lookup.source.sql_reader_query)
+    silently produced 0 resolved expressions even when wkmigrate had already
+    done the resolution. The L-F5 sweep (PR #19) made this gap measurable;
+    this function closes it.
+
+    For each task we look up the matching source ADF activity by name and
+    pair the IR-side resolved Python with the original ``@`` expression.
+    When the source dict has no matching expression (e.g. the activity was
+    synthesised by wkmigrate's preparer or the source uses a literal that
+    wkmigrate later wrapped), a synthetic label like
+    ``@<activity_type>('<task>').<field>`` is used instead — the
+    ``python_code`` field is what dimensions actually measure, so emitting
+    the pair is still valuable for X-1 / X-2 ratios.
+    """
+    # Lazy import of wkmigrate IR types: keeps `import lakeflow_migration_validator
+    # .adapters.wkmigrate_adapter` working in environments without wkmigrate
+    # installed (LA-3 graceful degradation invariant; see PR #18).
+    from wkmigrate.models.ir.pipeline import (
+        DatabricksNotebookActivity,
+        ForEachActivity,
+        IfConditionActivity,
+        LookupActivity,
+        SetVariableActivity,
+        WebActivity,
+    )
+
+    source_index = _build_source_activity_index(source_pipeline)
+    pairs: list[ExpressionPair] = []
+
+    for task in prepared_pipeline.tasks:
+        task_name = getattr(task, "name", None)
+        if not isinstance(task_name, str):
+            continue
+        source_activity = source_index.get(task_name)
+
+        if isinstance(task, SetVariableActivity):
+            variable_name = task.variable_name
+            variable_value = task.variable_value
+            if isinstance(variable_name, str) and variable_name and isinstance(variable_value, str) and variable_value:
+                pairs.append(
+                    ExpressionPair(
+                        adf_expression=(
+                            _source_expression_at(source_activity, "value") or f"@variables('{variable_name}')"
+                        ),
+                        python_code=variable_value,
+                    )
+                )
+            continue
+
+        if isinstance(task, DatabricksNotebookActivity):
+            if task.base_parameters:
+                for param_name, param_value in task.base_parameters.items():
+                    code = _coerce_resolved_value(param_value)
+                    if code is None:
+                        continue
+                    adf = (
+                        _source_expression_at(source_activity, "base_parameters", param_name)
+                        or f"@notebook('{task_name}').base_parameters.{param_name}"
+                    )
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+            continue
+
+        if isinstance(task, WebActivity):
+            for prop_name, prop_value in (("url", task.url), ("body", task.body)):
+                code = _coerce_resolved_value(prop_value)
+                if code is None:
+                    continue
+                adf = _source_expression_at(source_activity, prop_name) or f"@web('{task_name}').{prop_name}"
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+            # headers can be: dict[str, Any | ResolvedExpression], a single
+            # ResolvedExpression covering the whole dict, or None.
+            headers_code = _coerce_resolved_value(task.headers)
+            if headers_code is not None:
+                pairs.append(
+                    ExpressionPair(
+                        adf_expression=(
+                            _source_expression_at(source_activity, "headers") or f"@web('{task_name}').headers"
+                        ),
+                        python_code=headers_code,
+                    )
+                )
+            elif isinstance(task.headers, dict):
+                for header_name, header_value in task.headers.items():
+                    code = _coerce_resolved_value(header_value)
+                    if code is None:
+                        continue
+                    adf = (
+                        _source_expression_at(source_activity, "headers", header_name)
+                        or f"@web('{task_name}').headers.{header_name}"
+                    )
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+            continue
+
+        if isinstance(task, LookupActivity):
+            source_query_code = _coerce_resolved_value(task.source_query)
+            if source_query_code is not None:
+                adf = (
+                    _source_expression_at(source_activity, "source", "sql_reader_query")
+                    or f"@lookup('{task_name}').source.sql_reader_query"
+                )
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=source_query_code))
+            continue
+
+        if isinstance(task, ForEachActivity):
+            items_code = _coerce_resolved_value(task.items_string)
+            if items_code is not None:
+                adf = _source_expression_at(source_activity, "items") or f"@for_each('{task_name}').items"
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=items_code))
+            continue
+
+        if isinstance(task, IfConditionActivity):
+            # The original ADF predicate (`@equals(...)` etc.) has been
+            # decomposed into op/left/right at IR construction time and the
+            # canonical text is lost. We synthesise a (left op right)
+            # expression on the IR side and pair it with the original ADF
+            # expression captured from the source dict (when available).
+            op = getattr(task, "op", None)
+            left = getattr(task, "left", None)
+            right = getattr(task, "right", None)
+            if isinstance(op, str) and op:
+                python_code = f"({left} {op} {right})"
+                adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code))
+            continue
+
+    return pairs
+
+
 def unwrap_adf_pipeline(payload: Any) -> Any:
     """Flatten Azure-native ADF JSON ``{name, properties: {...}}`` shape.
 
@@ -159,17 +361,7 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
         len(activity.get("depends_on") or activity.get("dependsOn") or []) for activity in adf_activities
     )
 
-    expressions = []
-    for task in prepared.pipeline.tasks:
-        variable_name = getattr(task, "variable_name", None)
-        variable_value = getattr(task, "variable_value", None)
-        if isinstance(variable_name, str) and variable_name and isinstance(variable_value, str) and variable_value:
-            expressions.append(
-                ExpressionPair(
-                    adf_expression=f"@variables('{variable_name}')",
-                    python_code=variable_value,
-                )
-            )
+    expressions = _extract_resolved_expression_pairs(prepared.pipeline, source_pipeline)
 
     # Merge wkmigrate's pipeline-level warnings with the L-F12 placeholder
     # warnings we synthesised above. Placeholder warnings come last so they
