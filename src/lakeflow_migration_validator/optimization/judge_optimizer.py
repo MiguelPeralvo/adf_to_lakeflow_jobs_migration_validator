@@ -13,7 +13,6 @@ with a richer prompt template.
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -376,7 +375,6 @@ class JudgeOptimizer:
             )
 
         # Extract the optimised instruction and demos from the DSPy program
-        dspy = self._dspy
         program = self._optimized_program
 
         # Try to extract improved instructions from the optimised program

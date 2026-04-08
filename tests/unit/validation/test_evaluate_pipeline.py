@@ -1,6 +1,5 @@
 """TDD tests for the top-level evaluate_pipeline function."""
 
-import pytest
 
 from lakeflow_migration_validator import evaluate, evaluate_full
 from lakeflow_migration_validator.scorecard import Scorecard

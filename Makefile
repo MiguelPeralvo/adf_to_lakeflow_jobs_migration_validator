@@ -14,8 +14,8 @@ frontend-dev:
 
 # Run unit tests (no wkmigrate or external deps needed)
 test:
-	PYTHONPATH=src python -m pytest tests/unit/ -q --ignore=tests/unit/validation/test_wkmigrate_adapter.py --ignore=tests/unit/validation/test_cli.py
+	PYTHONPATH=src poetry run python -m pytest tests/unit/ -q --ignore=tests/unit/validation/test_wkmigrate_adapter.py --ignore=tests/unit/validation/test_cli.py
 
 # Run all tests (requires wkmigrate + typer installed)
 test-all:
-	PYTHONPATH=src python -m pytest tests/ -q
+	PYTHONPATH=src poetry run python -m pytest tests/ -q

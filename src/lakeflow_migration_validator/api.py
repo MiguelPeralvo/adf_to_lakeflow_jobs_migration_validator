@@ -6,12 +6,9 @@ import json as _json
 import logging
 import tempfile
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-
-logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -23,6 +20,8 @@ from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
 from lakeflow_migration_validator.golden_set import load_pipeline_golden_set
 from lakeflow_migration_validator.serialization import snapshot_from_adf_payload
 from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
+
+logger = logging.getLogger(__name__)
 
 
 class HistoryStore:
@@ -547,7 +546,7 @@ def create_app(
                 scorecard = evaluate_full(snapshot, judge_provider=judge_provider)
                 score = scorecard.score
                 label = scorecard.label
-            except Exception as exc:
+            except Exception:
                 score = 0.0
                 label = "ERROR"
             is_below = score < request.threshold
@@ -1322,7 +1321,7 @@ def create_app(
                 else:
                     fallback_note = "LLM produced no valid pipelines; using template mode."
                     mode = "template"
-            except Exception as exc:
+            except Exception:
                 logger.exception("LLM generation failed in streaming path")
                 fallback_note = "LLM generation failed; using template mode."
                 mode = "template"
@@ -1410,7 +1409,7 @@ def create_app(
                 else:
                     fallback_note = "LLM produced no valid pipelines; using template mode."
                     mode = "template"
-            except Exception as exc:
+            except Exception:
                 logger.exception("LLM generation failed in non-streaming path")
                 fallback_note = "LLM generation failed; using template mode."
                 mode = "template"

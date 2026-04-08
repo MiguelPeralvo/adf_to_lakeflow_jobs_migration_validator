@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
