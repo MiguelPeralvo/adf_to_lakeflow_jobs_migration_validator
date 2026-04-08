@@ -307,7 +307,12 @@ def sweep_activity_contexts_command(
         sweep_activity_contexts,
     )
 
-    payload = _read_json(golden_set, option_name="--golden-set")
+    # Read the golden set directly via json.loads — we accept BOTH a JSON
+    # object with an "expressions" key (the canonical golden_sets/expressions.json
+    # shape) AND a bare JSON array of pairs. The shared _read_json helper
+    # rejects lists, so it's intentionally not used here.
+    raw = golden_set.read_text(encoding="utf-8")
+    payload = json.loads(raw)
     if isinstance(payload, dict) and "expressions" in payload:
         corpus = payload["expressions"]
     elif isinstance(payload, list):
