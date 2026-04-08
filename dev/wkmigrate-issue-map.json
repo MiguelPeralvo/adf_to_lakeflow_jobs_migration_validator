@@ -199,7 +199,7 @@
     {
       "id": "W-8",
       "signature_key": "copy_sql_reader_query_silent_placeholder",
-      "regex": "(?i)Activity '[^']*copy[^']*' was substituted with a placeholder DatabricksNotebookActivity",
+      "regex": "(?i)\\(type:\\s*Copy\\)",
       "match_target": "not_translatable.message",
       "title": "[expressions] wkmigrate Copy translator silently falls to placeholder for Expression-typed source.sql_reader_query (sub-finding of wkmigrate#27)",
       "category": "expressions",
@@ -224,7 +224,7 @@
     {
       "id": "W-10",
       "signature_key": "for_each_items_silent_placeholder",
-      "regex": "(?i)Activity '[^']*foreach[^']*' was substituted with a placeholder DatabricksNotebookActivity",
+      "regex": "(?i)\\(type:\\s*ForEach\\)",
       "match_target": "not_translatable.message",
       "title": "[expressions] wkmigrate ForEach translator silently falls to placeholder for arbitrary items expressions (sub-finding of wkmigrate#27)",
       "category": "collection",
@@ -253,6 +253,6 @@
     "When a new failure cluster is harvested in Phase 1.5 and matches no signature, /lmv-autodev appends a new entry here (and commits) before drafting the lmv issue.",
     "Most regex patterns are matched against the `message` field of `not_translatable` entries from the lmv adapter (`match_target: 'not_translatable.message'`, the default).",
     "Some signatures (e.g. W-7) match against captured exception strings instead — see `match_target: 'exception'`. The current /lmv-autodev Phase 1.5 matcher only walks not_translatable entries; the exception channel comes from `lmv sweep-activity-contexts` and requires extending the matcher OR enriching wkmigrate's NotTranslatableWarning emission to convert these crashes into structured warnings (W-6 territory).",
-    "Placeholder warning regexes (W-8, W-10) currently match by task_key substring (e.g. 'copy', 'foreach'), since the placeholder warning message does not yet include the source ADF activity TYPE. A future adapter improvement should enrich the placeholder warning with `original_activity_type` so the regex can match by type instead of task_key — see L-F18 in dev/autodev-sessions/."
+    "L-F18 (PR #21): placeholder warnings emitted by lmv's adapter now include the original ADF activity type both as a structured `original_activity_type` field AND embedded in the message text as `(type: <Type>)`. W-8 and W-10 regexes were updated to match `(?i)\\(type:\\s*Copy\\)` / `(?i)\\(type:\\s*ForEach\\)` instead of relying on a brittle task_key substring (e.g. 'copy', 'foreach'). Older signatures that match by task_key remain valid as a fallback."
   ]
 }

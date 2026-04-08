@@ -303,6 +303,10 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
     """
     prepared: PreparedWorkflow = prepared_workflow
 
+    # Build the source-by-name index once and reuse it for both placeholder
+    # type lookup (L-F18) and the resolved-expression walker (L-F17).
+    source_index = _build_source_activity_index(source_pipeline)
+
     tasks = []
     placeholder_warnings: list[dict] = []
     for activity in prepared.activities:
@@ -323,15 +327,32 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
             # see them and downstream consumers can attribute the gap to
             # an unrecognised wkmigrate translator instead of "no
             # expressions in source" (the silent-empty case from L-F2).
+            #
+            # L-F18: also enrich the warning with the original ADF activity
+            # type from the source dict (e.g. "Copy", "ForEach", "WebActivity")
+            # so failure-signature regexes in dev/wkmigrate-issue-map.json
+            # can match by activity type rather than relying on a task_key
+            # substring (which depends on the user's pipeline naming
+            # convention and is brittle). Stored as a structured field
+            # `original_activity_type` AND embedded in the message text as
+            # `(type: <Type>)` for the regex matchers.
+            source_activity = source_index.get(task_key)
+            original_activity_type: str | None = None
+            if isinstance(source_activity, dict):
+                source_type = source_activity.get("type")
+                if isinstance(source_type, str) and source_type:
+                    original_activity_type = source_type
+            type_label = original_activity_type or "<unknown>"
             placeholder_warnings.append(
                 {
                     "kind": "placeholder_activity",
                     "task_key": task_key,
                     "property": task_key,
+                    "original_activity_type": original_activity_type,
                     "message": (
-                        f"Activity '{task_key}' was substituted with a placeholder "
-                        f"DatabricksNotebookActivity (wkmigrate did not recognise the "
-                        f"source ADF activity type)."
+                        f"Activity '{task_key}' (type: {type_label}) was substituted with a "
+                        f"placeholder DatabricksNotebookActivity (wkmigrate did not recognise "
+                        f"the source ADF activity type)."
                     ),
                 }
             )

@@ -300,6 +300,8 @@ def test_placeholder_activity_surfaces_in_not_translatable():
     notebook_path=/UNSUPPORTED_ADF_ACTIVITY. The adapter should:
       1) still mark the task as is_placeholder=True (existing behavior)
       2) ALSO add an entry to not_translatable so dimensions can count it
+      3) (L-F18) carry the original ADF activity type so failure-signature
+         regexes can match by type rather than task_key substring
     """
     source = {"activities": [{"name": "mystery", "type": "UnknownActivityType"}]}
     pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
@@ -321,12 +323,91 @@ def test_placeholder_activity_surfaces_in_not_translatable():
     assert len(snapshot.tasks) == 1
     assert snapshot.tasks[0].is_placeholder is True
 
-    # New behavior: placeholder also surfaces as a not_translatable warning
+    # L-F12 behavior: placeholder also surfaces as a not_translatable warning
     placeholder_warnings = [nt for nt in snapshot.not_translatable if nt.get("kind") == "placeholder_activity"]
     assert len(placeholder_warnings) == 1
     warning = placeholder_warnings[0]
     assert warning["task_key"] == "mystery"
     assert "placeholder" in warning["message"].lower() or "unsupported" in warning["message"].lower()
+
+    # L-F18 behavior: the original ADF activity type is captured both as a
+    # structured field AND embedded in the message text as `(type: <Type>)`
+    # so failure-signature regexes in dev/wkmigrate-issue-map.json can
+    # match by activity type rather than by task_key substring.
+    assert warning["original_activity_type"] == "UnknownActivityType"
+    assert "(type: UnknownActivityType)" in warning["message"]
+
+
+def test_placeholder_warning_falls_back_when_source_activity_type_missing():
+    """If the source dict has no matching activity (or the type is missing),
+    the placeholder warning still emits with original_activity_type=None and
+    a `(type: <unknown>)` label so the regex matchers don't crash."""
+    source = {"activities": []}  # No matching activity in source
+    pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
+    prepared = PreparedWorkflow(
+        pipeline=pipeline,
+        activities=[
+            PreparedActivity(
+                task={
+                    "task_key": "orphan",
+                    "notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"},
+                }
+            )
+        ],
+    )
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    placeholder_warnings = [nt for nt in snapshot.not_translatable if nt.get("kind") == "placeholder_activity"]
+    assert len(placeholder_warnings) == 1
+    warning = placeholder_warnings[0]
+    assert warning["task_key"] == "orphan"
+    assert warning["original_activity_type"] is None
+    assert "(type: <unknown>)" in warning["message"]
+
+
+def test_placeholder_warning_captures_real_activity_types_for_w8_w10_signatures():
+    """L-F18 enables W-8/W-10 regex matching by activity type. This test
+    verifies a Copy activity → 'Copy' label and a ForEach activity →
+    'ForEach' label, AND that the W-8/W-10 regex patterns from
+    dev/wkmigrate-issue-map.json successfully match the new message format."""
+    import re
+
+    source = {
+        "activities": [
+            {"name": "copy_task", "type": "Copy"},
+            {"name": "foreach_task", "type": "ForEach"},
+        ]
+    }
+    pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
+    prepared = PreparedWorkflow(
+        pipeline=pipeline,
+        activities=[
+            PreparedActivity(
+                task={"task_key": "copy_task", "notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"}}
+            ),
+            PreparedActivity(
+                task={"task_key": "foreach_task", "notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"}}
+            ),
+        ],
+    )
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    by_type = {
+        nt.get("original_activity_type"): nt
+        for nt in snapshot.not_translatable
+        if nt.get("kind") == "placeholder_activity"
+    }
+    assert "Copy" in by_type
+    assert "ForEach" in by_type
+
+    # Regex compatibility check: the W-8 / W-10 patterns from
+    # dev/wkmigrate-issue-map.json must match the new message format.
+    w8_pattern = re.compile(r"(?i)\(type:\s*Copy\)")
+    w10_pattern = re.compile(r"(?i)\(type:\s*ForEach\)")
+    assert w8_pattern.search(by_type["Copy"]["message"])
+    assert w10_pattern.search(by_type["ForEach"]["message"])
 
 
 def test_placeholder_warnings_do_not_overwrite_pipeline_warnings():
