@@ -170,12 +170,89 @@
       "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:observability", "kind:enhancement"],
       "fix_sketch": "Extend NotTranslatableWarning with a `failure_mode` field, one of: function_not_mapped, type_coercion_missing, nesting_depth_exceeded, parameter_reference_dropped, activity_output_chain_unresolved, unsupported_activity_type.",
       "weak_spots": []
+    },
+    {
+      "id": "W-7",
+      "signature_key": "lookup_sql_reader_query_dict_replace_crash",
+      "regex": "(?i)AttributeError.*'dict'.*has no attribute 'replace'",
+      "match_target": "exception",
+      "title": "[expressions] wkmigrate Lookup translator crashes on Expression-typed source.sql_reader_query (sub-finding of wkmigrate#27)",
+      "category": "expressions",
+      "kind": "bug",
+      "area": "expressions",
+      "priority": "P0",
+      "upstream_issues": ["ghanse/wkmigrate#27 (deferred Lookup adoption to proposed wkmigrate#28)"],
+      "lmv_issue": null,
+      "status": "open",
+      "discovered_via": "lmv sweep-activity-contexts (PR #19)",
+      "last_tested": {
+        "session": "PR-19-sweep-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Lookup.source.sql_reader_query context)",
+        "result": "200/200 hard crashes with AttributeError: 'dict' object has no attribute 'replace'. wkmigrate's Lookup translator assumes the sql_reader_query is a plain string and calls .replace() on it directly; when the source provides {type: Expression, value: ...} the call crashes.",
+        "raw_artifact": "/tmp/lmv_sweep_alpha1_v2.json (cell key 'string,lookup_query' and similar across all 6 categories)"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P0"],
+      "fix_sketch": "wkmigrate's Lookup translator (in alpha_1@969e74d) needs to handle the Expression-typed sql_reader_query case. Current code does something like `query.replace(...)` directly on the source dict; should instead use get_literal_or_expression() (the same shared utility pr/27-1 introduced for SetVariable) to resolve the expression OR pass through as a NotTranslatableWarning + UnsupportedValue if the resolution fails.",
+      "weak_spots": ["activity_output_chaining"]
+    },
+    {
+      "id": "W-8",
+      "signature_key": "copy_sql_reader_query_silent_placeholder",
+      "regex": "(?i)Activity '[^']*copy[^']*' was substituted with a placeholder DatabricksNotebookActivity",
+      "match_target": "not_translatable.message",
+      "title": "[expressions] wkmigrate Copy translator silently falls to placeholder for Expression-typed source.sql_reader_query (sub-finding of wkmigrate#27)",
+      "category": "expressions",
+      "kind": "bug",
+      "area": "expressions",
+      "priority": "P1",
+      "upstream_issues": ["ghanse/wkmigrate#27 (deferred Copy adoption to proposed wkmigrate#28)"],
+      "lmv_issue": null,
+      "status": "open",
+      "discovered_via": "lmv sweep-activity-contexts (PR #19)",
+      "last_tested": {
+        "session": "PR-19-sweep-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Copy.source.sql_reader_query context with valid TabularTranslator column_mapping)",
+        "result": "200/200 placeholder warnings. After providing the required column_mapping (otherwise wkmigrate raises ValueError), wkmigrate's Copy translator silently substitutes a /UNSUPPORTED_ADF_ACTIVITY placeholder DatabricksNotebookActivity for any Expression-typed source.sql_reader_query.",
+        "raw_artifact": "/tmp/lmv_sweep_alpha1_v2.json (cell keys '*,copy_query')"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
+      "fix_sketch": "Same as W-7 but for Copy.source.sql_reader_query: use get_literal_or_expression() to resolve the source query expression. Note that the Copy translator already accepts a column_mapping (TabularTranslator) — the regression here is purely the source.sql_reader_query field.",
+      "weak_spots": ["activity_output_chaining"]
+    },
+    {
+      "id": "W-10",
+      "signature_key": "for_each_items_silent_placeholder",
+      "regex": "(?i)Activity '[^']*foreach[^']*' was substituted with a placeholder DatabricksNotebookActivity",
+      "match_target": "not_translatable.message",
+      "title": "[expressions] wkmigrate ForEach translator silently falls to placeholder for arbitrary items expressions (sub-finding of wkmigrate#27)",
+      "category": "collection",
+      "kind": "bug",
+      "area": "expressions",
+      "priority": "P1",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": null,
+      "status": "open",
+      "discovered_via": "lmv sweep-activity-contexts (PR #19)",
+      "last_tested": {
+        "session": "PR-19-sweep-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in ForEach.items context with non-empty inner activities array)",
+        "result": "200/200 placeholder warnings, INCLUDING the 33 collection-category entries like @createArray('a', 'b') that are valid array sources. wkmigrate's ForEach translator falls through to /UNSUPPORTED_ADF_ACTIVITY for every Expression-typed items value, regardless of whether the expression evaluates to an array.",
+        "raw_artifact": "/tmp/lmv_sweep_alpha1_v2.json (cell keys '*,for_each')"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
+      "fix_sketch": "wkmigrate's ForEach translator should use get_literal_or_expression() for the items property and emit either a resolved Python list (when the expression statically evaluates to a literal array) or a runtime expression that produces an array. The pr/27-3-translator-adoption work covered the items field on the IR side but the placeholder fallback indicates the preparer never got the integration.",
+      "weak_spots": ["nested_expressions"]
     }
   ],
   "notes": [
     "lmv_issue is null until /lmv-autodev Phase 1.5 step 5 files the issue.",
     "upstream_issues are informational. /lmv-autodev does NOT auto-file in ghanse/wkmigrate.",
     "When a new failure cluster is harvested in Phase 1.5 and matches no signature, /lmv-autodev appends a new entry here (and commits) before drafting the lmv issue.",
-    "regex patterns are matched against the `message` field of `not_translatable` entries from the lmv adapter."
+    "Most regex patterns are matched against the `message` field of `not_translatable` entries from the lmv adapter (`match_target: 'not_translatable.message'`, the default).",
+    "Some signatures (e.g. W-7) match against captured exception strings instead — see `match_target: 'exception'`. The current /lmv-autodev Phase 1.5 matcher only walks not_translatable entries; the exception channel comes from `lmv sweep-activity-contexts` and requires extending the matcher OR enriching wkmigrate's NotTranslatableWarning emission to convert these crashes into structured warnings (W-6 territory).",
+    "Placeholder warning regexes (W-8, W-10) currently match by task_key substring (e.g. 'copy', 'foreach'), since the placeholder warning message does not yet include the source ADF activity TYPE. A future adapter improvement should enrich the placeholder warning with `original_activity_type` so the regex can match by type instead of task_key — see L-F18 in dev/autodev-sessions/."
   ]
 }
