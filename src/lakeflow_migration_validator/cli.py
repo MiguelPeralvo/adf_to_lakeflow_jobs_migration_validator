@@ -261,6 +261,91 @@ def batch_command(
     _emit(report.to_dict())
 
 
+@app.command("sweep-activity-contexts")
+def sweep_activity_contexts_command(
+    golden_set: Path = typer.Option(
+        ...,
+        "--golden-set",
+        exists=True,
+        readable=True,
+        help="Path to a golden set JSON file with an 'expressions' array (e.g. golden_sets/expressions.json)",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Optional output path for the full aggregated JSON (defaults to stdout only)",
+    ),
+    contexts: str | None = typer.Option(
+        None,
+        "--contexts",
+        help="Comma-separated subset of activity context names. Default: all 7. "
+        "Available: set_variable, notebook_base_param, if_condition, for_each, web_body, lookup_query, copy_query",
+    ),
+) -> None:
+    """Run an activity-context sweep across a golden set of expression pairs.
+
+    For each (expression, activity_context) cell, embeds the expression at the
+    expression-bearing property of the activity, runs it through wkmigrate via
+    ``adf_to_snapshot``, and aggregates per-cell + per-context counts of
+    resolved/placeholder/error outcomes.
+
+    The primary target is the deferred wkmigrate#28 Lookup/Copy translator
+    adoption gap — those two contexts are expected to have low resolution
+    rates on alpha_1 until #28 lands. See L-F5 in
+    ``dev/autodev-sessions/LMV-AUTODEV-2026-04-08-session2.md``.
+    """
+    _auto_configure()
+    if _CONVERT_FN is snapshot_from_adf_payload:
+        typer.echo(
+            "ERROR: wkmigrate not available — sweep requires the real adf_to_snapshot adapter. "
+            "Install wkmigrate via 'poetry install --with dev' first.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    from lakeflow_migration_validator.synthetic.activity_context_wrapper import (
+        sweep_activity_contexts,
+    )
+
+    # Read the golden set directly via json.loads — we accept BOTH a JSON
+    # object with an "expressions" key (the canonical golden_sets/expressions.json
+    # shape) AND a bare JSON array of pairs. The shared _read_json helper
+    # rejects lists, so it's intentionally not used here.
+    raw = golden_set.read_text(encoding="utf-8")
+    payload = json.loads(raw)
+    if isinstance(payload, dict) and "expressions" in payload:
+        corpus = payload["expressions"]
+    elif isinstance(payload, list):
+        corpus = payload
+    else:
+        typer.echo(
+            "ERROR: --golden-set must be a JSON object with an 'expressions' key OR a JSON array of pairs.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    if contexts is None:
+        selected_contexts: list[str] | None = None
+    else:
+        # Filter empty entries so `--contexts ""` or `--contexts " , , "`
+        # doesn't silently produce a zero-cell sweep.
+        selected_contexts = [c.strip() for c in contexts.split(",") if c.strip()]
+        if not selected_contexts:
+            typer.echo(
+                "ERROR: --contexts was passed but contained no non-empty names. "
+                "Either omit --contexts (to sweep all 7 by default) or pass at "
+                "least one valid name.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+    result = sweep_activity_contexts(corpus, _CONVERT_FN, contexts=selected_contexts)
+
+    _emit(result)
+    if output:
+        output.write_text(json.dumps(result, sort_keys=True, indent=2, default=str) + "\n", encoding="utf-8")
+        typer.echo(f"\nSweep result written to {output}", err=True)
+
+
 @app.command("regression-check")
 def regression_check_command(
     golden_set: Path = typer.Option(..., "--golden-set", exists=True, readable=True),
