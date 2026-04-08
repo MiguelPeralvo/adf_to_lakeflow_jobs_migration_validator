@@ -1,0 +1,181 @@
+{
+  "$schema": "https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/blob/main/dev/wkmigrate-issue-map.schema.json",
+  "version": 2,
+  "description": "Failure-signature → finding/issue index maintained by /lmv-autodev. Each failure_signature maps a regex over wkmigrate not_translatable warning messages to a known wkmigrate weakness. lmv_issue is the local lmv gh issue (filled in by Phase 1.5 step 5 once filed). upstream_issues are references to ghanse/wkmigrate (informational only — never auto-filed). last_tested records the wkmigrate ref the signature was last validated against.",
+  "last_session": {
+    "session_id": "LMV-AUTODEV-2026-04-08",
+    "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+    "corpus": "golden_sets/expressions.json (200 pairs, wrapped as SetVariable, FLAT input shape)",
+    "x1_mean_expression_coverage": 1.0,
+    "x2_byte_match_proxy": 1.0,
+    "harvest_outcome": "0 not_translatable entries from W-1..W-6 signatures; corpus exhausted on this wkmigrate ref"
+  },
+  "weak_spots": {
+    "nested_expressions": {
+      "upstream_issues": [27],
+      "status": "open",
+      "category": "nested",
+      "description": "Deeply nested @function(@function(...)) expressions"
+    },
+    "math_on_params": {
+      "upstream_issues": [27, 55],
+      "status": "open",
+      "category": "math",
+      "description": "Math expressions over pipeline().parameters.X requiring type coercion"
+    },
+    "deep_nesting": {
+      "upstream_issues": [27, 71],
+      "status": "open",
+      "category": "nested",
+      "description": "Pipeline DAGs with deep activity nesting; can hit PipelineAdapter recursion"
+    },
+    "complex_conditions": {
+      "upstream_issues": [27],
+      "status": "open",
+      "category": "logical",
+      "description": "Boolean expressions combining @greater/@less/@equals/@and/@or"
+    },
+    "activity_output_chaining": {
+      "upstream_issues": [27],
+      "status": "open",
+      "category": "nested",
+      "description": "@activity('Lookup').output.firstRow.X downstream chaining"
+    }
+  },
+  "failure_signatures": [
+    {
+      "id": "W-1",
+      "signature_key": "unsupported_function:concat",
+      "regex": "(?i)unsupported.*function.*concat|@concat",
+      "title": "[expressions] Map @concat(a, b, ...) to Python f-string / str concatenation (sub-finding of wkmigrate#27)",
+      "category": "string",
+      "kind": "bug",
+      "area": "expressions",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": "fixed-in:alpha_1@969e74d",
+      "status": "fixed",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (34 string-category expressions)",
+        "result": "34/34 resolved, 34/34 byte-match expected_python, 0 not_translatable, 0 W-1 cluster hits",
+        "verified_via_journey": "First lands in pr/27-1-expression-parser@be9e3a5 (47-fn Python registry includes concat as Tier-1)"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug"],
+      "fix_sketch": "Add a PythonEmitter mapping for `concat` in the parsers/ module, producing either a string-concat chain or an f-string.",
+      "weak_spots": ["nested_expressions"]
+    },
+    {
+      "id": "W-2",
+      "signature_key": "pipeline_param_in_non_notebook",
+      "regex": "(?i)pipeline\\(\\)\\.parameters.*(?:setvariable|ifcondition|copy|filter)|param.*not.*resolved",
+      "title": "[expressions] Resolve @pipeline().parameters.X in non-notebook activities (generalization of wkmigrate#55)",
+      "category": "logical",
+      "kind": "enhancement",
+      "area": "expressions",
+      "upstream_issues": ["ghanse/wkmigrate#27", "ghanse/wkmigrate#55"],
+      "lmv_issue": null,
+      "status": "not_tested_on_corpus",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs, all wrapped as SetVariable)",
+        "result": "Not exercised — corpus uses literal expressions only, never @pipeline().parameters.X. Need a stratified corpus that injects parameter references in SetVariable/IfCondition/Copy contexts. See L-F4 / L-F5."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:enhancement"],
+      "fix_sketch": "Generalize the #55 fix beyond notebook activities. SetVariable, IfCondition predicates, and Copy source paths all need pipeline().parameters.X → {{job.parameters.X}} substitution.",
+      "weak_spots": ["math_on_params", "complex_conditions"]
+    },
+    {
+      "id": "W-3",
+      "signature_key": "param_math_no_coercion",
+      "regex": "(?i)(@add|@mul|@sub|@div|@mod).*pipeline\\(\\)\\.parameters|type.*coercion.*missing",
+      "title": "[expressions] Type coercion for @add/@mul/@sub/@div/@mod on parameters (dbutils.widgets.get returns strings)",
+      "category": "math",
+      "kind": "bug",
+      "area": "expressions",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": null,
+      "status": "not_tested_on_corpus",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (math category: 34/34 expressions)",
+        "result": "Math literals resolve fully (34/34 byte-match), but the corpus contains no @pipeline().parameters.X references inside math contexts. Type-coercion path is unexercised. Need adversarial fixtures injecting parameter references."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug"],
+      "fix_sketch": "Track the declared parameter type from the pipeline spec; when emitting a pipeline().parameters.X reference inside a math context, wrap with the appropriate coercion (int/float).",
+      "weak_spots": ["math_on_params"]
+    },
+    {
+      "id": "W-4",
+      "signature_key": "activity_output_chain_unresolved",
+      "regex": "(?i)@activity\\(.*\\)\\.output|activity.*output.*chain",
+      "title": "[expressions] Support @activity('Lookup').output.firstRow.X chaining in downstream activities",
+      "category": "nested",
+      "kind": "enhancement",
+      "area": "expressions",
+      "upstream_issues": ["ghanse/wkmigrate#27 (Lookup adoption deferred to proposed wkmigrate#28)"],
+      "lmv_issue": null,
+      "status": "not_tested_on_corpus",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs, single-activity SetVariable wrapper)",
+        "result": "Not exercised — corpus has no multi-activity chains and never wraps in Lookup. wkmigrate's Lookup translator adoption is explicitly deferred per dev/pr-strategy-issue-27.md (proposed issue #28). Need a multi-activity corpus to probe."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:enhancement"],
+      "fix_sketch": "Translate Lookup activities into a notebook cell that assigns its result to a task-value; downstream references resolve via dbutils.jobs.taskValues.get(taskKey='Lookup', key='firstRow').",
+      "weak_spots": ["activity_output_chaining"]
+    },
+    {
+      "id": "W-5",
+      "signature_key": "pipeline_adapter_recursion",
+      "regex": "(?i)recursionerror|maximum recursion depth|cycle.*pipeline.*adapter",
+      "title": "[safety] Cycle detection in PipelineAdapter recursive enrichment",
+      "category": "safety",
+      "kind": "bug",
+      "area": "safety",
+      "upstream_issues": ["ghanse/wkmigrate#71"],
+      "lmv_issue": null,
+      "status": "not_tested_on_corpus",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (single-activity SetVariable wrapper, no Execute Pipeline)",
+        "result": "Not exercised — corpus has no Execute Pipeline activities or recursive structure. Need a corpus with self-referencing or circular pipelines to trigger the recursion path."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:safety", "kind:bug", "priority:P1"],
+      "fix_sketch": "Thread a `visited: set[str]` through PipelineAdapter recursive calls; raise NotTranslatableWarning + UnsupportedValue on revisit.",
+      "weak_spots": ["deep_nesting"]
+    },
+    {
+      "id": "W-6",
+      "signature_key": "unstructured_warning_message",
+      "signature_kind": "meta",
+      "regex": null,
+      "title": "[observability] Emit structured failure_mode tags on NotTranslatableWarning payloads",
+      "category": "observability",
+      "kind": "enhancement",
+      "area": "observability",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": null,
+      "status": "not_tested_on_corpus",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs)",
+        "result": "Not directly testable — this is a wkmigrate enhancement, not a failure signature. The 200-pair corpus produced 0 not_translatable warnings of any kind, so structured tags would have nothing to attach to. The enhancement is still valid for adversarial corpora that DO produce warnings."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:observability", "kind:enhancement"],
+      "fix_sketch": "Extend NotTranslatableWarning with a `failure_mode` field, one of: function_not_mapped, type_coercion_missing, nesting_depth_exceeded, parameter_reference_dropped, activity_output_chain_unresolved, unsupported_activity_type.",
+      "weak_spots": []
+    }
+  ],
+  "notes": [
+    "lmv_issue is null until /lmv-autodev Phase 1.5 step 5 files the issue.",
+    "upstream_issues are informational. /lmv-autodev does NOT auto-file in ghanse/wkmigrate.",
+    "When a new failure cluster is harvested in Phase 1.5 and matches no signature, /lmv-autodev appends a new entry here (and commits) before drafting the lmv issue.",
+    "regex patterns are matched against the `message` field of `not_translatable` entries from the lmv adapter."
+  ]
+}
