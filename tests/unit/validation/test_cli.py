@@ -16,7 +16,7 @@ from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 from lakeflow_migration_validator import evaluate
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 
 def test_validate_writes_scorecard_json(tmp_path):
