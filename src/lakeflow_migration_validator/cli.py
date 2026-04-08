@@ -324,7 +324,20 @@ def sweep_activity_contexts_command(
         )
         raise typer.Exit(code=2)
 
-    selected_contexts = [c.strip() for c in contexts.split(",")] if contexts else None
+    if contexts is None:
+        selected_contexts: list[str] | None = None
+    else:
+        # Filter empty entries so `--contexts ""` or `--contexts " , , "`
+        # doesn't silently produce a zero-cell sweep.
+        selected_contexts = [c.strip() for c in contexts.split(",") if c.strip()]
+        if not selected_contexts:
+            typer.echo(
+                "ERROR: --contexts was passed but contained no non-empty names. "
+                "Either omit --contexts (to sweep all 7 by default) or pass at "
+                "least one valid name.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
     result = sweep_activity_contexts(corpus, _CONVERT_FN, contexts=selected_contexts)
 
     _emit(result)
