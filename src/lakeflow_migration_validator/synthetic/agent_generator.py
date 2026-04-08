@@ -615,6 +615,6 @@ def _build_expected_snapshot(
         not_translatable=(),
         resolved_expressions=(),
         source_pipeline=adf_json,
-        total_source_dependencies=sum(len(a.get("depends_on", a.get("dependsOn", []))) for a in activities),
+        total_source_dependencies=sum(len(a.get("depends_on") or a.get("dependsOn") or []) for a in activities),
         expected_outputs=expected_outputs,
     )
