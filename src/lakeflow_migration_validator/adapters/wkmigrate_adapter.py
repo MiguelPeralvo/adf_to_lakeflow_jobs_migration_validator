@@ -217,10 +217,17 @@ def _extract_resolved_expression_pairs(prepared_pipeline: Any, source_pipeline: 
             # canonical text is lost. We synthesise a (left op right)
             # expression on the IR side and pair it with the original ADF
             # expression captured from the source dict (when available).
+            #
+            # All three operands must be non-empty strings — otherwise the
+            # f-string would silently embed the literal "None" (or "") into
+            # python_code, and that bogus pair would inflate X-1/X-2
+            # coverage metrics. Defensive validation matches every other
+            # handler in this walker (each of which goes through
+            # _coerce_resolved_value or an isinstance check before emitting).
             op = getattr(task, "op", None)
             left = getattr(task, "left", None)
             right = getattr(task, "right", None)
-            if isinstance(op, str) and op:
+            if isinstance(op, str) and op and isinstance(left, str) and left and isinstance(right, str) and right:
                 python_code = f"({left} {op} {right})"
                 adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code))

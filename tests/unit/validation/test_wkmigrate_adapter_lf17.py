@@ -330,14 +330,37 @@ def test_adapter_existing_set_variable_extraction_still_works():
 
     snap = from_wkmigrate(source, prepared)
 
-    # Exactly one pair (no double-extraction from the new walker)
+    # Exactly one pair (no double-extraction from the new walker).
     set_var_pairs = [
         p for p in snap.resolved_expressions if "concat" in p.adf_expression or "result" in p.adf_expression
     ]
-    assert len(set_var_pairs) >= 1
+    assert len(set_var_pairs) == 1
     # And the source ADF expression IS preferred over the @variables('result') fallback
     # when present in the source dict (this is also a small upgrade vs. the previous
-    # adapter which always emitted the @variables() label)
+    # adapter which always emitted the @variables() label).
     pairs_with_concat = [p for p in snap.resolved_expressions if "@concat" in p.adf_expression]
     assert len(pairs_with_concat) == 1
     assert pairs_with_concat[0].python_code == "str('a') + str('b')"
+
+
+def test_adapter_skips_if_condition_with_missing_operands():
+    """If left or right is missing (None or empty), the IfCondition handler
+    must NOT emit a pair — otherwise python_code becomes the literal text
+    'None' or '() == ()' and silently inflates X-1/X-2 coverage. Cursor
+    Bugbot caught this on PR #20."""
+    source = {"activities": []}
+    # Build an IfConditionActivity with left=None to simulate a malformed IR
+    task = IfConditionActivity(
+        name="bad_if",
+        task_key="bad_if",
+        op="==",
+        left="",  # ← invalid: empty operand
+        right="1",
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    # No pair emitted because left is empty
+    if_pairs = [p for p in snap.resolved_expressions if "if_condition" in p.adf_expression or "==" in p.python_code]
+    assert len(if_pairs) == 0
