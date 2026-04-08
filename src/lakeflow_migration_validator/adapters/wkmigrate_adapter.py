@@ -94,7 +94,11 @@ def _source_expression_at(source_activity: dict | None, *property_path: str) -> 
     return None
 
 
-def _extract_resolved_expression_pairs(prepared_pipeline: Any, source_pipeline: dict) -> list[ExpressionPair]:
+def _extract_resolved_expression_pairs(
+    prepared_pipeline: Any,
+    source_pipeline: dict,
+    source_index: dict[str, dict] | None = None,
+) -> list[ExpressionPair]:
     """L-F17: walk every IR activity type that exposes expression-bearing properties.
 
     Before this function was introduced, the adapter only extracted
@@ -114,6 +118,16 @@ def _extract_resolved_expression_pairs(prepared_pipeline: Any, source_pipeline: 
     ``@<activity_type>('<task>').<field>`` is used instead — the
     ``python_code`` field is what dimensions actually measure, so emitting
     the pair is still valuable for X-1 / X-2 ratios.
+
+    Args:
+        prepared_pipeline: wkmigrate's ``Pipeline`` IR (``prepared.pipeline``).
+        source_pipeline: raw ADF JSON dict (preserved on the snapshot).
+        source_index: optional pre-built ``{name → source_activity_dict}`` map.
+            ``from_wkmigrate`` builds this once for placeholder type lookup
+            (L-F18) and passes it through to avoid rebuilding it here. When
+            None (e.g. external callers), it's built lazily from
+            ``source_pipeline`` so the public signature stays callable on
+            its own.
     """
     # Lazy import of wkmigrate IR types: keeps `import lakeflow_migration_validator
     # .adapters.wkmigrate_adapter` working in environments without wkmigrate
@@ -127,7 +141,8 @@ def _extract_resolved_expression_pairs(prepared_pipeline: Any, source_pipeline: 
         WebActivity,
     )
 
-    source_index = _build_source_activity_index(source_pipeline)
+    if source_index is None:
+        source_index = _build_source_activity_index(source_pipeline)
     pairs: list[ExpressionPair] = []
 
     for task in prepared_pipeline.tasks:
@@ -389,7 +404,11 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
         len(activity.get("depends_on") or activity.get("dependsOn") or []) for activity in adf_activities
     )
 
-    expressions = _extract_resolved_expression_pairs(prepared.pipeline, source_pipeline)
+    expressions = _extract_resolved_expression_pairs(
+        prepared.pipeline,
+        source_pipeline,
+        source_index=source_index,
+    )
 
     # Merge wkmigrate's pipeline-level warnings with the L-F12 placeholder
     # warnings we synthesised above. Placeholder warnings come last so they
