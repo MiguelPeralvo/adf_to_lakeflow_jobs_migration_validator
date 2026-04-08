@@ -17,6 +17,7 @@ from lakeflow_migration_validator.synthetic.test_data_generator import (
 
 # --- Prompt Templates ---
 
+
 def test_all_templates_have_required_fields():
     for key, template in PROMPT_TEMPLATES.items():
         assert "label" in template, f"Template {key} missing 'label'"
@@ -51,11 +52,20 @@ def test_list_templates_returns_all():
 
 
 def test_preset_templates_exist():
-    expected = {"complex_expressions", "deep_nesting", "activity_mix", "math_on_params", "unsupported_types", "pipeline_invocation", "full_coverage"}
+    expected = {
+        "complex_expressions",
+        "deep_nesting",
+        "activity_mix",
+        "math_on_params",
+        "unsupported_types",
+        "pipeline_invocation",
+        "full_coverage",
+    }
     assert set(PROMPT_TEMPLATES.keys()) == expected
 
 
 # --- Test Data Generation ---
+
 
 def test_generate_for_pipeline_with_copy():
     adf_json = {
@@ -118,8 +128,7 @@ def test_generate_for_pipeline_without_data_activities():
 
 def test_generate_for_suite():
     pipelines = [
-        {"name": f"pipe_{i}", "properties": {"activities": [{"name": f"copy_{i}", "type": "Copy"}]}}
-        for i in range(3)
+        {"name": f"pipe_{i}", "properties": {"activities": [{"name": f"copy_{i}", "type": "Copy"}]}} for i in range(3)
     ]
     gen = TestDataGenerator()
     results = gen.generate_for_suite(pipelines)

@@ -71,9 +71,7 @@ def test_details_list_error_file_paths():
 
 def test_value_error_notebook_is_reported():
     """compile ValueError cases (e.g. null bytes) are captured as errors."""
-    snapshot = make_snapshot(
-        notebooks=[make_notebook(file_path="/nb/null_byte.py", content="print('x')\x00")]
-    )
+    snapshot = make_snapshot(notebooks=[make_notebook(file_path="/nb/null_byte.py", content="print('x')\x00")])
 
     score, details = compute_notebook_validity(snapshot)
 
@@ -84,9 +82,7 @@ def test_value_error_notebook_is_reported():
 
 def test_type_error_notebook_is_reported():
     """compile TypeError cases (e.g. non-string content) are captured as errors."""
-    snapshot = make_snapshot(
-        notebooks=[make_notebook(file_path="/nb/non_string.py", content=None)]
-    )
+    snapshot = make_snapshot(notebooks=[make_notebook(file_path="/nb/non_string.py", content=None)])
 
     score, details = compute_notebook_validity(snapshot)
 

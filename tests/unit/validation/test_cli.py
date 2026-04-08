@@ -69,7 +69,9 @@ def test_regression_check_exits_1_on_regression(tmp_path):
     suite = GroundTruthSuite.generate(count=3, difficulty="simple")
     golden_set_path = tmp_path / "suite.json"
     suite.to_json(str(golden_set_path))
-    configure_cli(convert_fn=lambda _: make_snapshot(tasks=[make_task("x", is_placeholder=True)], notebooks=[make_notebook()]))
+    configure_cli(
+        convert_fn=lambda _: make_snapshot(tasks=[make_task("x", is_placeholder=True)], notebooks=[make_notebook()])
+    )
     result = runner.invoke(app, ["regression-check", "--golden-set", str(golden_set_path), "--threshold", "90"])
     assert result.exit_code == 1
 
@@ -86,8 +88,11 @@ def test_harness_command_returns_result():
         def run(self, pipeline_name: str) -> HarnessResult:
             snapshot = make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()])
             return HarnessResult(
-                pipeline_name=pipeline_name, scorecard=evaluate(snapshot), snapshot=snapshot,
-                fix_suggestions=({"dimension": "activity_coverage", "suggestion": "replace placeholder"},), iterations=2,
+                pipeline_name=pipeline_name,
+                scorecard=evaluate(snapshot),
+                snapshot=snapshot,
+                fix_suggestions=({"dimension": "activity_coverage", "suggestion": "replace placeholder"},),
+                iterations=2,
             )
 
     configure_cli(harness_runner=_Runner())
@@ -115,9 +120,19 @@ def test_validate_folder_command(tmp_path):
     """'lmv validate-folder --folder ...' validates all JSON files."""
     for i in range(2):
         p = tmp_path / f"pipe_{i}.json"
-        p.write_text(json.dumps({"name": f"pipe_{i}", "properties": {"activities": [
-            {"name": "nb", "type": "DatabricksNotebook", "depends_on": [], "notebook_path": "/test"}
-        ]}}), encoding="utf-8")
+        p.write_text(
+            json.dumps(
+                {
+                    "name": f"pipe_{i}",
+                    "properties": {
+                        "activities": [
+                            {"name": "nb", "type": "DatabricksNotebook", "depends_on": [], "notebook_path": "/test"}
+                        ]
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
     configure_cli()
     result = runner.invoke(app, ["validate-folder", "--folder", str(tmp_path)])
     assert result.exit_code == 0
@@ -146,9 +161,14 @@ def test_parallel_test_command_returns_result():
         def run(self, pipeline_name: str, parameters=None, *, snapshot=None):
             scorecard = evaluate(make_snapshot(tasks=[make_task("a")], notebooks=[make_notebook()]))
             return ParallelTestResult(
-                pipeline_name=pipeline_name, adf_outputs={"a": "1"}, databricks_outputs={"a": "1"},
-                comparisons=(ComparisonResult(activity_name="a", adf_output="1", databricks_output="1", match=True, diff=None),),
-                equivalence_score=1.0, scorecard=scorecard,
+                pipeline_name=pipeline_name,
+                adf_outputs={"a": "1"},
+                databricks_outputs={"a": "1"},
+                comparisons=(
+                    ComparisonResult(activity_name="a", adf_output="1", databricks_output="1", match=True, diff=None),
+                ),
+                equivalence_score=1.0,
+                scorecard=scorecard,
             )
 
     configure_cli(parallel_runner=_Runner())

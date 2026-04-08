@@ -63,11 +63,7 @@ def test_create_semantic_equivalence_judge_builds_configured_judge(tmp_path):
     path = tmp_path / "expressions.json"
     path.write_text(
         json.dumps(
-            {
-                "expressions": [
-                    {"adf_expression": "@equals(1,1)", "expected_python": "(1 == 1)", "category": "logical"}
-                ]
-            }
+            {"expressions": [{"adf_expression": "@equals(1,1)", "expected_python": "(1 == 1)", "category": "logical"}]}
         ),
         encoding="utf-8",
     )

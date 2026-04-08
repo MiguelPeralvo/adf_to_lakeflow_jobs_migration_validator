@@ -12,9 +12,7 @@ _DEFAULT_CRITERIA = (
     "expression, including type coercion, branching, and function behavior."
 )
 _DEFAULT_TEMPLATE = (
-    "Input ADF expression:\n{input}\n\n"
-    "Output Python code:\n{output}\n\n"
-    "Score semantic equivalence."
+    "Input ADF expression:\n{input}\n\n" "Output Python code:\n{output}\n\n" "Score semantic equivalence."
 )
 _DEFAULT_CALIBRATION_PATH = Path(__file__).resolve().parents[3] / "golden_sets" / "expressions.json"
 

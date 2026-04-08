@@ -17,8 +17,7 @@ from lakeflow_migration_validator.scorecard import Scorecard
 class DatabricksOutputRunner(Protocol):
     """Protocol for running Databricks and collecting output values by task key."""
 
-    def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, str]:
-        ...
+    def run(self, pipeline_name: str, parameters: dict[str, str] | None = None) -> dict[str, str]: ...
 
 
 @dataclass(frozen=True, slots=True)

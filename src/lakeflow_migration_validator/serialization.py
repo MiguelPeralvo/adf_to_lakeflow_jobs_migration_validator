@@ -23,10 +23,7 @@ def snapshot_from_dict(payload: dict) -> ConversionSnapshot:
             NotebookSnapshot(file_path=item["file_path"], content=item["content"])
             for item in payload.get("notebooks", [])
         ),
-        secrets=tuple(
-            SecretRef(scope=item["scope"], key=item["key"])
-            for item in payload.get("secrets", [])
-        ),
+        secrets=tuple(SecretRef(scope=item["scope"], key=item["key"]) for item in payload.get("secrets", [])),
         parameters=tuple(payload.get("parameters", [])),
         dependencies=tuple(
             DependencyRef(source_task=item["source_task"], target_task=item["target_task"])
@@ -47,22 +44,14 @@ def snapshot_from_dict(payload: dict) -> ConversionSnapshot:
 def snapshot_to_dict(snapshot: ConversionSnapshot) -> dict:
     """Convert a ConversionSnapshot to plain dict form."""
     return {
-        "tasks": [
-            {"task_key": task.task_key, "is_placeholder": task.is_placeholder}
-            for task in snapshot.tasks
-        ],
+        "tasks": [{"task_key": task.task_key, "is_placeholder": task.is_placeholder} for task in snapshot.tasks],
         "notebooks": [
-            {"file_path": notebook.file_path, "content": notebook.content}
-            for notebook in snapshot.notebooks
+            {"file_path": notebook.file_path, "content": notebook.content} for notebook in snapshot.notebooks
         ],
-        "secrets": [
-            {"scope": secret.scope, "key": secret.key}
-            for secret in snapshot.secrets
-        ],
+        "secrets": [{"scope": secret.scope, "key": secret.key} for secret in snapshot.secrets],
         "parameters": list(snapshot.parameters),
         "dependencies": [
-            {"source_task": dep.source_task, "target_task": dep.target_task}
-            for dep in snapshot.dependencies
+            {"source_task": dep.source_task, "target_task": dep.target_task} for dep in snapshot.dependencies
         ],
         "not_translatable": list(snapshot.not_translatable),
         "resolved_expressions": [

@@ -43,27 +43,29 @@ class _MockProvider:
         return text
 
 
-_VALID_PIPELINE_JSON = json.dumps({
-    "name": "test_pipeline",
-    "properties": {
-        "parameters": {"env": {"type": "String"}},
-        "activities": [
-            {
-                "name": "set_var",
-                "type": "SetVariable",
-                "depends_on": [],
-                "variable_name": "result",
-                "value": {"type": "Expression", "value": "@concat('hello', pipeline().parameters.env)"},
-            },
-            {
-                "name": "notebook",
-                "type": "DatabricksNotebook",
-                "depends_on": [{"activity": "set_var", "dependency_conditions": ["Succeeded"]}],
-                "notebook_path": "/notebooks/etl",
-            },
-        ],
-    },
-})
+_VALID_PIPELINE_JSON = json.dumps(
+    {
+        "name": "test_pipeline",
+        "properties": {
+            "parameters": {"env": {"type": "String"}},
+            "activities": [
+                {
+                    "name": "set_var",
+                    "type": "SetVariable",
+                    "depends_on": [],
+                    "variable_name": "result",
+                    "value": {"type": "Expression", "value": "@concat('hello', pipeline().parameters.env)"},
+                },
+                {
+                    "name": "notebook",
+                    "type": "DatabricksNotebook",
+                    "depends_on": [{"activity": "set_var", "dependency_conditions": ["Succeeded"]}],
+                    "notebook_path": "/notebooks/etl",
+                },
+            ],
+        },
+    }
+)
 
 
 def test_is_adf_pipeline_valid():
@@ -95,12 +97,12 @@ def test_extract_json_from_plain_json():
 
 
 def test_extract_json_from_markdown_code_block():
-    text = "```json\n{\"name\": \"test\"}\n```"
+    text = '```json\n{"name": "test"}\n```'
     assert _extract_json(text) == {"name": "test"}
 
 
 def test_extract_json_from_mixed_text():
-    text = "Here is the pipeline:\n{\"name\": \"test\"}\nDone."
+    text = 'Here is the pipeline:\n{"name": "test"}\nDone.'
     assert _extract_json(text) == {"name": "test"}
 
 
@@ -111,19 +113,27 @@ def test_extract_json_returns_none_for_invalid():
 
 
 def test_estimate_ground_truth_all_supported():
-    adf = {"properties": {"activities": [
-        {"name": "a", "type": "SetVariable"},
-        {"name": "b", "type": "DatabricksNotebook"},
-    ]}}
+    adf = {
+        "properties": {
+            "activities": [
+                {"name": "a", "type": "SetVariable"},
+                {"name": "b", "type": "DatabricksNotebook"},
+            ]
+        }
+    }
     gt = _estimate_ground_truth(adf)
     assert gt["activity_coverage"] == 1.0
 
 
 def test_estimate_ground_truth_with_unsupported():
-    adf = {"properties": {"activities": [
-        {"name": "a", "type": "SetVariable"},
-        {"name": "b", "type": "AzureFunctionActivity"},
-    ]}}
+    adf = {
+        "properties": {
+            "activities": [
+                {"name": "a", "type": "SetVariable"},
+                {"name": "b", "type": "AzureFunctionActivity"},
+            ]
+        }
+    }
     gt = _estimate_ground_truth(adf)
     assert gt["activity_coverage"] == 0.5
 
@@ -134,17 +144,27 @@ def test_estimate_ground_truth_empty_pipeline():
 
 
 def test_agent_generator_calls_provider():
-    plan_json = json.dumps({
-        "count": 1,
-        "pipelines": [
-            {"name": "test_pipeline", "activity_count": 2, "activity_types": ["SetVariable", "DatabricksNotebook"],
-             "stress_area": "nested_expressions", "expression_complexity": "nested", "parameters": ["env"]}
-        ],
-    })
-    provider = _MockProvider(completions=[
-        plan_json,           # plan phase
-        _VALID_PIPELINE_JSON,  # pipeline generation
-    ])
+    plan_json = json.dumps(
+        {
+            "count": 1,
+            "pipelines": [
+                {
+                    "name": "test_pipeline",
+                    "activity_count": 2,
+                    "activity_types": ["SetVariable", "DatabricksNotebook"],
+                    "stress_area": "nested_expressions",
+                    "expression_complexity": "nested",
+                    "parameters": ["env"],
+                }
+            ],
+        }
+    )
+    provider = _MockProvider(
+        completions=[
+            plan_json,  # plan phase
+            _VALID_PIPELINE_JSON,  # pipeline generation
+        ]
+    )
     gen = AgentPipelineGenerator(judge_provider=provider)
     pipelines = gen.generate(count=1)
 
@@ -154,12 +174,14 @@ def test_agent_generator_calls_provider():
 
 
 def test_agent_generator_handles_invalid_llm_output():
-    provider = _MockProvider(completions=[
-        "{}",  # plan phase — empty, falls back to deterministic plan
-        "I can't generate JSON sorry",
-        "Still no JSON",
-        "Nope",
-    ])
+    provider = _MockProvider(
+        completions=[
+            "{}",  # plan phase — empty, falls back to deterministic plan
+            "I can't generate JSON sorry",
+            "Still no JSON",
+            "Nope",
+        ]
+    )
     gen = AgentPipelineGenerator(judge_provider=provider, max_retries=2)
     pipelines = gen.generate(count=1)
 
@@ -167,18 +189,27 @@ def test_agent_generator_handles_invalid_llm_output():
 
 
 def test_agent_generator_retries_on_invalid_json():
-    plan_json = json.dumps({
-        "count": 1,
-        "pipelines": [
-            {"name": "test_pipeline", "activity_count": 2, "activity_types": ["SetVariable", "DatabricksNotebook"],
-             "stress_area": "nested_expressions", "parameters": ["env"]}
-        ],
-    })
-    provider = _MockProvider(completions=[
-        plan_json,           # plan phase
-        "not json",          # first attempt fails
-        _VALID_PIPELINE_JSON,  # retry succeeds
-    ])
+    plan_json = json.dumps(
+        {
+            "count": 1,
+            "pipelines": [
+                {
+                    "name": "test_pipeline",
+                    "activity_count": 2,
+                    "activity_types": ["SetVariable", "DatabricksNotebook"],
+                    "stress_area": "nested_expressions",
+                    "parameters": ["env"],
+                }
+            ],
+        }
+    )
+    provider = _MockProvider(
+        completions=[
+            plan_json,  # plan phase
+            "not json",  # first attempt fails
+            _VALID_PIPELINE_JSON,  # retry succeeds
+        ]
+    )
     gen = AgentPipelineGenerator(judge_provider=provider, max_retries=1)
     pipelines = gen.generate(count=1)
 
@@ -186,17 +217,26 @@ def test_agent_generator_retries_on_invalid_json():
 
 
 def test_agent_generator_builds_expected_snapshot():
-    plan_json = json.dumps({
-        "count": 1,
-        "pipelines": [
-            {"name": "test_pipeline", "activity_count": 2, "activity_types": ["SetVariable", "DatabricksNotebook"],
-             "stress_area": "nested_expressions", "parameters": ["env"]}
-        ],
-    })
-    provider = _MockProvider(completions=[
-        plan_json,
-        _VALID_PIPELINE_JSON,
-    ])
+    plan_json = json.dumps(
+        {
+            "count": 1,
+            "pipelines": [
+                {
+                    "name": "test_pipeline",
+                    "activity_count": 2,
+                    "activity_types": ["SetVariable", "DatabricksNotebook"],
+                    "stress_area": "nested_expressions",
+                    "parameters": ["env"],
+                }
+            ],
+        }
+    )
+    provider = _MockProvider(
+        completions=[
+            plan_json,
+            _VALID_PIPELINE_JSON,
+        ]
+    )
     gen = AgentPipelineGenerator(judge_provider=provider)
     pipelines = gen.generate(count=1)
 
@@ -208,23 +248,44 @@ def test_agent_generator_builds_expected_snapshot():
 
 
 def test_agent_generator_rotates_weak_spots():
-    plan_json = json.dumps({
-        "count": 3,
-        "pipelines": [
-            {"name": "pipe_0", "activity_count": 1, "activity_types": ["SetVariable"],
-             "stress_area": "nested_expressions", "parameters": ["env"]},
-            {"name": "pipe_1", "activity_count": 1, "activity_types": ["SetVariable"],
-             "stress_area": "math_on_params", "parameters": ["env"]},
-            {"name": "pipe_2", "activity_count": 1, "activity_types": ["SetVariable"],
-             "stress_area": "deep_nesting", "parameters": ["env"]},
-        ],
-    })
+    plan_json = json.dumps(
+        {
+            "count": 3,
+            "pipelines": [
+                {
+                    "name": "pipe_0",
+                    "activity_count": 1,
+                    "activity_types": ["SetVariable"],
+                    "stress_area": "nested_expressions",
+                    "parameters": ["env"],
+                },
+                {
+                    "name": "pipe_1",
+                    "activity_count": 1,
+                    "activity_types": ["SetVariable"],
+                    "stress_area": "math_on_params",
+                    "parameters": ["env"],
+                },
+                {
+                    "name": "pipe_2",
+                    "activity_count": 1,
+                    "activity_types": ["SetVariable"],
+                    "stress_area": "deep_nesting",
+                    "parameters": ["env"],
+                },
+            ],
+        }
+    )
     completions = [plan_json]
     for i in range(3):
-        completions.append(json.dumps({
-            "name": f"pipe_{i}",
-            "properties": {"activities": [{"name": f"a{i}", "type": "SetVariable", "depends_on": []}]},
-        }))
+        completions.append(
+            json.dumps(
+                {
+                    "name": f"pipe_{i}",
+                    "properties": {"activities": [{"name": f"a{i}", "type": "SetVariable", "depends_on": []}]},
+                }
+            )
+        )
 
     provider = _MockProvider(completions=completions)
     config = GenerationConfig(

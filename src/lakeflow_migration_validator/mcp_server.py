@@ -134,9 +134,7 @@ def create_mcp_server(
     @server.tool()
     def validate_expression(adf_expression: str, python_code: str) -> dict[str, Any]:
         """Validate one expression pair and return score + reasoning."""
-        return service.validate_expression(
-            {"adf_expression": adf_expression, "python_code": python_code}
-        )
+        return service.validate_expression({"adf_expression": adf_expression, "python_code": python_code})
 
     @server.tool()
     def suggest_fix(context: str) -> dict[str, Any]:

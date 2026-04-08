@@ -35,7 +35,9 @@ MAX_GENERATION_TOKENS: int = 65_536
 # Canonical supported types — derived from the shared pipeline_generator constant
 # to avoid drift. Control-flow types (ForEach, IfCondition) are also supported.
 _SUPPORTED_TYPES: frozenset[str] = frozenset(_DEFAULT_ACTIVITY_TYPES) | {
-    "DatabricksSparkJar", "DatabricksSparkPython", "DatabricksJob",
+    "DatabricksSparkJar",
+    "DatabricksSparkPython",
+    "DatabricksJob",
 }
 
 _WEAK_SPOTS = {
@@ -114,6 +116,7 @@ ONLY valid JSON, no explanation."""
 @dataclass(frozen=True, slots=True)
 class PipelineSpec:
     """Spec for a single pipeline from the generation plan."""
+
     name: str
     activity_count: int = 5
     activity_types: tuple[str, ...] = ("SetVariable", "DatabricksNotebook", "Lookup", "IfCondition")
@@ -125,6 +128,7 @@ class PipelineSpec:
 @dataclass(frozen=True, slots=True)
 class GenerationPlan:
     """An LLM-produced plan describing the full test suite to generate."""
+
     count: int
     specs: tuple[PipelineSpec, ...]
     raw_plan: dict = field(default_factory=dict)
@@ -133,6 +137,7 @@ class GenerationPlan:
 @dataclass(frozen=True, slots=True)
 class GenerationConfig:
     """Configuration for a single generation run."""
+
     activity_count: int = 5
     activity_types: tuple[str, ...] = ("SetVariable", "DatabricksNotebook", "Lookup", "IfCondition")
     parameters: tuple[str, ...] = ("env", "batch_id", "output_path")
@@ -168,7 +173,12 @@ class AgentPipelineGenerator:
         config: GenerationConfig | None = None,
     ) -> list[SyntheticPipeline]:
         """Generate synthetic pipelines using the LLM."""
-        return [p for ev in self.generate_stream(count, config) if ev["type"] == "pipeline" and ev.get("pipeline") for p in [ev["pipeline"]]]
+        return [
+            p
+            for ev in self.generate_stream(count, config)
+            if ev["type"] == "pipeline" and ev.get("pipeline")
+            for p in [ev["pipeline"]]
+        ]
 
     def generate_stream(
         self,
@@ -254,14 +264,16 @@ class AgentPipelineGenerator:
                 for item in plan_json["pipelines"]:
                     if not isinstance(item, dict):
                         continue
-                    specs.append(PipelineSpec(
-                        name=item.get("name", f"llm_pipeline_{len(specs):03d}"),
-                        activity_count=int(item.get("activity_count", cfg.activity_count)),
-                        activity_types=tuple(item.get("activity_types", cfg.activity_types)),
-                        stress_area=item.get("stress_area", cfg.target_weak_spots[0]),
-                        expression_complexity=item.get("expression_complexity", "nested"),
-                        parameters=tuple(item.get("parameters", cfg.parameters)),
-                    ))
+                    specs.append(
+                        PipelineSpec(
+                            name=item.get("name", f"llm_pipeline_{len(specs):03d}"),
+                            activity_count=int(item.get("activity_count", cfg.activity_count)),
+                            activity_types=tuple(item.get("activity_types", cfg.activity_types)),
+                            stress_area=item.get("stress_area", cfg.target_weak_spots[0]),
+                            expression_complexity=item.get("expression_complexity", "nested"),
+                            parameters=tuple(item.get("parameters", cfg.parameters)),
+                        )
+                    )
                 if specs:
                     return GenerationPlan(
                         count=len(specs),
@@ -275,13 +287,15 @@ class AgentPipelineGenerator:
         specs = []
         for i in range(count):
             weak_spot = cfg.target_weak_spots[i % len(cfg.target_weak_spots)]
-            specs.append(PipelineSpec(
-                name=f"llm_pipeline_{i:03d}",
-                activity_count=cfg.activity_count + (i % 3),
-                activity_types=cfg.activity_types,
-                stress_area=weak_spot,
-                parameters=cfg.parameters,
-            ))
+            specs.append(
+                PipelineSpec(
+                    name=f"llm_pipeline_{i:03d}",
+                    activity_count=cfg.activity_count + (i % 3),
+                    activity_types=cfg.activity_types,
+                    stress_area=weak_spot,
+                    parameters=cfg.parameters,
+                )
+            )
         return GenerationPlan(count=count, specs=tuple(specs))
 
     # ------------------------------------------------------------------
@@ -310,20 +324,38 @@ class AgentPipelineGenerator:
                 raw_text = self._complete(prompt, max_tokens=MAX_GENERATION_TOKENS)
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
-                yield {"stage": "retry", "pct": 5, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {
+                    "stage": "retry",
+                    "pct": 5,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                }
                 continue
 
             yield {"stage": "parsing", "pct": 90}
             adf_json = _extract_json(raw_text)
             if adf_json is None:
                 last_error = f"LLM returned non-JSON (attempt {attempt + 1}/{max_attempts})"
-                yield {"stage": "retry", "pct": 90, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {
+                    "stage": "retry",
+                    "pct": 90,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                }
                 continue
 
             yield {"stage": "validating", "pct": 94}
             if not _is_adf_pipeline(adf_json):
                 last_error = f"Not a valid ADF pipeline (attempt {attempt + 1}/{max_attempts})"
-                yield {"stage": "retry", "pct": 94, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {
+                    "stage": "retry",
+                    "pct": 94,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                }
                 continue
 
             if "name" not in adf_json:
@@ -334,12 +366,22 @@ class AgentPipelineGenerator:
                 snapshot = _build_expected_snapshot(adf_json)
             except Exception as snap_exc:
                 last_error = f"Snapshot build failed: {type(snap_exc).__name__}: {snap_exc}"
-                yield {"stage": "retry", "pct": 93, "attempt": attempt + 1, "max_attempts": max_attempts, "error": last_error}
+                yield {
+                    "stage": "retry",
+                    "pct": 93,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                }
                 continue
             pipeline = SyntheticPipeline(
                 adf_json=adf_json,
                 expected_snapshot=snapshot,
-                description=f"LLM pipeline: {pipeline_name} ({stress_area})" if stress_area else f"LLM pipeline: {pipeline_name}",
+                description=(
+                    f"LLM pipeline: {pipeline_name} ({stress_area})"
+                    if stress_area
+                    else f"LLM pipeline: {pipeline_name}"
+                ),
                 difficulty="llm",
             )
             yield {"stage": "complete", "pct": 100, "pipeline": pipeline}
@@ -382,6 +424,7 @@ class AgentPipelineGenerator:
 @dataclass(frozen=True, slots=True)
 class FailureRecord:
     """A recorded failure from running wkmigrate on a generated pipeline."""
+
     pipeline_name: str
     dimension: str
     score: float
@@ -435,6 +478,7 @@ class FailureFeedback:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_json(text: str) -> dict | None:
     """Extract a JSON object from LLM output.
 
@@ -464,6 +508,7 @@ def _extract_json(text: str) -> dict | None:
     # (handles unescaped quotes, missing commas, trailing commas, etc.)
     try:
         from json_repair import repair_json
+
         repaired = repair_json(text, return_objects=True)
         if isinstance(repaired, dict):
             return repaired
@@ -484,6 +529,7 @@ def _extract_json(text: str) -> dict | None:
         except json.JSONDecodeError:
             try:
                 from json_repair import repair_json
+
                 repaired = repair_json(match.group(), return_objects=True)
                 if isinstance(repaired, dict):
                     return repaired
@@ -554,11 +600,7 @@ def _build_expected_snapshot(
     parameters = _extract_parameters(adf_json)
 
     # Store both task-level expected outputs and predicted dimension scores
-    expected_outputs = {
-        t.task_key: f"expected_output_{i}"
-        for i, t in enumerate(tasks)
-        if not t.is_placeholder
-    }
+    expected_outputs = {t.task_key: f"expected_output_{i}" for i, t in enumerate(tasks) if not t.is_placeholder}
     # Include deterministic ground-truth estimates as metadata
     gt = _estimate_ground_truth(adf_json)
     if gt:
@@ -573,9 +615,6 @@ def _build_expected_snapshot(
         not_translatable=(),
         resolved_expressions=(),
         source_pipeline=adf_json,
-        total_source_dependencies=sum(
-            len(a.get("depends_on", a.get("dependsOn", [])))
-            for a in activities
-        ),
+        total_source_dependencies=sum(len(a.get("depends_on", a.get("dependsOn", []))) for a in activities),
         expected_outputs=expected_outputs,
     )

@@ -1,6 +1,5 @@
 """TDD tests for the Scorecard aggregation."""
 
-
 from lakeflow_migration_validator.dimensions import DimensionResult
 from lakeflow_migration_validator.scorecard import Scorecard
 

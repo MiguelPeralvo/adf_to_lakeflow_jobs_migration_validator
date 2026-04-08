@@ -38,16 +38,19 @@ class HistoryStore:
         self._conn: Any = None
         try:
             import sqlite3
+
             self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
             self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("""
+            self._conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS activity_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
                     type TEXT NOT NULL,
                     data TEXT NOT NULL
                 )
-            """)
+            """
+            )
             # Migrate: add entity_id and results columns if missing
             try:
                 self._conn.execute("ALTER TABLE activity_log ADD COLUMN entity_id TEXT")
@@ -70,8 +73,13 @@ class HistoryStore:
         if self._use_sqlite:
             self._conn.execute(
                 "INSERT INTO activity_log (timestamp, type, data, entity_id, results) VALUES (?, ?, ?, ?, ?)",
-                (event["timestamp"], event["type"], _json.dumps(event), entity_id,
-                 _json.dumps(results) if results is not None else None),
+                (
+                    event["timestamp"],
+                    event["type"],
+                    _json.dumps(event),
+                    entity_id,
+                    _json.dumps(results) if results is not None else None,
+                ),
             )
             self._conn.commit()
         else:
@@ -89,68 +97,100 @@ class HistoryStore:
 
     def append(self, pipeline_name: str, scorecard: dict[str, Any], full_result: dict[str, Any] | None = None) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "validation",
-            "pipeline_name": pipeline_name,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "scorecard": scorecard,
-        }, entity_id=eid, results=full_result or scorecard)
+        self._write_event(
+            {
+                "type": "validation",
+                "pipeline_name": pipeline_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "scorecard": scorecard,
+            },
+            entity_id=eid,
+            results=full_result or scorecard,
+        )
         return eid
 
-    def log_batch(self, folder: str, total: int, mean_score: float, below: int, threshold: float, full_result: dict[str, Any] | None = None) -> str:
+    def log_batch(
+        self,
+        folder: str,
+        total: int,
+        mean_score: float,
+        below: int,
+        threshold: float,
+        full_result: dict[str, Any] | None = None,
+    ) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "batch_validation",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "folder": folder,
-            "total": total,
-            "mean_score": mean_score,
-            "below_threshold": below,
-            "threshold": threshold,
-        }, entity_id=eid, results=full_result)
+        self._write_event(
+            {
+                "type": "batch_validation",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "folder": folder,
+                "total": total,
+                "mean_score": mean_score,
+                "below_threshold": below,
+                "threshold": threshold,
+            },
+            entity_id=eid,
+            results=full_result,
+        )
         return eid
 
     def log_synthetic(self, output_path: str, count: int, mode: str, full_result: dict[str, Any] | None = None) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "synthetic_generation",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "output_path": output_path,
-            "count": count,
-            "mode": mode,
-        }, entity_id=eid, results=full_result)
+        self._write_event(
+            {
+                "type": "synthetic_generation",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "output_path": output_path,
+                "count": count,
+                "mode": mode,
+            },
+            entity_id=eid,
+            results=full_result,
+        )
         return eid
 
     def log_expression(self, adf_expression: str, python_code: str, result: dict[str, Any]) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "expression",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "adf_expression": adf_expression,
-            "python_code": python_code,
-            "score": result.get("score", 0),
-        }, entity_id=eid, results=result)
+        self._write_event(
+            {
+                "type": "expression",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "adf_expression": adf_expression,
+                "python_code": python_code,
+                "score": result.get("score", 0),
+            },
+            entity_id=eid,
+            results=result,
+        )
         return eid
 
     def log_harness(self, pipeline_name: str, result: dict[str, Any]) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "harness",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "pipeline_name": pipeline_name,
-            "iterations": result.get("iterations", 0),
-            "score": result.get("scorecard", {}).get("score", 0),
-        }, entity_id=eid, results=result)
+        self._write_event(
+            {
+                "type": "harness",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "pipeline_name": pipeline_name,
+                "iterations": result.get("iterations", 0),
+                "score": result.get("scorecard", {}).get("score", 0),
+            },
+            entity_id=eid,
+            results=result,
+        )
         return eid
 
     def log_parallel(self, pipeline_name: str, result: dict[str, Any]) -> str:
         eid = str(uuid.uuid4())
-        self._write_event({
-            "type": "parallel",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "pipeline_name": pipeline_name,
-            "equivalence_score": result.get("equivalence_score", 0),
-        }, entity_id=eid, results=result)
+        self._write_event(
+            {
+                "type": "parallel",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "pipeline_name": pipeline_name,
+                "equivalence_score": result.get("equivalence_score", 0),
+            },
+            entity_id=eid,
+            results=result,
+        )
         return eid
 
     def get(self, pipeline_name: str) -> list[dict[str, Any]]:
@@ -171,9 +211,7 @@ class HistoryStore:
 
     def get_activity_log(self, limit: int = 100) -> list[dict[str, Any]]:
         if self._use_sqlite:
-            rows = self._conn.execute(
-                "SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)
-            ).fetchall()
+            rows = self._conn.execute("SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
             return [_json.loads(row[0]) for row in rows]
         # JSON fallback
         if not self._json_path.exists():
@@ -219,9 +257,7 @@ class HistoryStore:
                     (entity_type, limit),
                 ).fetchall()
             else:
-                rows = self._conn.execute(
-                    "SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)
-                ).fetchall()
+                rows = self._conn.execute("SELECT data FROM activity_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
             return [_json.loads(row[0]) for row in rows]
         # JSON fallback
         if not self._json_path.exists():
@@ -291,6 +327,7 @@ def _adf_credentials_from_env() -> dict[str, str]:
       ADF_SUBSCRIPTION_ID, ADF_RESOURCE_GROUP, ADF_FACTORY_NAME
     """
     import os
+
     return {
         "tenant_id": os.environ.get("ADF_TENANT_ID", ""),
         "client_id": os.environ.get("ADF_CLIENT_ID", ""),
@@ -329,7 +366,7 @@ class DownloadPipelinesRequest(BaseModel):
     resource_group: str | None = None
     factory_name: str | None = None
     pipeline_names: list[str] | None = None  # None = download all
-    output_folder: str | None = None         # None = auto-generate in temp
+    output_folder: str | None = None  # None = auto-generate in temp
 
 
 class UploadPipelinesRequest(BaseModel):
@@ -344,8 +381,8 @@ class UploadPipelinesRequest(BaseModel):
     subscription_id: str | None = None
     resource_group: str | None = None
     factory_name: str | None = None
-    folder_path: str = Field(min_length=1)   # local folder with pipeline subfolders or *.json
-    name_prefix: str = ""                    # optional prefix for uploaded pipeline names
+    folder_path: str = Field(min_length=1)  # local folder with pipeline subfolders or *.json
+    name_prefix: str = ""  # optional prefix for uploaded pipeline names
 
 
 class HarnessRunRequest(BaseModel):
@@ -367,9 +404,9 @@ class SyntheticGenerateRequest(BaseModel):
     difficulty: str = "medium"
     max_activities: int = 20
     mode: str = "template"
-    preset: str | None = None           # key from PROMPT_TEMPLATES (for llm mode)
-    custom_prompt: str | None = None    # user-edited prompt (for custom mode)
-    generate_test_data: bool = False    # also generate test data for parallel testing
+    preset: str | None = None  # key from PROMPT_TEMPLATES (for llm mode)
+    custom_prompt: str | None = None  # user-edited prompt (for custom mode)
+    generate_test_data: bool = False  # also generate test data for parallel testing
     output_path: str | None = None
     spec: dict[str, Any] | None = None  # pre-generated spec — skips planning
 
@@ -400,7 +437,10 @@ def create_app(
     def get_status() -> dict[str, Any]:
         """Return which capabilities are active."""
         adf_env = _adf_credentials_from_env()
-        adf_configured = all(adf_env.get(k) for k in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name"))
+        adf_configured = all(
+            adf_env.get(k)
+            for k in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name")
+        )
         return {
             "validator": True,
             "judge": judge_provider is not None,
@@ -415,7 +455,17 @@ def create_app(
         """Return ADF connection status — which env vars are set (no secrets exposed)."""
         env = _adf_credentials_from_env()
         return {
-            "configured": all(env.get(k) for k in ("tenant_id", "client_id", "client_secret", "subscription_id", "resource_group", "factory_name")),
+            "configured": all(
+                env.get(k)
+                for k in (
+                    "tenant_id",
+                    "client_id",
+                    "client_secret",
+                    "subscription_id",
+                    "resource_group",
+                    "factory_name",
+                )
+            ),
             "factory_name": env.get("factory_name", ""),
             "resource_group": env.get("resource_group", ""),
             "subscription_id": env.get("subscription_id", ""),
@@ -516,17 +566,16 @@ def create_app(
             files = subfolder_files
         else:
             # Flat layout: glob in root, exclude suite.json
-            files = sorted(
-                f for f in folder.glob(request.glob_pattern)
-                if f.is_file() and f.name != "suite.json"
-            )
+            files = sorted(f for f in folder.glob(request.glob_pattern) if f.is_file() and f.name != "suite.json")
         if not files:
             raise HTTPException(status_code=422, detail=f"No ADF pipeline files found in {request.folder_path}")
 
         if stream:
             return StreamingResponse(
                 _validate_folder_stream(
-                    files, convert, request.threshold,
+                    files,
+                    convert,
+                    request.threshold,
                     judge_provider=judge_provider,
                     analysis_agent=judge_provider if request.agent_analysis else None,
                 ),
@@ -553,13 +602,15 @@ def create_app(
             if is_below:
                 below += 1
             scores.append(score)
-            cases.append({
-                "pipeline_name": name,
-                "file": str(file_path),
-                "score": score,
-                "label": label,
-                "ccs_below_threshold": is_below,
-            })
+            cases.append(
+                {
+                    "pipeline_name": name,
+                    "file": str(file_path),
+                    "score": score,
+                    "label": label,
+                    "ccs_below_threshold": is_below,
+                }
+            )
 
         mean = sum(scores) / len(scores) if scores else 0.0
         return {
@@ -635,30 +686,31 @@ def create_app(
                 "dimensions": dims,
             }
 
-            yield _json.dumps({
-                "type": "progress",
-                "completed": i + 1,
-                "total": total,
-                "pipeline_name": name,
-                "score": score,
-                "label": label,
-                "ok": error is None,
-                "error": error,
-            }) + "\n"
+            yield _json.dumps(
+                {
+                    "type": "progress",
+                    "completed": i + 1,
+                    "total": total,
+                    "pipeline_name": name,
+                    "score": score,
+                    "label": label,
+                    "ok": error is None,
+                    "error": error,
+                }
+            ) + "\n"
 
             # Agent analysis — run whenever any dimension is imperfect (not just below threshold)
             has_imperfect = any(not v.get("passed", True) for v in dims.values()) if dims else False
             if analysis_agent is not None and (is_below or has_imperfect) and dims and snapshot is not None:
-                yield _json.dumps({
-                    "type": "analysis_start",
-                    "pipeline_name": name,
-                    "pipeline_index": i,
-                }) + "\n"
+                yield _json.dumps(
+                    {
+                        "type": "analysis_start",
+                        "pipeline_name": name,
+                        "pipeline_index": i,
+                    }
+                ) + "\n"
 
-                failing_dims = {
-                    k: v for k, v in dims.items()
-                    if not v.get("passed", True)
-                }
+                failing_dims = {k: v for k, v in dims.items() if not v.get("passed", True)}
                 analyses = []
                 for dim_name, dim_data in failing_dims.items():
                     try:
@@ -693,14 +745,16 @@ def create_app(
                     }
                     analyses.append(analysis_entry)
 
-                    yield _json.dumps({
-                        "type": "analysis",
-                        "pipeline_name": name,
-                        "pipeline_index": i,
-                        "dimension": dim_name,
-                        "score": dim_data["score"],
-                        "diagnosis": reasoning,
-                    }) + "\n"
+                    yield _json.dumps(
+                        {
+                            "type": "analysis",
+                            "pipeline_name": name,
+                            "pipeline_index": i,
+                            "dimension": dim_name,
+                            "score": dim_data["score"],
+                            "diagnosis": reasoning,
+                        }
+                    ) + "\n"
 
                 case["agent_analysis"] = analyses
 
@@ -719,10 +773,12 @@ def create_app(
         }
         entity_id = history.log_batch(folder_path, len(cases), mean, below, threshold, full_result=batch_result)
         batch_result["entity_id"] = entity_id
-        yield _json.dumps({
-            "type": "complete",
-            "result": batch_result,
-        }) + "\n"
+        yield _json.dumps(
+            {
+                "type": "complete",
+                "result": batch_result,
+            }
+        ) + "\n"
 
     @app.post("/api/harness/run")
     def post_harness_run(request: HarnessRunRequest) -> dict[str, Any]:
@@ -837,27 +893,40 @@ def create_app(
                 with open(pipe_dir / "adf_pipeline.json", "w", encoding="utf-8") as fh:
                     _json.dump(pipeline_json, fh, indent=2)
                 downloaded.append(name)
-                yield _json.dumps({
-                    "type": "progress", "completed": i + 1, "total": total,
-                    "pipeline_name": name, "ok": True,
-                }) + "\n"
+                yield _json.dumps(
+                    {
+                        "type": "progress",
+                        "completed": i + 1,
+                        "total": total,
+                        "pipeline_name": name,
+                        "ok": True,
+                    }
+                ) + "\n"
             except Exception as exc:
                 errors.append({"pipeline": name, "error": f"{type(exc).__name__}: {exc}"})
-                yield _json.dumps({
-                    "type": "progress", "completed": i + 1, "total": total,
-                    "pipeline_name": name, "ok": False, "error": str(exc),
-                }) + "\n"
+                yield _json.dumps(
+                    {
+                        "type": "progress",
+                        "completed": i + 1,
+                        "total": total,
+                        "pipeline_name": name,
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                ) + "\n"
 
-        yield _json.dumps({
-            "type": "complete",
-            "result": {
-                "folder": str(out_dir),
-                "total": total,
-                "downloaded": len(downloaded),
-                "errors": errors,
-                "pipelines": downloaded,
-            },
-        }) + "\n"
+        yield _json.dumps(
+            {
+                "type": "complete",
+                "result": {
+                    "folder": str(out_dir),
+                    "total": total,
+                    "downloaded": len(downloaded),
+                    "errors": errors,
+                    "pipelines": downloaded,
+                },
+            }
+        ) + "\n"
 
     @app.post("/api/adf/upload")
     def post_adf_upload(
@@ -918,7 +987,10 @@ def create_app(
                 props = adf_json.get("properties", adf_json)
                 resource = PipelineResource(**props)
                 client.management_client.pipelines.create_or_update(
-                    client.resource_group_name, client.factory_name, name, resource,
+                    client.resource_group_name,
+                    client.factory_name,
+                    name,
+                    resource,
                 )
                 uploaded.append(name)
             except Exception as exc:
@@ -944,15 +1016,34 @@ def create_app(
                 props = adf_json.get("properties", adf_json)
                 resource = PipelineResource(**props)
                 client.management_client.pipelines.create_or_update(
-                    client.resource_group_name, client.factory_name, name, resource,
+                    client.resource_group_name,
+                    client.factory_name,
+                    name,
+                    resource,
                 )
                 uploaded.append(name)
-                yield _json.dumps({"type": "progress", "completed": i + 1, "total": total, "pipeline_name": name, "ok": True}) + "\n"
+                yield _json.dumps(
+                    {"type": "progress", "completed": i + 1, "total": total, "pipeline_name": name, "ok": True}
+                ) + "\n"
             except Exception as exc:
                 errors.append({"pipeline": name, "error": str(exc)})
-                yield _json.dumps({"type": "progress", "completed": i + 1, "total": total, "pipeline_name": name, "ok": False, "error": str(exc)}) + "\n"
+                yield _json.dumps(
+                    {
+                        "type": "progress",
+                        "completed": i + 1,
+                        "total": total,
+                        "pipeline_name": name,
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                ) + "\n"
 
-        yield _json.dumps({"type": "complete", "result": {"total": total, "uploaded": len(uploaded), "errors": errors, "pipelines": uploaded}}) + "\n"
+        yield _json.dumps(
+            {
+                "type": "complete",
+                "result": {"total": total, "uploaded": len(uploaded), "errors": errors, "pipelines": uploaded},
+            }
+        ) + "\n"
 
     @app.get("/api/adf/list")
     def get_adf_list_pipelines() -> list[str]:
@@ -967,9 +1058,12 @@ def create_app(
         creds = _resolve_adf_credentials({})
         try:
             client = FactoryClient(
-                tenant_id=creds["tenant_id"], client_id=creds["client_id"],
-                client_secret=creds["client_secret"], subscription_id=creds["subscription_id"],
-                resource_group_name=creds["resource_group"], factory_name=creds["factory_name"],
+                tenant_id=creds["tenant_id"],
+                client_id=creds["client_id"],
+                client_secret=creds["client_secret"],
+                subscription_id=creds["subscription_id"],
+                resource_group_name=creds["resource_group"],
+                factory_name=creds["factory_name"],
             )
             return client.list_pipelines()
         except Exception as exc:
@@ -1039,8 +1133,7 @@ def create_app(
         # GitHub branches API doesn't include commit dates, so we fetch each commit
         # For performance, just return as-is and let the frontend sort if needed
         return [
-            {"name": b["name"], "sha": b.get("_sha", "")[:8], "protected": b.get("protected", False)}
-            for b in branches
+            {"name": b["name"], "sha": b.get("_sha", "")[:8], "protected": b.get("protected", False)} for b in branches
         ]
 
     # ------------------------------------------------------------------
@@ -1067,23 +1160,27 @@ def create_app(
                     pass
             # Count pipeline subfolders
             subfolders = [p for p in d.iterdir() if p.is_dir()]
-            runs.append({
-                "path": str(d),
-                "name": d.name,
-                "pipeline_count": pipeline_count,
-                "subfolder_count": len(subfolders),
-                "has_suite": suite_file.exists(),
-            })
+            runs.append(
+                {
+                    "path": str(d),
+                    "name": d.name,
+                    "pipeline_count": pipeline_count,
+                    "subfolder_count": len(subfolders),
+                    "has_suite": suite_file.exists(),
+                }
+            )
         return runs
 
     @app.get("/api/synthetic/templates")
     def get_synthetic_templates() -> list[dict[str, str]]:
         from lakeflow_migration_validator.synthetic.prompt_templates import list_templates
+
         return list_templates()
 
     @app.post("/api/synthetic/resolve-template")
     def post_resolve_template(request: dict[str, Any]) -> dict[str, str]:
         from lakeflow_migration_validator.synthetic.prompt_templates import resolve_template
+
         base = resolve_template(
             request.get("preset", "complex_expressions"),
             count=request.get("count", 10),
@@ -1115,6 +1212,7 @@ def create_app(
                 AgentPipelineGenerator,
                 GenerationConfig,
             )
+
             weak_spots = _PRESET_WEAK_SPOTS.get(req_preset or "", ("nested_expressions",))
             config = GenerationConfig(
                 target_weak_spots=weak_spots,
@@ -1138,16 +1236,19 @@ def create_app(
             }
         # Template / fallback: deterministic spec
         from lakeflow_migration_validator.synthetic.pipeline_generator import _DEFAULT_ACTIVITY_TYPES
+
         specs = []
         for i in range(req_count):
-            specs.append({
-                "name": f"synthetic_pipeline_{i:03d}",
-                "activity_count": 1 + (i % req_max_activities),
-                "activity_types": list(_DEFAULT_ACTIVITY_TYPES),
-                "stress_area": req_difficulty,
-                "expression_complexity": "mixed",
-                "parameters": ["param1", "param2"],
-            })
+            specs.append(
+                {
+                    "name": f"synthetic_pipeline_{i:03d}",
+                    "activity_count": 1 + (i % req_max_activities),
+                    "activity_types": list(_DEFAULT_ACTIVITY_TYPES),
+                    "stress_area": req_difficulty,
+                    "expression_complexity": "mixed",
+                    "parameters": ["param1", "param2"],
+                }
+            )
         return {"count": req_count, "pipelines": specs}
 
     _PRESET_WEAK_SPOTS: dict[str, tuple[str, ...]] = {
@@ -1217,6 +1318,7 @@ def create_app(
             result["fallback_note"] = fallback_note
         if generate_test_data:
             from lakeflow_migration_validator.synthetic.test_data_generator import TestDataGenerator
+
             gen = TestDataGenerator()
             test_data = gen.generate_for_suite([p.adf_json for p in suite.pipelines])
             result["test_data"] = [td.to_dict() for td in test_data]
@@ -1239,6 +1341,7 @@ def create_app(
                     AgentPipelineGenerator,
                     GenerationConfig,
                 )
+
                 weak_spots = _PRESET_WEAK_SPOTS.get(request.preset or "", ("nested_expressions",))
                 config = GenerationConfig(
                     target_weak_spots=weak_spots,
@@ -1252,16 +1355,19 @@ def create_app(
                         GenerationPlan,
                         PipelineSpec,
                     )
+
                     pre_specs = []
                     for item in request.spec["pipelines"]:
-                        pre_specs.append(PipelineSpec(
-                            name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
-                            activity_count=int(item.get("activity_count", 5)),
-                            activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
-                            stress_area=item.get("stress_area", "nested_expressions"),
-                            expression_complexity=item.get("expression_complexity", "nested"),
-                            parameters=tuple(item.get("parameters", ("env",))),
-                        ))
+                        pre_specs.append(
+                            PipelineSpec(
+                                name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
+                                activity_count=int(item.get("activity_count", 5)),
+                                activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
+                                stress_area=item.get("stress_area", "nested_expressions"),
+                                expression_complexity=item.get("expression_complexity", "nested"),
+                                parameters=tuple(item.get("parameters", ("env",))),
+                            )
+                        )
                     pre_plan = GenerationPlan(
                         count=len(pre_specs),
                         specs=tuple(pre_specs),
@@ -1269,20 +1375,23 @@ def create_app(
                     )
                 collected = []
                 for ev in agent_gen.generate_stream(
-                    count=request.count, config=config, plan=pre_plan,
+                    count=request.count,
+                    config=config,
+                    plan=pre_plan,
                 ):
                     if ev["type"] == "plan":
                         plan = ev["plan"]
                         plan_specs = [
-                            {"name": s.name, "stress_area": s.stress_area,
-                             "activity_count": s.activity_count}
+                            {"name": s.name, "stress_area": s.stress_area, "activity_count": s.activity_count}
                             for s in plan.specs
                         ]
-                        yield _json.dumps({
-                            "type": "plan",
-                            "count": plan.count,
-                            "specs": plan_specs,
-                        }) + "\n"
+                        yield _json.dumps(
+                            {
+                                "type": "plan",
+                                "count": plan.count,
+                                "specs": plan_specs,
+                            }
+                        ) + "\n"
                     elif ev["type"] == "stage":
                         stage_event: dict[str, Any] = {
                             "type": "stage",
@@ -1333,13 +1442,15 @@ def create_app(
                 max_activities=request.max_activities,
                 mode="template",
             )
-            yield _json.dumps({
-                "type": "progress",
-                "completed": len(suite.pipelines),
-                "total": request.count,
-                "pipeline_name": None,
-                "ok": True,
-            }) + "\n"
+            yield _json.dumps(
+                {
+                    "type": "progress",
+                    "completed": len(suite.pipelines),
+                    "total": request.count,
+                    "pipeline_name": None,
+                    "ok": True,
+                }
+            ) + "\n"
 
         persist_path = _persist_suite(suite, request.output_path)
         result = _build_result(suite, persist_path, fallback_note, request.generate_test_data)
@@ -1370,6 +1481,7 @@ def create_app(
                     AgentPipelineGenerator,
                     GenerationConfig,
                 )
+
                 weak_spots = _PRESET_WEAK_SPOTS.get(request.preset or "", ("nested_expressions",))
                 config = GenerationConfig(
                     target_weak_spots=weak_spots,
@@ -1382,23 +1494,27 @@ def create_app(
                         GenerationPlan,
                         PipelineSpec,
                     )
+
                     pre_specs = []
                     for item in request.spec["pipelines"]:
-                        pre_specs.append(PipelineSpec(
-                            name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
-                            activity_count=int(item.get("activity_count", 5)),
-                            activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
-                            stress_area=item.get("stress_area", "nested_expressions"),
-                            expression_complexity=item.get("expression_complexity", "nested"),
-                            parameters=tuple(item.get("parameters", ("env",))),
-                        ))
+                        pre_specs.append(
+                            PipelineSpec(
+                                name=item.get("name", f"pipeline_{len(pre_specs):03d}"),
+                                activity_count=int(item.get("activity_count", 5)),
+                                activity_types=tuple(item.get("activity_types", ("SetVariable", "DatabricksNotebook"))),
+                                stress_area=item.get("stress_area", "nested_expressions"),
+                                expression_complexity=item.get("expression_complexity", "nested"),
+                                parameters=tuple(item.get("parameters", ("env",))),
+                            )
+                        )
                     pre_plan = GenerationPlan(
                         count=len(pre_specs),
                         specs=tuple(pre_specs),
                         raw_plan=request.spec,
                     )
                 pipelines = [
-                    p for ev in agent_gen.generate_stream(count=request.count, config=config, plan=pre_plan)
+                    p
+                    for ev in agent_gen.generate_stream(count=request.count, config=config, plan=pre_plan)
                     if ev["type"] == "pipeline" and ev.get("pipeline")
                     for p in [ev["pipeline"]]
                 ]
@@ -1455,6 +1571,7 @@ def _resolve_snapshot(
     if request.adf_yaml is not None:
         try:
             import yaml
+
             parsed = yaml.safe_load(request.adf_yaml)
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"Invalid YAML: {exc}") from exc

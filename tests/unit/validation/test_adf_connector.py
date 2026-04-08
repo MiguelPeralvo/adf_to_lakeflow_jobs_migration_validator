@@ -21,9 +21,7 @@ def test_callable_injection_fetch_pipeline():
 
 def test_callable_injection_translate_and_prepare():
     """Injected translate_prepare_fn receives the pipeline JSON."""
-    connector = ADFConnector(
-        translate_prepare_fn=lambda json: (json, {"prepared": True})
-    )
+    connector = ADFConnector(translate_prepare_fn=lambda json: (json, {"prepared": True}))
     source, prepared = connector.translate_and_prepare({"name": "test"})
     assert source["name"] == "test"
     assert prepared["prepared"] is True
@@ -53,6 +51,7 @@ def test_unconfigured_translate_raises():
 def test_from_credentials_raises_without_wkmigrate(monkeypatch):
     """from_credentials raises NotImplementedError with install hint when wkmigrate is missing."""
     import builtins
+
     real_import = builtins.__import__
 
     def mock_import(name, *args, **kwargs):
@@ -64,6 +63,10 @@ def test_from_credentials_raises_without_wkmigrate(monkeypatch):
 
     with pytest.raises(NotImplementedError, match="wkmigrate"):
         ADFConnector.from_credentials(
-            tenant_id="t", client_id="c", client_secret="s",
-            subscription_id="sub", resource_group="rg", factory_name="f",
+            tenant_id="t",
+            client_id="c",
+            client_secret="s",
+            subscription_id="sub",
+            resource_group="rg",
+            factory_name="f",
         )

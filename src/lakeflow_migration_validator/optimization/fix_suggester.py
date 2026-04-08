@@ -93,9 +93,7 @@ class FixSuggester:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _rank_dimensions(
-        self, scorecard: Scorecard
-    ) -> list[tuple[str, float, float]]:
+    def _rank_dimensions(self, scorecard: Scorecard) -> list[tuple[str, float, float]]:
         """Return failing dimensions sorted by impact ``(1 - score) * weight`` descending.
 
         Only dimensions with score < 1.0 are considered (i.e., imperfect).

@@ -36,9 +36,7 @@ class ExecutionDimension:
                 details={"error": str(exc)},
             )
         if not results:
-            return DimensionResult(
-                name=self.name, score=0.0, passed=False, details={"error": "no tasks returned"}
-            )
+            return DimensionResult(name=self.name, score=0.0, passed=False, details={"error": "no tasks returned"})
         successes = sum(1 for r in results.values() if r.get("success"))
         score = successes / len(results)
         return DimensionResult(

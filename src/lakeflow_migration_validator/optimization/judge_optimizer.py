@@ -23,6 +23,7 @@ from lakeflow_migration_validator.dimensions.llm_judge import LLMJudge, JudgePro
 # Calibration pair schema
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class CalibrationPair:
     """A single human-labelled ADF-expression / Python-code pair."""
@@ -111,6 +112,7 @@ _CALIBRATED_TEMPLATE = (
 # ---------------------------------------------------------------------------
 # ManualCalibrator — no DSPy required
 # ---------------------------------------------------------------------------
+
 
 def _select_diverse_examples(
     pairs: list[CalibrationPair],
@@ -217,7 +219,8 @@ class ManualCalibrator:
         """Select the best few-shot examples from the calibration set."""
         if self._selected_examples is None:
             self._selected_examples = _select_diverse_examples(
-                self._pairs, max_examples=self._max_examples,
+                self._pairs,
+                max_examples=self._max_examples,
             )
         return self._selected_examples
 
@@ -264,6 +267,7 @@ class ManualCalibrator:
 # ---------------------------------------------------------------------------
 # JudgeOptimizer — requires DSPy 3.x
 # ---------------------------------------------------------------------------
+
 
 class JudgeOptimizer:
     """Wrap LLMJudge as a DSPy module and optimise with MIPROv2 or SIMBA.
@@ -326,6 +330,7 @@ class JudgeOptimizer:
             examples.append(ex)
 
         if metric_fn is None:
+
             def metric_fn(example, prediction, trace=None):
                 predicted = float(prediction.score)
                 expected = float(example.human_score)
@@ -335,9 +340,7 @@ class JudgeOptimizer:
         class JudgeModule(dspy.Module):
             def __init__(self_module):
                 super().__init__()
-                self_module.judge = dspy.ChainOfThought(
-                    "adf_expression, python_code -> score, reasoning"
-                )
+                self_module.judge = dspy.ChainOfThought("adf_expression, python_code -> score, reasoning")
 
             def forward(self_module, adf_expression, python_code):
                 return self_module.judge(
@@ -353,10 +356,7 @@ class JudgeOptimizer:
         elif self._optimizer_name == "SIMBA":
             optimizer = dspy.SIMBA(metric=metric_fn)
         else:
-            raise ValueError(
-                f"Unknown optimizer: {self._optimizer_name!r}. "
-                f"Supported: 'MIPROv2', 'SIMBA'."
-            )
+            raise ValueError(f"Unknown optimizer: {self._optimizer_name!r}. " f"Supported: 'MIPROv2', 'SIMBA'.")
 
         self._optimized_program = optimizer.compile(
             module,
@@ -369,10 +369,7 @@ class JudgeOptimizer:
         Must call :meth:`optimize` first.
         """
         if self._optimized_program is None:
-            raise RuntimeError(
-                "Call optimize() before to_optimized_judge(). "
-                "No optimisation has been run yet."
-            )
+            raise RuntimeError("Call optimize() before to_optimized_judge(). " "No optimisation has been run yet.")
 
         # Extract the optimised instruction and demos from the DSPy program
         program = self._optimized_program
@@ -385,15 +382,15 @@ class JudgeOptimizer:
         for _name, predictor in program.named_predictors():
             if hasattr(predictor, "demos") and predictor.demos:
                 for demo in predictor.demos:
-                    demos.append({
-                        "input": getattr(demo, "adf_expression", ""),
-                        "output": getattr(demo, "python_code", ""),
-                        "score": float(getattr(demo, "human_score", 1.0)),
-                    })
+                    demos.append(
+                        {
+                            "input": getattr(demo, "adf_expression", ""),
+                            "output": getattr(demo, "python_code", ""),
+                            "score": float(getattr(demo, "human_score", 1.0)),
+                        }
+                    )
             # Extract optimised extended signature instruction if available
-            if hasattr(predictor, "extended_signature") and hasattr(
-                predictor.extended_signature, "instructions"
-            ):
+            if hasattr(predictor, "extended_signature") and hasattr(predictor.extended_signature, "instructions"):
                 instructions = predictor.extended_signature.instructions
 
         calibration_examples = tuple(demos) if demos else ()
@@ -413,6 +410,7 @@ class JudgeOptimizer:
 # Convenience: auto-select best available calibrator
 # ---------------------------------------------------------------------------
 
+
 def create_calibrator(
     calibration_path: str | Path,
     provider: JudgeProvider | None = None,
@@ -428,6 +426,7 @@ def create_calibrator(
     """
     try:
         import dspy  # noqa: F401
+
         if provider is not None:
             return JudgeOptimizer(provider, optimizer=optimizer)
     except ImportError:

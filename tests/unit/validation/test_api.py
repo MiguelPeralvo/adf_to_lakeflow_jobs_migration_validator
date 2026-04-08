@@ -109,10 +109,7 @@ def test_post_validate_batch_returns_report(tmp_path):
     path = tmp_path / "pipelines.json"
     suite.to_json(str(path))
 
-    by_name = {
-        pipeline.adf_json["name"]: pipeline.expected_snapshot
-        for pipeline in suite.pipelines
-    }
+    by_name = {pipeline.adf_json["name"]: pipeline.expected_snapshot for pipeline in suite.pipelines}
 
     def convert_fn(adf_json: dict) -> ConversionSnapshot:
         return by_name[adf_json["name"]]

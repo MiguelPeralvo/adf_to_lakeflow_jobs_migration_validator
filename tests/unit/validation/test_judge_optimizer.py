@@ -23,6 +23,7 @@ from lakeflow_migration_validator.optimization.judge_optimizer import (
 # Stub provider for tests — no real LLM calls
 # ---------------------------------------------------------------------------
 
+
 class _StubProvider:
     """Mimics JudgeProvider without making network calls."""
 
@@ -38,6 +39,7 @@ class _StubProvider:
 # ---------------------------------------------------------------------------
 # CalibrationPair format tests
 # ---------------------------------------------------------------------------
+
 
 class TestCalibrationPairFormat:
     """Verify calibration pair schema and loading."""
@@ -81,23 +83,25 @@ class TestCalibrationPairFormat:
     def test_load_calibration_pairs_from_file(self, tmp_path: Path):
         path = tmp_path / "cal.json"
         path.write_text(
-            json.dumps({
-                "calibration_pairs": [
-                    {
-                        "adf_expression": "@add(1,2)",
-                        "python_code": "(1 + 2)",
-                        "human_score": 1.0,
-                        "category": "math",
-                        "notes": "perfect",
-                    },
-                    {
-                        "adf_expression": "@div(9,2)",
-                        "python_code": "(9 / 2)",
-                        "human_score": 0.5,
-                        "category": "math",
-                    },
-                ]
-            }),
+            json.dumps(
+                {
+                    "calibration_pairs": [
+                        {
+                            "adf_expression": "@add(1,2)",
+                            "python_code": "(1 + 2)",
+                            "human_score": 1.0,
+                            "category": "math",
+                            "notes": "perfect",
+                        },
+                        {
+                            "adf_expression": "@div(9,2)",
+                            "python_code": "(9 / 2)",
+                            "human_score": 0.5,
+                            "category": "math",
+                        },
+                    ]
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -120,11 +124,7 @@ class TestCalibrationPairFormat:
 
     def test_load_golden_set_calibration_pairs(self):
         """Verify the actual golden_sets/calibration_pairs.json is valid."""
-        golden_path = (
-            Path(__file__).resolve().parents[3]
-            / "golden_sets"
-            / "calibration_pairs.json"
-        )
+        golden_path = Path(__file__).resolve().parents[3] / "golden_sets" / "calibration_pairs.json"
         if not golden_path.exists():
             pytest.skip("calibration_pairs.json not found")
 
@@ -134,18 +134,12 @@ class TestCalibrationPairFormat:
         for pair in pairs:
             assert pair.adf_expression, "adf_expression must not be empty"
             assert pair.python_code, "python_code must not be empty"
-            assert 0.0 <= pair.human_score <= 1.0, (
-                f"human_score {pair.human_score} out of [0, 1] range"
-            )
+            assert 0.0 <= pair.human_score <= 1.0, f"human_score {pair.human_score} out of [0, 1] range"
             assert pair.category, "category should be set for golden data"
 
     def test_golden_set_has_score_diversity(self):
         """Golden set must include low, mid, and high scores for calibration."""
-        golden_path = (
-            Path(__file__).resolve().parents[3]
-            / "golden_sets"
-            / "calibration_pairs.json"
-        )
+        golden_path = Path(__file__).resolve().parents[3] / "golden_sets" / "calibration_pairs.json"
         if not golden_path.exists():
             pytest.skip("calibration_pairs.json not found")
 
@@ -160,6 +154,7 @@ class TestCalibrationPairFormat:
 # ---------------------------------------------------------------------------
 # ManualCalibrator tests
 # ---------------------------------------------------------------------------
+
 
 class TestManualCalibrator:
     """ManualCalibrator loads examples and produces improved judge."""
@@ -182,16 +177,18 @@ class TestManualCalibrator:
     def test_manual_calibrator_from_file(self, tmp_path: Path):
         path = tmp_path / "cal.json"
         path.write_text(
-            json.dumps({
-                "calibration_pairs": [
-                    {
-                        "adf_expression": "@add(1,2)",
-                        "python_code": "(1 + 2)",
-                        "human_score": 1.0,
-                        "category": "math",
-                    }
-                ]
-            }),
+            json.dumps(
+                {
+                    "calibration_pairs": [
+                        {
+                            "adf_expression": "@add(1,2)",
+                            "python_code": "(1 + 2)",
+                            "human_score": 1.0,
+                            "category": "math",
+                        }
+                    ]
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -278,6 +275,7 @@ class TestManualCalibrator:
 # JudgeOptimizer tests (DSPy not installed)
 # ---------------------------------------------------------------------------
 
+
 class TestJudgeOptimizerWithoutDSPy:
     """JudgeOptimizer must raise a helpful ImportError when DSPy is absent."""
 
@@ -309,21 +307,24 @@ class TestJudgeOptimizerWithoutDSPy:
 # create_calibrator fallback
 # ---------------------------------------------------------------------------
 
+
 class TestCreateCalibrator:
     """create_calibrator should fall back to ManualCalibrator without DSPy."""
 
     def test_returns_manual_calibrator_without_dspy(self, tmp_path: Path):
         path = tmp_path / "cal.json"
         path.write_text(
-            json.dumps({
-                "calibration_pairs": [
-                    {
-                        "adf_expression": "@add(1,2)",
-                        "python_code": "(1 + 2)",
-                        "human_score": 1.0,
-                    }
-                ]
-            }),
+            json.dumps(
+                {
+                    "calibration_pairs": [
+                        {
+                            "adf_expression": "@add(1,2)",
+                            "python_code": "(1 + 2)",
+                            "human_score": 1.0,
+                        }
+                    ]
+                }
+            ),
             encoding="utf-8",
         )
 

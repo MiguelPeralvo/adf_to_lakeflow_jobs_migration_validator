@@ -73,7 +73,11 @@ def _build_prepared_workflow(
             },
             notebooks=[NotebookArtifact(file_path="/nb/real.py", content="x = 1")] if include_notebook else None,
             secrets=(
-                [SecretInstruction(scope="scope1", key="key1", service_name=None, service_type=None, provided_value=None)]
+                [
+                    SecretInstruction(
+                        scope="scope1", key="key1", service_name=None, service_type=None, provided_value=None
+                    )
+                ]
                 if include_secret
                 else None
             ),

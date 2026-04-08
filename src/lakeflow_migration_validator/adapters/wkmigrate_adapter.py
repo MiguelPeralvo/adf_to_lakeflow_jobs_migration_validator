@@ -73,20 +73,14 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
         activities_top if activities_top is not None else source_pipeline.get("properties", {}).get("activities", [])
     )
     total_source_dependencies = sum(
-        len(activity.get("depends_on") or activity.get("dependsOn") or [])
-        for activity in adf_activities
+        len(activity.get("depends_on") or activity.get("dependsOn") or []) for activity in adf_activities
     )
 
     expressions = []
     for task in prepared.pipeline.tasks:
         variable_name = getattr(task, "variable_name", None)
         variable_value = getattr(task, "variable_value", None)
-        if (
-            isinstance(variable_name, str)
-            and variable_name
-            and isinstance(variable_value, str)
-            and variable_value
-        ):
+        if isinstance(variable_name, str) and variable_name and isinstance(variable_value, str) and variable_value:
             expressions.append(
                 ExpressionPair(
                     adf_expression=f"@variables('{variable_name}')",

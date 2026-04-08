@@ -22,7 +22,15 @@ from lakeflow_migration_validator.synthetic.expression_generator import Expressi
 
 _SUPPORTED_MODES = {"template", "llm", "adversarial", "custom"}
 _SUPPORTED_COMPLEXITIES = {"simple", "nested", "mixed"}
-_DEFAULT_ACTIVITY_TYPES = ("SetVariable", "IfCondition", "DatabricksNotebook", "Copy", "Lookup", "WebActivity", "ForEach")
+_DEFAULT_ACTIVITY_TYPES = (
+    "SetVariable",
+    "IfCondition",
+    "DatabricksNotebook",
+    "Copy",
+    "Lookup",
+    "WebActivity",
+    "ForEach",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +154,10 @@ class PipelineGenerator:
     @staticmethod
     def _type_properties(activity_name: str, activity_type: str, adf_expression: str) -> dict[str, Any]:
         if activity_type == "SetVariable":
-            return {"variable_name": f"{activity_name}_result", "value": {"type": "Expression", "value": adf_expression}}
+            return {
+                "variable_name": f"{activity_name}_result",
+                "value": {"type": "Expression", "value": adf_expression},
+            }
         if activity_type == "IfCondition":
             return {
                 # wkmigrate reads activity.get("expression") at top level.
@@ -278,7 +289,9 @@ class PipelineGenerator:
         pipeline_index: int,
         pipeline_name: str,
     ) -> ConversionSnapshot:
-        tasks = tuple(TaskSnapshot(task_key=f"task_{pipeline_index}_{i}", is_placeholder=False) for i in range(activity_count))
+        tasks = tuple(
+            TaskSnapshot(task_key=f"task_{pipeline_index}_{i}", is_placeholder=False) for i in range(activity_count)
+        )
         notebooks = tuple(
             NotebookSnapshot(
                 file_path=f"/notebooks/{pipeline_name}_{i}.py",
@@ -305,9 +318,7 @@ class PipelineGenerator:
         resolved_expressions = tuple(
             ExpressionPair(adf_expression=case.adf_expression, python_code=case.expected_python) for case in expressions
         )
-        expected_outputs = {
-            f"task_{pipeline_index}_{i}": expressions[i].expected_python for i in range(activity_count)
-        }
+        expected_outputs = {f"task_{pipeline_index}_{i}": expressions[i].expected_python for i in range(activity_count)}
         return ConversionSnapshot(
             tasks=tasks,
             notebooks=notebooks,
