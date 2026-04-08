@@ -140,10 +140,7 @@ def test_max_three_suggestions():
         "notebook_validity": 0.15,
         "parameter_completeness": 0.10,
     }
-    results = {
-        name: DimensionResult(name=name, score=0.1, passed=False, details={})
-        for name in weights
-    }
+    results = {name: DimensionResult(name=name, score=0.1, passed=False, details={}) for name in weights}
     scorecard = Scorecard.compute(weights, results)
 
     suggester = FixSuggester(_MockJudge(), weights=weights)

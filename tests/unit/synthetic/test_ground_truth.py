@@ -21,15 +21,14 @@ def test_json_roundtrip_preserves_pipeline_count(tmp_path):
 
     assert len(loaded.pipelines) == len(suite.pipelines)
     assert loaded.pipelines[0].description == suite.pipelines[0].description
-    assert loaded.pipelines[0].expected_snapshot.expected_outputs == suite.pipelines[0].expected_snapshot.expected_outputs
+    assert (
+        loaded.pipelines[0].expected_snapshot.expected_outputs == suite.pipelines[0].expected_snapshot.expected_outputs
+    )
 
 
 def test_evaluate_converter_reports_perfect_when_converter_matches_expected_snapshot():
     suite = GroundTruthSuite.generate(count=4, difficulty="simple")
-    by_name = {
-        pipeline.adf_json["name"]: pipeline.expected_snapshot
-        for pipeline in suite.pipelines
-    }
+    by_name = {pipeline.adf_json["name"]: pipeline.expected_snapshot for pipeline in suite.pipelines}
 
     def convert_fn(adf_json: dict) -> ConversionSnapshot:
         return by_name[adf_json["name"]]
@@ -44,10 +43,7 @@ def test_evaluate_converter_reports_perfect_when_converter_matches_expected_snap
 
 def test_evaluate_converter_detects_expression_mismatches():
     suite = GroundTruthSuite.generate(count=3, difficulty="simple")
-    by_name = {
-        pipeline.adf_json["name"]: pipeline.expected_snapshot
-        for pipeline in suite.pipelines
-    }
+    by_name = {pipeline.adf_json["name"]: pipeline.expected_snapshot for pipeline in suite.pipelines}
 
     def convert_fn(adf_json: dict) -> ConversionSnapshot:
         expected = by_name[adf_json["name"]]

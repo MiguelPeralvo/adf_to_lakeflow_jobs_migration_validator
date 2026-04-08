@@ -9,10 +9,7 @@ from lakeflow_migration_validator.synthetic.runner import run_synthetic_workflow
 
 def test_run_synthetic_workflow_reports_distribution_for_perfect_converter():
     suite = GroundTruthSuite.generate(count=8, difficulty="simple", max_activities=5)
-    by_name = {
-        pipeline.adf_json["name"]: pipeline.expected_snapshot
-        for pipeline in suite.pipelines
-    }
+    by_name = {pipeline.adf_json["name"]: pipeline.expected_snapshot for pipeline in suite.pipelines}
 
     def convert_fn(adf_json: dict) -> ConversionSnapshot:
         return by_name[adf_json["name"]]
@@ -28,10 +25,7 @@ def test_run_synthetic_workflow_reports_distribution_for_perfect_converter():
 
 def test_run_synthetic_workflow_triages_expression_failures():
     suite = GroundTruthSuite.generate(count=6, difficulty="simple", max_activities=5)
-    by_name = {
-        pipeline.adf_json["name"]: pipeline.expected_snapshot
-        for pipeline in suite.pipelines
-    }
+    by_name = {pipeline.adf_json["name"]: pipeline.expected_snapshot for pipeline in suite.pipelines}
 
     def convert_fn(adf_json: dict) -> ConversionSnapshot:
         expected = by_name[adf_json["name"]]

@@ -36,9 +36,7 @@ def test_nested_expression_complexity_generates_nested_expressions():
     pipelines = generator.generate(count=3, expression_complexity="nested", max_activities=4)
 
     flattened = [
-        pair.adf_expression
-        for synthetic in pipelines
-        for pair in synthetic.expected_snapshot.resolved_expressions
+        pair.adf_expression for synthetic in pipelines for pair in synthetic.expected_snapshot.resolved_expressions
     ]
     assert flattened
     assert all(expr.count("(") >= 3 for expr in flattened)

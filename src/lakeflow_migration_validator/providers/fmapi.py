@@ -57,7 +57,7 @@ class FMAPIJudgeProvider:
             except (URLError, TimeoutError, ValueError) as exc:
                 last_error = exc
                 if attempt < self.max_retries:
-                    backoff = min(0.5 * (2 ** attempt), 8.0)
+                    backoff = min(0.5 * (2**attempt), 8.0)
                     time.sleep(backoff)
                 continue
 
@@ -88,7 +88,7 @@ class FMAPIJudgeProvider:
             except (URLError, TimeoutError, ValueError) as exc:
                 last_error = exc
                 if attempt < self.max_retries:
-                    backoff = min(0.5 * (2 ** attempt), 8.0)
+                    backoff = min(0.5 * (2**attempt), 8.0)
                     time.sleep(backoff)
                 continue
 
@@ -122,8 +122,7 @@ def _extract_content(raw: dict[str, Any]) -> str:
         # content could be a list of content blocks (multimodal)
         if isinstance(content, list):
             return "".join(
-                block.get("text", "") for block in content
-                if isinstance(block, dict) and block.get("type") == "text"
+                block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
             )
         raise ValueError("FMAPI message content has unexpected type")
 
@@ -134,8 +133,7 @@ def _extract_content(raw: dict[str, Any]) -> str:
             return content
         if isinstance(content, list):
             return "".join(
-                block.get("text", "") for block in content
-                if isinstance(block, dict) and block.get("type") == "text"
+                block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
             )
         raise ValueError("FMAPI content has unexpected type")
 

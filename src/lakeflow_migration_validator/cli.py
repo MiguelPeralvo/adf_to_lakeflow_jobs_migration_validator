@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -81,6 +80,7 @@ def _auto_configure() -> None:
     if host and _JUDGE_PROVIDER is None:
         try:
             from lakeflow_migration_validator.providers.fmapi import FMAPIJudgeProvider
+
             token = os.environ.get("DATABRICKS_TOKEN")
             _JUDGE_PROVIDER = FMAPIJudgeProvider(
                 endpoint=f"{host.rstrip('/')}/serving-endpoints",
@@ -99,6 +99,7 @@ def _emit(data: Any) -> None:
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
 
 @app.command("validate")
 def validate_command(
@@ -119,7 +120,9 @@ def validate_command(
 
 @app.command("validate-folder")
 def validate_folder_command(
-    folder: Path = typer.Option(..., "--folder", exists=True, file_okay=False, help="Folder containing ADF pipeline JSONs"),
+    folder: Path = typer.Option(
+        ..., "--folder", exists=True, file_okay=False, help="Folder containing ADF pipeline JSONs"
+    ),
     threshold: float = typer.Option(90.0, "--threshold", help="CCS threshold for pass/fail"),
     glob_pattern: str = typer.Option("*.json", "--glob", help="Glob pattern for pipeline files"),
 ) -> None:
@@ -166,15 +169,17 @@ def validate_folder_command(
         cases.append({"pipeline_name": name, "score": score, "label": label, "below_threshold": is_below})
 
     mean = sum(scores) / len(scores) if scores else 0.0
-    _emit({
-        "total": len(cases),
-        "threshold": threshold,
-        "mean_score": round(mean, 1),
-        "min_score": round(min(scores), 1) if scores else 0.0,
-        "max_score": round(max(scores), 1) if scores else 0.0,
-        "below_threshold": below,
-        "cases": cases,
-    })
+    _emit(
+        {
+            "total": len(cases),
+            "threshold": threshold,
+            "mean_score": round(mean, 1),
+            "min_score": round(min(scores), 1) if scores else 0.0,
+            "max_score": round(max(scores), 1) if scores else 0.0,
+            "below_threshold": below,
+            "cases": cases,
+        }
+    )
 
 
 @app.command("synthetic")
@@ -194,8 +199,10 @@ def synthetic_command(
 
     if mode in ("llm", "custom") and _JUDGE_PROVIDER is not None:
         from lakeflow_migration_validator.synthetic.agent_generator import (
-            AgentPipelineGenerator, GenerationConfig,
+            AgentPipelineGenerator,
+            GenerationConfig,
         )
+
         weak_spots = ("nested_expressions",)
         if preset:
             _PRESET_MAP = {
@@ -277,12 +284,14 @@ def harness_command(
         typer.echo(json.dumps({"error": "harness runner not configured — set AZURE_* env vars"}))
         raise typer.Exit(code=2)
     result = _HARNESS_RUNNER.run(pipeline_name)
-    _emit({
-        "pipeline_name": result.pipeline_name,
-        "scorecard": result.scorecard.to_dict(),
-        "iterations": result.iterations,
-        "fix_suggestions": list(result.fix_suggestions),
-    })
+    _emit(
+        {
+            "pipeline_name": result.pipeline_name,
+            "scorecard": result.scorecard.to_dict(),
+            "iterations": result.iterations,
+            "fix_suggestions": list(result.fix_suggestions),
+        }
+    )
 
 
 @app.command("parallel-test")
@@ -311,22 +320,38 @@ def adf_download_command(
     subscription_id: str = typer.Option(None, "--subscription-id", envvar="AZURE_SUBSCRIPTION_ID"),
     resource_group: str = typer.Option(None, "--resource-group", envvar="AZURE_RESOURCE_GROUP"),
     output: Path | None = typer.Option(None, "--output", help="Output directory"),
-    pipeline_names: str | None = typer.Option(None, "--pipelines", help="Comma-separated pipeline names (default: all)"),
+    pipeline_names: str | None = typer.Option(
+        None, "--pipelines", help="Comma-separated pipeline names (default: all)"
+    ),
 ) -> None:
     """Download ADF pipelines from Azure Data Factory to a local folder."""
     import tempfile
     from datetime import datetime, timezone
 
-    missing = [k for k, v in {"tenant_id": tenant_id, "client_id": client_id, "client_secret": client_secret,
-                               "subscription_id": subscription_id, "resource_group": resource_group}.items() if not v]
+    missing = [
+        k
+        for k, v in {
+            "tenant_id": tenant_id,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+        }.items()
+        if not v
+    ]
     if missing:
         typer.echo(f"Missing credentials: {', '.join(missing)}. Set via --flags or AZURE_* env vars.", err=True)
         raise typer.Exit(code=2)
 
     from wkmigrate.clients.factory_client import FactoryClient
+
     client = FactoryClient(
-        tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
-        subscription_id=subscription_id, resource_group_name=resource_group, factory_name=factory_name,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
+        subscription_id=subscription_id,
+        resource_group_name=resource_group,
+        factory_name=factory_name,
     )
 
     names = pipeline_names.split(",") if pipeline_names else client.list_pipelines()
@@ -370,17 +395,31 @@ def adf_upload_command(
     name_prefix: str = typer.Option("", "--prefix", help="Prefix for uploaded pipeline names"),
 ) -> None:
     """Upload local ADF pipeline JSONs to an Azure Data Factory."""
-    missing = [k for k, v in {"tenant_id": tenant_id, "client_id": client_id, "client_secret": client_secret,
-                               "subscription_id": subscription_id, "resource_group": resource_group}.items() if not v]
+    missing = [
+        k
+        for k, v in {
+            "tenant_id": tenant_id,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+        }.items()
+        if not v
+    ]
     if missing:
         typer.echo(f"Missing credentials: {', '.join(missing)}", err=True)
         raise typer.Exit(code=2)
 
     from wkmigrate.clients.factory_client import FactoryClient
     from azure.mgmt.datafactory.models import PipelineResource
+
     client = FactoryClient(
-        tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
-        subscription_id=subscription_id, resource_group_name=resource_group, factory_name=factory_name,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
+        subscription_id=subscription_id,
+        resource_group_name=resource_group,
+        factory_name=factory_name,
     )
 
     subfolder_files = sorted(folder.glob("*/adf_pipeline.json"))
@@ -398,7 +437,10 @@ def adf_upload_command(
             props = adf_json.get("properties", adf_json)
             resource = PipelineResource(**props)
             client.management_client.pipelines.create_or_update(
-                client.resource_group_name, client.factory_name, name, resource,
+                client.resource_group_name,
+                client.factory_name,
+                name,
+                resource,
             )
             uploaded.append(name)
             typer.echo(f"  [{i+1}/{len(files)}] {name} ✓", err=True)
@@ -413,12 +455,14 @@ def adf_upload_command(
 def status_command() -> None:
     """Show which capabilities are available."""
     _auto_configure()
-    _emit({
-        "wkmigrate": _CONVERT_FN is not snapshot_from_adf_payload,
-        "judge": _JUDGE_PROVIDER is not None,
-        "harness": _HARNESS_RUNNER is not None,
-        "parallel": _PARALLEL_RUNNER is not None,
-    })
+    _emit(
+        {
+            "wkmigrate": _CONVERT_FN is not snapshot_from_adf_payload,
+            "judge": _JUDGE_PROVIDER is not None,
+            "harness": _HARNESS_RUNNER is not None,
+            "parallel": _PARALLEL_RUNNER is not None,
+        }
+    )
 
 
 @app.command("history")
@@ -429,6 +473,7 @@ def history_command(
     """Show activity history from the SQLite store."""
     _auto_configure()
     from lakeflow_migration_validator.api import HistoryStore
+
     store = HistoryStore()
     if pipeline_name:
         entries = store.get(pipeline_name)
@@ -440,6 +485,7 @@ def history_command(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_json(path: Path, option_name: str = "--adf-json") -> dict:
     raw = path.read_text(encoding="utf-8")

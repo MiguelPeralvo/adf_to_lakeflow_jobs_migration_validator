@@ -1,7 +1,5 @@
 """TDD tests for the top-level evaluate_pipeline function."""
 
-import pytest
-
 from lakeflow_migration_validator import evaluate, evaluate_full
 from lakeflow_migration_validator.scorecard import Scorecard
 from tests.unit.validation.conftest import (
@@ -40,11 +38,7 @@ def test_evaluate_perfect_pipeline_scores_above_90():
         tasks=[make_task("a"), make_task("b")],
         notebooks=[
             make_notebook(
-                content=(
-                    "dbutils.widgets.get('param1')\n"
-                    'dbutils.secrets.get(scope="scope1", key="key1")\n'
-                    "x = 1"
-                )
+                content=("dbutils.widgets.get('param1')\n" 'dbutils.secrets.get(scope="scope1", key="key1")\n' "x = 1")
             )
         ],
         secrets=[make_secret("scope1", "key1")],

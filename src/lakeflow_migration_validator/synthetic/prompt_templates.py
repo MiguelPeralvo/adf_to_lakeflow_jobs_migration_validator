@@ -25,7 +25,6 @@ nested ADF expressions. Each pipeline should:
 Output ONLY valid ADF pipeline JSON per pipeline. Each pipeline must have
 "name" and "properties.activities" fields.""",
     },
-
     "deep_nesting": {
         "label": "Deep Nesting",
         "icon": "account_tree",
@@ -42,7 +41,6 @@ Output ONLY valid ADF pipeline JSON per pipeline. Each pipeline must have
 
 Output ONLY valid ADF pipeline JSON.""",
     },
-
     "activity_mix": {
         "label": "Activity Mix",
         "icon": "dashboard",
@@ -59,7 +57,6 @@ Each pipeline should:
 
 Output ONLY valid ADF pipeline JSON.""",
     },
-
     "math_on_params": {
         "label": "Math on Parameters",
         "icon": "calculate",
@@ -77,7 +74,6 @@ dbutils.widgets.get() returns strings. Each pipeline should include expressions 
 
 Output ONLY valid ADF pipeline JSON.""",
     },
-
     "unsupported_types": {
         "label": "Unsupported Types",
         "icon": "warning",
@@ -93,7 +89,6 @@ unsupported activity types. This tests placeholder generation and activity_cover
 
 Output ONLY valid ADF pipeline JSON.""",
     },
-
     "pipeline_invocation": {
         "label": "Pipeline Invocation",
         "icon": "share",
@@ -116,7 +111,6 @@ execution contexts. Each pipeline should:
 
 Output ONLY valid ADF pipeline JSON.""",
     },
-
     "full_coverage": {
         "label": "Full Coverage",
         "icon": "verified",

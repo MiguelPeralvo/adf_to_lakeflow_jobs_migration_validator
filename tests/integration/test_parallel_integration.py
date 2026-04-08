@@ -34,10 +34,13 @@ def test_parallel_live_run_contract():
         pytest.skip(f"missing required env vars for live run: {missing}")
 
     def trigger(pipeline_name: str, parameters: dict[str, str]) -> str:
-        payload = _run_json_command(os.environ["LMV_PARALLEL_ADF_TRIGGER_CMD"], {
-            "pipeline_name": pipeline_name,
-            "parameters": parameters,
-        })
+        payload = _run_json_command(
+            os.environ["LMV_PARALLEL_ADF_TRIGGER_CMD"],
+            {
+                "pipeline_name": pipeline_name,
+                "parameters": parameters,
+            },
+        )
         run_id = str(payload.get("run_id", ""))
         if not run_id:
             raise RuntimeError("trigger command did not return run_id")

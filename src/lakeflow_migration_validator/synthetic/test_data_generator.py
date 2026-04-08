@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from lakeflow_migration_validator.dimensions.llm_judge import JudgeProvider
@@ -22,10 +22,10 @@ class SyntheticTestData:
     """Test data generated alongside a synthetic pipeline."""
 
     pipeline_name: str
-    source_files: dict[str, str]      # file_path → CSV/JSON content
-    seed_sql: tuple[str, ...]         # SQL statements to seed lookup sources
+    source_files: dict[str, str]  # file_path → CSV/JSON content
+    seed_sql: tuple[str, ...]  # SQL statements to seed lookup sources
     expected_outputs: dict[str, str]  # activity_name → expected output value
-    setup_instructions: str           # human-readable setup guide
+    setup_instructions: str  # human-readable setup guide
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,18 +70,14 @@ class TestDataGenerator:
                     path, content = file_data
                     source_files[path] = content
                     expected_outputs[act_name] = f"copied_{len(content)} bytes"
-                    instructions.append(
-                        f"Upload {path} to the source container for activity '{act_name}'"
-                    )
+                    instructions.append(f"Upload {path} to the source container for activity '{act_name}'")
 
             elif act_type == "Lookup":
                 sql, rows = _generate_lookup_data(activity)
                 if sql:
                     seed_sql.extend(sql)
                     expected_outputs[act_name] = json.dumps(rows[0] if rows else {})
-                    instructions.append(
-                        f"Run seed SQL for activity '{act_name}' against the source database"
-                    )
+                    instructions.append(f"Run seed SQL for activity '{act_name}' against the source database")
 
         if not instructions:
             instructions.append("No data-reading activities found — no test data needed")
@@ -123,13 +119,15 @@ def _generate_copy_source_data(activity: dict) -> tuple[str, str] | None:
     writer = csv.writer(output)
     writer.writerow(columns)
     for i in range(10):
-        writer.writerow([
-            i + 1,
-            f"record_{i+1}",
-            round(100.0 + i * 10.5, 2),
-            f"2026-01-{(i % 28) + 1:02d}",
-            ["A", "B", "C"][i % 3],
-        ])
+        writer.writerow(
+            [
+                i + 1,
+                f"record_{i+1}",
+                round(100.0 + i * 10.5, 2),
+                f"2026-01-{(i % 28) + 1:02d}",
+                ["A", "B", "C"][i % 3],
+            ]
+        )
 
     file_path = f"test_data/{act_name}_source.csv"
     return file_path, output.getvalue()

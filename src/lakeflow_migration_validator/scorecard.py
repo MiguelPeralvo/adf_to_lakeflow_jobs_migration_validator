@@ -20,11 +20,7 @@ class Scorecard:
         total_weight = sum(weights.get(name, 0) for name in results)
         if total_weight == 0:
             return cls(weights=weights, results=results, score=0.0)
-        raw = sum(
-            results[name].score * weights.get(name, 0)
-            for name in results
-            if name in weights
-        )
+        raw = sum(results[name].score * weights.get(name, 0) for name in results if name in weights)
         score = (raw / total_weight) * 100
         return cls(weights=weights, results=results, score=score)
 
@@ -45,7 +41,6 @@ class Scorecard:
             "score": self.score,
             "label": self.label,
             "dimensions": {
-                name: {"score": r.score, "passed": r.passed, "details": r.details}
-                for name, r in self.results.items()
+                name: {"score": r.score, "passed": r.passed, "details": r.details} for name, r in self.results.items()
             },
         }

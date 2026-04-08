@@ -75,4 +75,3 @@ def _triage_failures(report: Report) -> list[TriageFailure]:
             )
         )
     return triaged
-

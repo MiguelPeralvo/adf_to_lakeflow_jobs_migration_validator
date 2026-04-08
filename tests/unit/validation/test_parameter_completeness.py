@@ -9,11 +9,7 @@ from tests.unit.validation.conftest import make_notebook, make_snapshot
 def test_all_params_defined_scores_1():
     """Every dbutils.widgets.get reference has a matching JobParameterDefinition."""
     snapshot = make_snapshot(
-        notebooks=[
-            make_notebook(
-                content="x = dbutils.widgets.get('foo')\ny = dbutils.widgets.get('bar')"
-            )
-        ],
+        notebooks=[make_notebook(content="x = dbutils.widgets.get('foo')\ny = dbutils.widgets.get('bar')")],
         parameters=("foo", "bar"),
     )
 

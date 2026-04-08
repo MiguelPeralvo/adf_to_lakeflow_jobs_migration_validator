@@ -47,10 +47,14 @@ class LLMJudge:
     def _build_prompt(self, input: Any, output: Any) -> str:
         examples_block = ""
         if self.calibration_examples:
-            examples_block = "Examples:\n" + "\n".join(
-                f"- Input: {ex['input']}\n  Output: {ex['output']}\n  Score: {ex['score']}"
-                for ex in self.calibration_examples
-            ) + "\n\n"
+            examples_block = (
+                "Examples:\n"
+                + "\n".join(
+                    f"- Input: {ex['input']}\n  Output: {ex['output']}\n  Score: {ex['score']}"
+                    for ex in self.calibration_examples
+                )
+                + "\n\n"
+            )
 
         return (
             f"You are an evaluation judge. Score the following output on a scale of 0.0 to 1.0.\n\n"
