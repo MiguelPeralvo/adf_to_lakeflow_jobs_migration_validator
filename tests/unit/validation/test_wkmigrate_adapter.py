@@ -8,7 +8,10 @@ these tests break first (and only these tests break).
 import pytest
 
 from lakeflow_migration_validator import evaluate, evaluate_from_wkmigrate
-from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
+from lakeflow_migration_validator.adapters.wkmigrate_adapter import (
+    adf_to_snapshot,
+    from_wkmigrate,
+)
 from lakeflow_migration_validator.contract import DependencyRef
 from wkmigrate.models.ir.pipeline import Activity, Dependency, Pipeline, SetVariableActivity
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
@@ -184,12 +187,16 @@ def test_adapter_maps_dependencies():
 
 
 def test_adapter_maps_not_translatable():
-    """Pipeline.not_translatable list is preserved."""
+    """Pipeline.not_translatable list is preserved (alongside any L-F12 placeholder warnings)."""
     source, prepared = _build_prepared_workflow()
 
     snapshot = from_wkmigrate(source, prepared)
 
-    assert snapshot.not_translatable == ({"message": "unsupported expression"},)
+    # The pipeline-level warning is preserved verbatim
+    assert {"message": "unsupported expression"} in snapshot.not_translatable
+    # And the default fixture includes a placeholder activity, so a
+    # placeholder_activity warning is also present (L-F12)
+    assert any(nt.get("kind") == "placeholder_activity" for nt in snapshot.not_translatable)
 
 
 def test_adapter_maps_expression_pairs():
@@ -278,3 +285,125 @@ def test_roundtrip_evaluate_from_wkmigrate():
 
     assert wrapped.score == direct.score
     assert wrapped.to_dict() == direct.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# L-F12: placeholder activity surfacing
+# ---------------------------------------------------------------------------
+
+
+def test_placeholder_activity_surfaces_in_not_translatable():
+    """When an activity is mapped to /UNSUPPORTED_ADF_ACTIVITY, surface as not_translatable.
+
+    Pre-#27 wkmigrate (and any future case where a source ADF activity has no
+    real translator) silently substitutes a DatabricksNotebookActivity with
+    notebook_path=/UNSUPPORTED_ADF_ACTIVITY. The adapter should:
+      1) still mark the task as is_placeholder=True (existing behavior)
+      2) ALSO add an entry to not_translatable so dimensions can count it
+    """
+    source = {"activities": [{"name": "mystery", "type": "UnknownActivityType"}]}
+    pipeline = Pipeline(name="pipeline", parameters=None, schedule=None, tasks=[], tags={})
+    prepared = PreparedWorkflow(
+        pipeline=pipeline,
+        activities=[
+            PreparedActivity(
+                task={
+                    "task_key": "mystery",
+                    "notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"},
+                }
+            )
+        ],
+    )
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    # Existing behavior: task is marked as placeholder
+    assert len(snapshot.tasks) == 1
+    assert snapshot.tasks[0].is_placeholder is True
+
+    # New behavior: placeholder also surfaces as a not_translatable warning
+    placeholder_warnings = [nt for nt in snapshot.not_translatable if nt.get("kind") == "placeholder_activity"]
+    assert len(placeholder_warnings) == 1
+    warning = placeholder_warnings[0]
+    assert warning["task_key"] == "mystery"
+    assert "placeholder" in warning["message"].lower() or "unsupported" in warning["message"].lower()
+
+
+def test_placeholder_warnings_do_not_overwrite_pipeline_warnings():
+    """Pipeline.not_translatable warnings AND placeholder warnings both appear."""
+    source = {"activities": []}
+    pipeline = Pipeline(
+        name="pipeline",
+        parameters=None,
+        schedule=None,
+        tasks=[],
+        tags={},
+        not_translatable=[{"message": "pipeline-level warning", "property": "p"}],
+    )
+    prepared = PreparedWorkflow(
+        pipeline=pipeline,
+        activities=[
+            PreparedActivity(task={"task_key": "ph", "notebook_task": {"notebook_path": "/UNSUPPORTED_ADF_ACTIVITY"}})
+        ],
+    )
+
+    snapshot = from_wkmigrate(source, prepared)
+
+    messages = [nt.get("message", "") for nt in snapshot.not_translatable]
+    assert "pipeline-level warning" in messages
+    assert any("placeholder" in m.lower() or "unsupported" in m.lower() for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# L-F1: adf_to_snapshot one-shot helper that handles wrapped input
+# ---------------------------------------------------------------------------
+
+
+def test_adf_to_snapshot_handles_wrapped_azure_native_input():
+    """The wrapped {name, properties: {activities, ...}} shape produces a non-empty snapshot.
+
+    This is L-F1 — wkmigrate's translate_pipeline silently produces an empty IR
+    when given the wrapped Azure-native shape, but adf_to_snapshot unwraps
+    properties before calling translate_pipeline so the IR is non-empty.
+    """
+    wrapped = {
+        "name": "synthetic_pipe",
+        "properties": {
+            "activities": [
+                {
+                    "name": "set_var",
+                    "type": "SetVariable",
+                    "depends_on": [],
+                    "variable_name": "result",
+                    "value": {"type": "Expression", "value": "@concat('hello', 'world')"},
+                }
+            ],
+            "variables": {"result": {"type": "String"}},
+        },
+    }
+
+    snapshot = adf_to_snapshot(wrapped)
+
+    # The activity was found (non-empty tasks)
+    assert len(snapshot.tasks) > 0
+
+
+def test_adf_to_snapshot_handles_already_flat_input():
+    """Flat input {name, activities, ...} also works (idempotent unwrap)."""
+    flat = {
+        "name": "flat_pipe",
+        "activities": [
+            {
+                "name": "set_var",
+                "type": "SetVariable",
+                "depends_on": [],
+                "variable_name": "result",
+                "value": {"type": "Expression", "value": "@concat('a', 'b')"},
+            }
+        ],
+        "variables": {"result": {"type": "String"}},
+    }
+
+    snapshot = adf_to_snapshot(flat)
+
+    assert len(snapshot.tasks) > 0

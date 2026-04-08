@@ -58,19 +58,21 @@ def _auto_configure() -> None:
     global _CONVERT_FN, _JUDGE_PROVIDER
     if _CONVERT_FN is not snapshot_from_adf_payload:
         return  # already configured
-    # Try to build wkmigrate converter
+    # Try to build wkmigrate converter. The adapter module is importable
+    # even when wkmigrate isn't installed (the PreparedWorkflow import is
+    # behind TYPE_CHECKING for LA-3 graceful degradation), so an explicit
+    # `import wkmigrate` probe is needed here to detect a missing dep —
+    # otherwise `_CONVERT_FN` would be set to a `convert` function that
+    # explodes at runtime instead of falling back to the passthrough.
     try:
-        from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
-        from wkmigrate.preparers.preparer import prepare_workflow
-        from lakeflow_migration_validator.adapters.wkmigrate_adapter import from_wkmigrate
+        import wkmigrate  # noqa: F401  # availability probe; see comment above
+        from lakeflow_migration_validator.adapters.wkmigrate_adapter import adf_to_snapshot
         from lakeflow_migration_validator.serialization import snapshot_from_dict
 
         def convert(payload: dict) -> ConversionSnapshot:
             if "tasks" in payload and "notebooks" in payload:
                 return snapshot_from_dict(payload)
-            pipeline_ir = translate_pipeline(payload)
-            prepared = prepare_workflow(pipeline_ir)
-            return from_wkmigrate(payload, prepared)
+            return adf_to_snapshot(payload)
 
         _CONVERT_FN = convert
     except ImportError:
