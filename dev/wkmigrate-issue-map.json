@@ -182,7 +182,7 @@
       "area": "expressions",
       "priority": "P0",
       "upstream_issues": ["ghanse/wkmigrate#27 (deferred Lookup adoption to proposed wkmigrate#28)"],
-      "lmv_issue": null,
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#22",
       "status": "open",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
       "last_tested": {
@@ -207,7 +207,7 @@
       "area": "expressions",
       "priority": "P1",
       "upstream_issues": ["ghanse/wkmigrate#27 (deferred Copy adoption to proposed wkmigrate#28)"],
-      "lmv_issue": null,
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23",
       "status": "open",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
       "last_tested": {
@@ -232,7 +232,7 @@
       "area": "expressions",
       "priority": "P1",
       "upstream_issues": ["ghanse/wkmigrate#27"],
-      "lmv_issue": null,
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#24",
       "status": "open",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
       "last_tested": {
