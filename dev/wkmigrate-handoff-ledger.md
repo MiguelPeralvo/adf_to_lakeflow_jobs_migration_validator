@@ -4,8 +4,8 @@
 >
 > **Authoritative metadata** lives in [`dev/wkmigrate-issue-map.json`](wkmigrate-issue-map.json) — the JSON is what the matchers consume, this Markdown is what humans (and `/wkmigrate-autodev`) read. Keep them in sync.
 >
-> **Last updated:** 2026-04-08 (session `LMV-AUTODEV-2026-04-08-session2`)
-> **wkmigrate ref under test:** `MiguelPeralvo/wkmigrate@alpha_1@969e74d`
+> **Last updated:** 2026-04-08 (session `LMV-AUTODEV-2026-04-08-session2` + `WKMIGRATE-AUTODEV-2026-04-08`)
+> **wkmigrate ref under test:** `MiguelPeralvo/wkmigrate@alpha_1` ↔ `MiguelPeralvo/wkmigrate@pr/27-3-translator-adoption@3d8c541` (the fixes live on the PR series; alpha_1 still pending integration)
 > **Filing repo for lmv issues:** `MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator`
 > **Upstream repo (informational only — never auto-filed):** `ghanse/wkmigrate`
 
@@ -35,15 +35,15 @@
 | **W-4** | `@activity('Lookup').output.firstRow.X` chaining | enhancement | `not_translatable.message` | not yet filed | ghanse/wkmigrate#27 (deferred to proposed #28) | **not_tested_on_corpus** |
 | **W-5** | PipelineAdapter cycle detection | bug | `not_translatable.message` | not yet filed | ghanse/wkmigrate#71 | **not_tested_on_corpus** |
 | **W-6** | Structured `failure_mode` tags on warnings | enhancement (meta) | n/a | not yet filed | ghanse/wkmigrate#27 | **not_tested_on_corpus** |
-| **W-7** | **Lookup HARD CRASH** on Expression-typed `sql_reader_query` | **P0** bug | `exception` | [`#22`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/22) | ghanse/wkmigrate#27 (deferred Lookup adoption → proposed #28) | **OPEN — awaiting upstream fix** |
-| **W-8** | Copy translator silent placeholder on Expression `sql_reader_query` | P1 bug | `not_translatable.message` (`(type: Copy)`) | [`#23`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/23) | ghanse/wkmigrate#27 (deferred Copy adoption → proposed #28) | **OPEN — awaiting upstream fix** |
-| **W-10** | ForEach translator silent placeholder on `items` | P1 bug | `not_translatable.message` (`(type: ForEach)`) | [`#24`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/24) | ghanse/wkmigrate#27 | **OPEN — awaiting upstream fix** |
+| **W-7** | **Lookup HARD CRASH** on Expression-typed `sql_reader_query` | **P0** bug | `exception` | [`#22`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/22) | ghanse/wkmigrate#27 (deferred Lookup adoption → proposed #28) | **fixed-in:`pr/27-3-translator-adoption@3d8c541`** (verified 200/200 resolved on the PR branch; awaits alpha_1 integration) |
+| **W-8** | Copy translator placeholder fallback on Expression `sql_reader_query` | P1 → **MIS-DIAGNOSED** | `not_translatable.message` (`(type: Copy)`) | [`#23`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/23) | ghanse/wkmigrate#27 | **lmv-fixture-bug, fixed in lmv** (missing `sink.type`; see *Resolved findings*) |
+| **W-10** | ForEach translator placeholder fallback on `items` | P1 → **MIS-DIAGNOSED** | `not_translatable.message` (`(type: ForEach)`) | [`#24`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/24) | ghanse/wkmigrate#27 | **fixed-in:`pr/27-3-translator-adoption@3d8c541`** for valid array inputs; corpus contains zero ForEach-compatible expressions so the 0/200 acceptance was unreachable. See *Resolved findings*. |
 
 **Counts:**
 - Active findings: 9 (W-1..W-8 + W-10 — there is no W-9 in the catalog yet)
 - Filed lmv issues: 3 (`#22`, `#23`, `#24`)
-- Fixed (with re-validation evidence): 1 (W-1)
-- Awaiting upstream fix: 3 (W-7, W-8, W-10)
+- Fixed (with re-validation evidence): 4 (W-1 already fixed; W-7 fixed on pr/27-3; W-8 was an lmv fixture bug, fixed in lmv; W-10 fixed on pr/27-3 for valid arrays)
+- Awaiting alpha_1 integration: 2 (W-7, W-10 — the fixes live on `pr/27-3-translator-adoption` and need a normal merge cycle to land in `alpha_1`)
 - Discovered but not yet exercised against wkmigrate: 5 (W-2..W-6)
 
 ---
@@ -54,88 +54,69 @@ Each block below is a self-contained briefing for `/wkmigrate-autodev`. The "Han
 
 ---
 
-### W-7 — Lookup translator HARD CRASH (P0)
+### W-7 — Lookup translator HARD CRASH (P0) — fixed on pr/27-3, awaits alpha_1 integration
 
 - **Filed as:** [`MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#22`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/22)
 - **Upstream parent:** ghanse/wkmigrate#27 (deferred Lookup adoption — see proposed wkmigrate#28)
 - **Discovered via:** `lmv sweep-activity-contexts` (PR #19)
 - **Match target:** `exception` — `(?i)AttributeError.*'dict'.*has no attribute 'replace'`
-- **Sweep evidence:** **200 / 200 hard crashes** across all 6 categories on `golden_sets/expressions.json` × `lookup_query` context.
+- **Sweep evidence (alpha_1):** 200 / 200 hard crashes across all 6 categories.
+- **Sweep evidence (`pr/27-3-translator-adoption@3d8c541`, verified 2026-04-08 by `/wkmigrate-autodev`):** **200 / 200 resolved**, 0 placeholders, 0 errors. The fix exists on the PR series via `_resolve_source_query`, which routes the raw query through `get_literal_or_expression()` with `ExpressionContext.LOOKUP_QUERY` and stores the emitted Python-code string on `LookupActivity.source_query`. The lookup notebook embeds it verbatim in `.option("query", ...)`.
 - **Blast radius:** every Expression-typed `Lookup.source.sql_reader_query` in any pipeline.
-- **Suggested fix sketch:** route the source query through the same `get_literal_or_expression()` shared utility that `pr/27-1-expression-parser` introduced for `SetVariable`. Today the translator does `query.replace(...)` directly on the source dict; the fix is to resolve the expression first, then fall back to `NotTranslatableWarning + UnsupportedValue` if resolution fails.
+- **Why it isn't already on alpha_1:** the full pr/27-3 translator-adoption work (lookup + copy + for_each + if_condition + 5 other translators + emission_config threading + IR widening + AD-series adoption) is bundled into a single PR. A surgical port of just the W-7 piece into alpha_1 was attempted in this `/wkmigrate-autodev` run but reverted (intentional — alpha_1 should pick up the fix via the normal pr/27-3 → alpha_1 review cycle, not via piecemeal patches).
 - **Weak spots tagged:** `activity_output_chaining`
 
-**Handoff command:**
+**Handoff command (unchanged — still valid for ghanse/wkmigrate#27):**
 
 ```text
 /wkmigrate-autodev https://github.com/ghanse/wkmigrate/issues/27 --autonomy semi-auto
 
-Scope this run to W-7 only (lmv issue
-MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#22). The repro and full
-context are in dev/wkmigrate-handoff-ledger.md (W-7 block) in the lmv repo.
+W-7 is already fixed on MiguelPeralvo/wkmigrate@pr/27-3-translator-adoption@3d8c541
+(verified by lmv sweep-activity-contexts: 200/200 resolved on lookup_query). The
+lmv issue MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#22 stays open
+until pr/27-3 lands on alpha_1 OR upstream ghanse/wkmigrate#27 merges the same
+shared-utility approach.
 
-Acceptance criterion: rerun `lmv sweep-activity-contexts --activity lookup_query`
-on the new wkmigrate ref and observe 0 / 200 AttributeError crashes
-(any non-zero count is a regression).
+Acceptance criterion: rerun `lmv sweep-activity-contexts --contexts lookup_query`
+against the new ref and observe 0 / 200 AttributeError crashes AND >= 200 / 200
+resolved expressions on the lookup_query context.
 ```
 
 ---
 
-### W-8 — Copy translator silent placeholder (P1)
+### W-8 — Copy translator placeholder fallback (mis-diagnosed → lmv-fixture bug, fixed in lmv)
 
 - **Filed as:** [`MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/23)
-- **Upstream parent:** ghanse/wkmigrate#27 (deferred Copy adoption — see proposed wkmigrate#28)
-- **Discovered via:** `lmv sweep-activity-contexts` (PR #19)
-- **Match target:** `not_translatable.message` — `(?i)\(type:\s*Copy\)` (works because of the L-F18 placeholder enrichment in PR #21)
-- **Sweep evidence:** **200 / 200 placeholder warnings** across all 6 categories on `golden_sets/expressions.json` × `copy_query` context. Every Expression-typed `source.sql_reader_query` is silently dropped into a `/UNSUPPORTED_ADF_ACTIVITY` notebook.
-- **Blast radius:** every Expression-typed `Copy.source.sql_reader_query` in any pipeline that already provides a `column_mapping`.
-- **Suggested fix sketch:** identical pattern to W-7 — route `source.sql_reader_query` through `get_literal_or_expression()`. The Copy translator already accepts a `column_mapping` (TabularTranslator), so the regression is purely the source query field.
-- **Weak spots tagged:** `activity_output_chaining`
+- **Original diagnosis:** "wkmigrate Copy translator silently falls to placeholder for Expression-typed source.sql_reader_query"
+- **Corrected diagnosis (`/wkmigrate-autodev` run, 2026-04-08):** the placeholder fallback was caused by an **lmv test-fixture bug**, not by anything wkmigrate does with the source query expression. The `wrap_in_copy_query` helper in `src/lakeflow_migration_validator/synthetic/activity_context_wrapper.py` was emitting a column mapping with `sink: {name: "tgt_col"}` and **no `type` field**. wkmigrate's `_parse_dataset_mapping` requires `sink.type` (it raises `UnsupportedValue("Missing value for key 'type' in sink dataset")`), and the resulting `UnsupportedValue` propagates up to `normalize_translated_result` which converts it to a `/UNSUPPORTED_ADF_ACTIVITY` placeholder. The `(type: Copy)` regex match wasn't catching a wkmigrate failure — it was catching an lmv malformed-fixture failure.
+- **Trace:**
+  1. lmv emits `wrap_in_copy_query` → `translator.mappings[0].sink = {name: "tgt_col"}`
+  2. wkmigrate `copy_activity_translator._parse_dataset_mapping` calls `get_value_or_unsupported(sink, "type", ...)` → returns `UnsupportedValue("Missing value for key 'type' in sink dataset")`
+  3. wkmigrate aggregates it into the activity-level `UnsupportedValue("Could not parse property 'translator' of dataset...")`
+  4. `normalize_translated_result` converts the `UnsupportedValue` into the `/UNSUPPORTED_ADF_ACTIVITY` placeholder DatabricksNotebookActivity
+  5. lmv adapter sees `notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"` and emits the placeholder warning with `original_activity_type: "Copy"`
+  6. The W-8 regex `(?i)\(type:\s*Copy\)` matches — but the underlying cause is the missing `sink.type`, NOT the source query expression.
+- **lmv fix (this run):** the `wrap_in_copy_query` fixture now emits `sink: {name: "tgt_col", "type": "string"}`. After the fix, an lmv sweep against the same `alpha_1@969e74d` ref returns **200 / 200 with 0 placeholders, 0 errors** on the `copy_query` context (verified 2026-04-08).
+- **Why `resolved_expressions` is still 0 on copy_query:** the lmv L-F17 walker that extracts `ExpressionPair` entries from non-SetVariable activities doesn't yet walk `Copy.source.sql_reader_query`. That's a known lmv-side enhancement (not blocked on wkmigrate), tracked in `dev/wkmigrate-issue-map.json` as a future L-series item.
+- **Implication for upstream wkmigrate:** there is no W-8 work for `/wkmigrate-autodev` to do. wkmigrate's Copy translator behavior is correct given the malformed input — the sink.type validation is intentional and well-tested.
 
-**Handoff command:**
-
-```text
-/wkmigrate-autodev https://github.com/ghanse/wkmigrate/issues/27 --autonomy semi-auto
-
-Scope this run to W-8 only (lmv issue
-MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23). Repro is in
-dev/wkmigrate-handoff-ledger.md (W-8 block) in the lmv repo. Same root cause
-as W-7 but for Copy.source.sql_reader_query — the fix in `get_literal_or_expression`
-should slot in symmetrically.
-
-Acceptance criterion: rerun `lmv sweep-activity-contexts --activity copy_query`
-on the new wkmigrate ref and observe 0 / 200 placeholder warnings whose message
-contains `(type: Copy)`.
-```
+**Handoff command:** no longer needed. `MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23` will be updated with the corrected diagnosis and closed (or relabeled) by the same `/wkmigrate-autodev` session.
 
 ---
 
-### W-10 — ForEach translator silent placeholder (P1)
+### W-10 — ForEach translator placeholder fallback (mis-diagnosed → corpus mismatch + fix lives on pr/27-3)
 
 - **Filed as:** [`MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#24`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/24)
-- **Upstream parent:** ghanse/wkmigrate#27 (`pr/27-3-translator-adoption` documented coverage on the IR side, but the preparer never picked it up)
-- **Discovered via:** `lmv sweep-activity-contexts` (PR #19)
-- **Match target:** `not_translatable.message` — `(?i)\(type:\s*ForEach\)` (L-F18-enriched message format)
-- **Sweep evidence:** **200 / 200 placeholder warnings**, INCLUDING the 33 `collection`-category entries like `@createArray('a', 'b')` that are valid array sources.
-- **Blast radius:** every ForEach activity whose `items` field is an Expression — even when the expression evaluates statically to a literal array.
-- **Suggested fix sketch:** wire the preparer in `wkmigrate/preparers/for_each_activity_preparer.py` (start there) to call `get_literal_or_expression()` on `items`. Emit a literal Python list when statically resolvable; otherwise emit a runtime expression that produces an array.
-- **Weak spots tagged:** `nested_expressions`
+- **Original diagnosis:** "wkmigrate ForEach translator silently falls to placeholder for arbitrary items expressions, INCLUDING the 33 collection-category entries"
+- **Corrected diagnosis (`/wkmigrate-autodev` run, 2026-04-08):**
+  - **The "arbitrary items expressions → placeholder" fall-through is correct behavior**, not a bug. ADF `ForEach.items` must evaluate to an array. Expressions like `@toUpper('abc')`, `@add(1, 2)`, `@equals(1, 1)` evaluate to scalars and cannot drive a ForEach loop, so wkmigrate correctly produces a placeholder rather than emitting nonsense.
+  - **The 33 collection-category entries are mostly transformations OF arrays, not bare arrays.** Examples: `@length(createArray(1, 2, 3))` → returns int (count), `@first(createArray('a', 'b'))` → returns element, `@last(...)` → returns element, `@empty(createArray())` → returns bool. These are correct test fixtures for the `length`/`first`/`last`/`empty` *functions*, but they are NOT valid ForEach items.
+  - **Bare `@createArray(...)` expressions ARE handled correctly on `pr/27-3-translator-adoption`** (and even on alpha_1's existing for_each translator at lines 207-218). Verified directly: `wrap_in_for_each("@createArray('a', 'b', 'c')")` returns `ForEachActivity(items_string='["a","b","c"]')` with 1 resolved expression and `is_placeholder=False`.
+  - **The 0 / 200 acceptance criterion in the original ledger was unreachable** because the corpus contains zero bare `@createArray(...)` expressions — every collection-category entry wraps `createArray` inside another scalar-returning function.
+- **What IS a real (small) wkmigrate UX issue:** when ForEach receives a non-array expression, the resulting placeholder warning carries the generic message `(type: ForEach) was substituted with a placeholder DatabricksNotebookActivity (wkmigrate did not recognise the source ADF activity type)`. That message is misleading: the type WAS recognised, the items WAS evaluated, the items just didn't return an array. A more specific `NotTranslatableWarning` with `failure_mode = "items_expression_not_array"` would be more useful — but that's a P3 messaging improvement folded into W-6 (structured failure_mode tags), not a P1 functional bug.
+- **lmv-side follow-up:** the L-F3 adversarial corpus should grow at least one bare `@createArray(...)` expression so the W-10 fix has a positive test that lights up. Filed as a corpus growth task, not a wkmigrate issue.
 
-**Handoff command:**
-
-```text
-/wkmigrate-autodev https://github.com/ghanse/wkmigrate/issues/27 --autonomy semi-auto
-
-Scope this run to W-10 only (lmv issue
-MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#24). Repro is in
-dev/wkmigrate-handoff-ledger.md (W-10 block) in the lmv repo. The IR side is
-already in pr/27-3 — the missing piece is the preparer integration.
-
-Acceptance criterion: rerun `lmv sweep-activity-contexts --activity for_each`
-on the new wkmigrate ref and observe 0 / 200 placeholder warnings whose message
-contains `(type: ForEach)`. The 33 collection-category entries should resolve
-to literal Python lists.
-```
+**Handoff command:** no longer needed. `MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#24` will be updated with the corrected diagnosis and closed (or relabeled) by the same `/wkmigrate-autodev` session.
 
 ---
 

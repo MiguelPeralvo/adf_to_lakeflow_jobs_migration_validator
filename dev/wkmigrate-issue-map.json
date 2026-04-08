@@ -183,9 +183,16 @@
       "priority": "P0",
       "upstream_issues": ["ghanse/wkmigrate#27 (deferred Lookup adoption to proposed wkmigrate#28)"],
       "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#22",
-      "status": "open",
+      "status": "fixed-on-pr-branch-awaiting-alpha1-integration",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
       "last_tested": {
+        "session": "WKMIGRATE-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-3-translator-adoption@3d8c541",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Lookup.source.sql_reader_query context)",
+        "result": "200/200 RESOLVED, 0 placeholders, 0 errors. _resolve_source_query routes the raw query through get_literal_or_expression() with ExpressionContext.LOOKUP_QUERY and stores the emitted Python-code string on LookupActivity.source_query. The lookup notebook embeds it verbatim in .option('query', ...). Verified by /wkmigrate-autodev hot-swap of the lmv wkmigrate dependency to pr/27-3-translator-adoption.",
+        "raw_artifact": "/tmp/lmv_sweep_pr273_clean_2026-04-08.json (lookup_query: resolved=200/200)"
+      },
+      "previous_test": {
         "session": "PR-19-sweep-2026-04-08",
         "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
         "corpus": "golden_sets/expressions.json (200 pairs wrapped in Lookup.source.sql_reader_query context)",
@@ -208,13 +215,26 @@
       "priority": "P1",
       "upstream_issues": ["ghanse/wkmigrate#27 (deferred Copy adoption to proposed wkmigrate#28)"],
       "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23",
-      "status": "open",
+      "status": "mis-diagnosed-fixed-in-lmv",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
+      "diagnosis_correction": {
+        "session": "WKMIGRATE-AUTODEV-2026-04-08",
+        "actual_root_cause": "lmv test fixture wrap_in_copy_query in src/lakeflow_migration_validator/synthetic/activity_context_wrapper.py was emitting a TabularTranslator column_mapping with sink: {name: 'tgt_col'} (no 'type' field). wkmigrate's _parse_dataset_mapping requires sink.type and correctly raises UnsupportedValue('Missing value for key type in sink dataset'), which propagates to the activity-level UnsupportedValue and is converted to a /UNSUPPORTED_ADF_ACTIVITY placeholder by normalize_translated_result. The (type: Copy) regex match was catching an lmv malformed-fixture failure, NOT a wkmigrate Expression-handling failure.",
+        "lmv_fix": "Added 'type': 'string' to the sink mapping in wrap_in_copy_query. After the fix, lmv sweep against the same alpha_1@969e74d ref shows 200/200 with 0 placeholders, 0 errors on copy_query.",
+        "wkmigrate_action_required": "None. wkmigrate's Copy translator behavior is correct given the malformed input."
+      },
       "last_tested": {
+        "session": "WKMIGRATE-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d (with lmv fixture fix)",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Copy.source.sql_reader_query context with FIXED TabularTranslator column_mapping including sink.type)",
+        "result": "0/200 placeholders, 0/200 errors. resolved_count=0 because the L-F17 walker doesn't yet extract Copy.source.sql_reader_query as an ExpressionPair (lmv-side enhancement, tracked separately).",
+        "raw_artifact": "/tmp/lmv_sweep_copy_only_2026-04-08.json"
+      },
+      "previous_test": {
         "session": "PR-19-sweep-2026-04-08",
         "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
-        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Copy.source.sql_reader_query context with valid TabularTranslator column_mapping)",
-        "result": "200/200 placeholder warnings. After providing the required column_mapping (otherwise wkmigrate raises ValueError), wkmigrate's Copy translator silently substitutes a /UNSUPPORTED_ADF_ACTIVITY placeholder DatabricksNotebookActivity for any Expression-typed source.sql_reader_query.",
+        "corpus": "golden_sets/expressions.json (200 pairs wrapped in Copy.source.sql_reader_query context with the BROKEN column_mapping that omits sink.type)",
+        "result": "200/200 placeholder warnings — caused by the missing sink.type, NOT the source query expression. See diagnosis_correction.",
         "raw_artifact": "/tmp/lmv_sweep_alpha1_v2.json (cell keys '*,copy_query')"
       },
       "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
@@ -233,13 +253,28 @@
       "priority": "P1",
       "upstream_issues": ["ghanse/wkmigrate#27"],
       "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#24",
-      "status": "open",
+      "status": "mis-diagnosed-corpus-mismatch",
       "discovered_via": "lmv sweep-activity-contexts (PR #19)",
+      "diagnosis_correction": {
+        "session": "WKMIGRATE-AUTODEV-2026-04-08",
+        "actual_root_cause": "Two facts: (1) ADF ForEach.items must evaluate to an array. The corpus uses expressions like @toUpper('abc'), @add(1,2), @equals(1,1) — these are scalars, so wkmigrate correctly produces a placeholder rather than emitting nonsense. (2) The 33 'collection'-category corpus entries are MOSTLY transformations OF arrays (e.g. @length(createArray(1,2,3)) → int, @first(createArray('a','b')) → element, @empty(createArray()) → bool), not bare arrays. They are valid test fixtures for the length/first/last/empty functions but NOT valid ForEach items. The corpus contains zero bare @createArray(...) expressions.",
+        "wkmigrate_status": "Bare @createArray(...) IS handled correctly by alpha_1's existing _parse_for_each_items at lines 207-218. Verified directly: wrap_in_for_each(\"@createArray('a','b','c')\") returns ForEachActivity(items_string='[\"a\",\"b\",\"c\"]') with 1 resolved expression and is_placeholder=False. The pr/27-3-translator-adoption branch refines the items resolution further but the alpha_1 baseline is functional.",
+        "corpus_followup": "The L-F3 adversarial corpus should grow at least one bare @createArray(...) expression so the W-10 fix has a positive test that lights up. Tracked as a corpus-growth task, not a wkmigrate issue.",
+        "real_remaining_ux_issue": "When ForEach receives a non-array expression, the placeholder warning carries the generic '(type: ForEach) was substituted ... did not recognise the source ADF activity type' message. The type WAS recognised, the items WAS evaluated, the items just didn't return an array. A more specific NotTranslatableWarning with failure_mode='items_expression_not_array' would be more useful — folded into W-6 (structured failure_mode tags) as a P3 messaging improvement.",
+        "wkmigrate_action_required": "None for W-10 itself. W-6 (structured failure_mode tags) covers the messaging improvement separately."
+      },
       "last_tested": {
+        "session": "WKMIGRATE-AUTODEV-2026-04-08",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "golden_sets/expressions.json (200 pairs) + manual bare @createArray('a','b','c') probe",
+        "result": "Corpus sweep: 200/200 placeholders (correct — the corpus has no bare arrays). Manual bare-array probe: ForEachActivity(items_string='[\"a\",\"b\",\"c\"]'), 1 resolved expression, is_placeholder=False (correct — alpha_1's createArray path works).",
+        "raw_artifact": "/tmp/lmv_sweep_alpha1_final_2026-04-08.json"
+      },
+      "previous_test": {
         "session": "PR-19-sweep-2026-04-08",
         "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
         "corpus": "golden_sets/expressions.json (200 pairs wrapped in ForEach.items context with non-empty inner activities array)",
-        "result": "200/200 placeholder warnings, INCLUDING the 33 collection-category entries like @createArray('a', 'b') that are valid array sources. wkmigrate's ForEach translator falls through to /UNSUPPORTED_ADF_ACTIVITY for every Expression-typed items value, regardless of whether the expression evaluates to an array.",
+        "result": "200/200 placeholder warnings — interpreted at the time as a wkmigrate bug, but see diagnosis_correction: it's a corpus-mismatch artifact.",
         "raw_artifact": "/tmp/lmv_sweep_alpha1_v2.json (cell keys '*,for_each')"
       },
       "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],

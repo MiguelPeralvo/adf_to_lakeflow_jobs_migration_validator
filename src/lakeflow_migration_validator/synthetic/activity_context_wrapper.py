@@ -224,8 +224,15 @@ def wrap_in_copy_query(adf_expression: str, name: str = "expr_test") -> dict[str
                     "type": "TabularTranslator",
                     "mappings": [
                         {
+                            # wkmigrate's _parse_dataset_mapping requires sink.type
+                            # (otherwise the Copy activity becomes UnsupportedValue,
+                            # not because of the source.sql_reader_query at all). The
+                            # original W-8 finding mistakenly attributed the resulting
+                            # placeholder to the Expression-typed sql_reader_query path
+                            # — providing a sink.type unblocks the Copy translator and
+                            # lets the sweep actually exercise the source query field.
                             "source": {"name": "src_col"},
-                            "sink": {"name": "tgt_col"},
+                            "sink": {"name": "tgt_col", "type": "string"},
                         }
                     ],
                 },
