@@ -16,7 +16,12 @@ from lakeflow_migration_validator.synthetic.ground_truth import GroundTruthSuite
 from lakeflow_migration_validator import evaluate
 from tests.unit.validation.conftest import make_notebook, make_snapshot, make_task
 
-runner = CliRunner(mix_stderr=False)
+try:
+    # Click 8.x supports mix_stderr=False to keep stderr separate from stdout.
+    # Click 9.x removed the kwarg and separates streams by default.
+    runner = CliRunner(mix_stderr=False)
+except TypeError:
+    runner = CliRunner()
 
 
 def test_validate_writes_scorecard_json(tmp_path):
