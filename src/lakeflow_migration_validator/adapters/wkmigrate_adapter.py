@@ -5,9 +5,7 @@ If wkmigrate renames a field or restructures a class, only this file breaks.
 
 from __future__ import annotations
 
-from typing import Any
-
-from wkmigrate.models.workflows.artifacts import PreparedWorkflow
+from typing import TYPE_CHECKING, Any
 
 from lakeflow_migration_validator.contract import (
     ConversionSnapshot,
@@ -17,6 +15,14 @@ from lakeflow_migration_validator.contract import (
     SecretRef,
     TaskSnapshot,
 )
+
+if TYPE_CHECKING:
+    # Type-checker-only import: keeps the adapter module importable in
+    # environments where wkmigrate isn't installed (LA-3 graceful
+    # degradation). Runtime callers of from_wkmigrate / adf_to_snapshot
+    # still need wkmigrate, but `import lakeflow_migration_validator.adapters.wkmigrate_adapter`
+    # itself does not.
+    from wkmigrate.models.workflows.artifacts import PreparedWorkflow
 
 _PLACEHOLDER_PATH = "/UNSUPPORTED_ADF_ACTIVITY"
 
