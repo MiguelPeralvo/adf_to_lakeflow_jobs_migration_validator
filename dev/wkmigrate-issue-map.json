@@ -252,9 +252,10 @@
       "area": "expressions",
       "priority": "P1",
       "upstream_issues": ["ghanse/wkmigrate#27 (deferred Copy adoption to proposed wkmigrate#28)"],
-      "lmv_issue": null,
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#29",
       "status": "open",
-      "discovered_via": "L-F19 dropped-expression-field detector (PR D follow-up to W-8 mis-diagnosis)",
+      "discovered_via": "L-F19 dropped-expression-field detector (lmv PR #27, commit a8a6397)",
+      "filed_via": "/lmv-autodev Phase 1.5 on 2026-04-09",
       "diagnosis": {
         "session": "LMV-AUTODEV-2026-04-09",
         "root_cause": "wkmigrate's parsers/dataset_parsers.py::_parse_sql_format_options builds CopyActivity.source_properties from a fixed key list (type, query_isolation_level, query_timeout_seconds, numPartitions, batchsize, sessionInitStatement, mode) that does NOT include sql_reader_query. The query — literal OR Expression — is silently lost the moment translate_copy_activity runs. The Copy preparer then generates a JDBC read with no query, which would either pull the entire table or omit the WHERE clause depending on downstream code.",
