@@ -4,7 +4,7 @@
 >
 > **Authoritative metadata** lives in [`dev/wkmigrate-issue-map.json`](wkmigrate-issue-map.json) — the JSON is what the matchers consume, this Markdown is what humans (and `/wkmigrate-autodev`) read. Keep them in sync.
 >
-> **Last updated:** 2026-04-08 (session `LMV-AUTODEV-2026-04-08-session2` + `WKMIGRATE-AUTODEV-2026-04-08`)
+> **Last updated:** 2026-04-09 (session `LMV-AUTODEV-2026-04-09` — adds **W-9** discovered via L-F19 detector)
 > **wkmigrate ref under test:** `MiguelPeralvo/wkmigrate@alpha_1` ↔ `MiguelPeralvo/wkmigrate@pr/27-3-translator-adoption@3d8c541` (the fixes live on the PR series; alpha_1 still pending integration)
 > **Filing repo for lmv issues:** `MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator`
 > **Upstream repo (informational only — never auto-filed):** `ghanse/wkmigrate`
@@ -37,14 +37,16 @@
 | **W-6** | Structured `failure_mode` tags on warnings | enhancement (meta) | n/a | not yet filed | ghanse/wkmigrate#27 | **not_tested_on_corpus** |
 | **W-7** | **Lookup HARD CRASH** on Expression-typed `sql_reader_query` | **P0** bug | `exception` | [`#22`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/22) | ghanse/wkmigrate#27 (deferred Lookup adoption → proposed #28) | **fixed-in:`pr/27-3-translator-adoption@3d8c541`** (verified 200/200 resolved on the PR branch; awaits alpha_1 integration) |
 | **W-8** | Copy translator placeholder fallback on Expression `sql_reader_query` | P1 → **MIS-DIAGNOSED** | `not_translatable.message` (`(type: Copy)`) | [`#23`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/23) | ghanse/wkmigrate#27 | **lmv-fixture-bug, fixed in lmv** (missing `sink.type`; see *Resolved findings*) |
+| **W-9** | Copy translator drops `source.sql_reader_query` in `_parse_sql_format_options` | **P1** bug | `not_translatable.message` (`dropped_expression_field` from L-F19) | not yet filed | ghanse/wkmigrate#27 (deferred Copy adoption → proposed #28) | **open** — discovered after the W-8 fixture fix unblocked the Copy path; affects both alpha_1 and pr/27-3 |
 | **W-10** | ForEach translator placeholder fallback on `items` | P1 → **MIS-DIAGNOSED** | `not_translatable.message` (`(type: ForEach)`) | [`#24`](https://github.com/MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator/issues/24) | ghanse/wkmigrate#27 | **fixed-in:`pr/27-3-translator-adoption@3d8c541`** for valid array inputs; corpus contains zero ForEach-compatible expressions so the 0/200 acceptance was unreachable. See *Resolved findings*. |
 
 **Counts:**
-- Active findings: 9 (W-1..W-8 + W-10 — there is no W-9 in the catalog yet)
-- Filed lmv issues: 3 (`#22`, `#23`, `#24`)
+- Active findings: 10 (W-1..W-10)
+- Filed lmv issues: 3 (`#22`, `#23`, `#24`) — W-9 awaits filing
 - Fixed (with re-validation evidence): 4 (W-1 already fixed; W-7 fixed on pr/27-3; W-8 was an lmv fixture bug, fixed in lmv; W-10 fixed on pr/27-3 for valid arrays)
 - Awaiting alpha_1 integration: 2 (W-7, W-10 — the fixes live on `pr/27-3-translator-adoption` and need a normal merge cycle to land in `alpha_1`)
 - Discovered but not yet exercised against wkmigrate: 5 (W-2..W-6)
+- Newly discovered this session (not yet handed off): 1 (W-9 — uncovered by L-F19 detector that fires when wkmigrate silently drops an expression-bearing field)
 
 ---
 
@@ -101,6 +103,64 @@ resolved expressions on the lookup_query context.
 - **Implication for upstream wkmigrate:** there is no W-8 work for `/wkmigrate-autodev` to do. wkmigrate's Copy translator behavior is correct given the malformed input — the sink.type validation is intentional and well-tested.
 
 **Handoff command:** no longer needed. `MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#23` will be updated with the corrected diagnosis and closed (or relabeled) by the same `/wkmigrate-autodev` session.
+
+---
+
+### W-9 — Copy translator silently drops `source.sql_reader_query` (P1, newly discovered 2026-04-09)
+
+- **Filed as:** *not yet filed* — discovered after the W-8 fixture fix unblocked the Copy translation path.
+- **Upstream parent:** ghanse/wkmigrate#27 (deferred Copy adoption — proposed wkmigrate#28)
+- **Discovered via:** **L-F19 dropped-expression-field detector** in `src/lakeflow_migration_validator/adapters/wkmigrate_adapter.py::_detect_dropped_expression_fields` (this session). The detector emits a synthetic `not_translatable` warning of kind `dropped_expression_field` whenever the source ADF dict has `Copy.source.sql_reader_query` as an Expression (or a literal) but the IR-side `CopyActivity.source_properties` is missing the `sql_reader_query` key.
+- **Match target:** `not_translatable.message` — `(?i)dropped_expression_field.*Copy.*sql_reader_query|_parse_sql_format_options dropped`
+- **Root cause:** wkmigrate's `parsers/dataset_parsers.py::_parse_sql_format_options` builds `CopyActivity.source_properties` from a fixed key list — `type`, `query_isolation_level`, `query_timeout_seconds`, `numPartitions`, `batchsize`, `sessionInitStatement`, `mode`. **It does not include `sql_reader_query`.** The query (literal OR Expression) is silently lost the moment `translate_copy_activity` runs. The Copy preparer then generates a JDBC read with no query, which would either pull the entire table or omit the `WHERE` clause depending on downstream code.
+- **Distinction from W-7:** W-7 is the Lookup translator hard-crashing on Expression `sql_reader_query` (`'dict' object has no attribute 'replace'`). W-9 is the Copy translator silently *dropping* the query (literal or Expression) without crashing or warning. **Different code paths, different fixes.**
+- **Distinction from W-8:** W-8 was an lmv fixture bug (missing `sink.type`) that produced a misleading placeholder. W-9 is the real wkmigrate gap that the W-8 fixture fix unblocked us to see.
+- **Sweep evidence:** verified end-to-end via `wrap_in_copy_query` → `adf_to_snapshot` → `expression_coverage` drops to **0.0 (measurable=True)** with **1 dropped_expression_field warning** per Copy activity. Pinned by `tests/unit/validation/test_wkmigrate_adapter_lf17.py::test_adapter_emits_dropped_field_warning_for_copy_with_expression_sql_reader_query`. The same drop exists on `pr/27-3-translator-adoption` — the W-9 gap is independent of the W-7 fix.
+- **Blast radius:** every Copy activity with a `source.sql_reader_query` (literal or Expression) in any pipeline. ADF Copy activities with `AzureSqlSource` / `AzurePostgreSqlSource` / `AzureMySqlSource` / `OracleSource` that use a custom query (not just a table reference) all hit this gap.
+- **Suggested fix sketch:** extend `_parse_sql_format_options` in `wkmigrate/parsers/dataset_parsers.py` to extract `sql_reader_query` from the source definition. For literal strings, store directly. For `{type: Expression, value: ...}` dicts, route through `get_literal_or_expression()` with an appropriate `ExpressionContext` (analogous to `ExpressionContext.LOOKUP_QUERY` introduced in pr/27-1). Then have the Copy preparer / code generator embed the resolved query in the JDBC read expression's `WHERE` clause.
+- **Acceptance criterion (post-fix):** rerun `lmv sweep-activity-contexts --contexts copy_query` against the new wkmigrate ref and observe **0 / 200 dropped_expression_field warnings** AND **>= 200 / 200 resolved expressions** on the `copy_query` cell. Lmv-side, the L-F17 walker should also be extended to extract the new `CopyActivity.source_properties["sql_reader_query"]` field as a regular `ExpressionPair` once wkmigrate exposes it (test `test_adapter_skips_dropped_field_warning_for_copy_when_ir_already_has_sql_reader_query` already pins the contract for that future state).
+- **Weak spots tagged:** `activity_output_chaining`
+
+**Handoff command (after the lmv issue is filed via `/lmv-autodev` Phase 1.5):**
+
+```text
+/wkmigrate-autodev https://github.com/ghanse/wkmigrate/issues/27 --autonomy semi-auto
+
+Scope this run to W-9 — Copy.source.sql_reader_query is silently dropped by
+_parse_sql_format_options in wkmigrate/parsers/dataset_parsers.py. Both literal
+strings and Expression dicts are lost; the resulting CopyActivity has no
+sql_reader_query in source_properties and the generated JDBC read has no
+WHERE clause.
+
+Failure signature (lmv L-F19 detector):
+  (?i)dropped_expression_field.*Copy.*sql_reader_query|_parse_sql_format_options dropped
+
+Match target: not_translatable.message (synthesised by lmv adapter, NOT a
+wkmigrate-emitted warning — wkmigrate currently emits NOTHING for this case,
+which is the entire problem).
+
+Sweep evidence: 200 / 200 dropped on the copy_query context (both alpha_1 and
+pr/27-3-translator-adoption). End-to-end verification pinned by
+tests/unit/validation/test_wkmigrate_adapter_lf17.py::test_adapter_emits_dropped_field_warning_for_copy_with_expression_sql_reader_query
+in the lmv repo.
+
+Suggested fix sketch: extend _parse_sql_format_options to extract sql_reader_query
+(literal → store directly; Expression dict → route through get_literal_or_expression
+with an ExpressionContext analogous to LOOKUP_QUERY from pr/27-1). Update the Copy
+preparer / code_generator.py to embed the resolved query in the JDBC read.
+
+Distinction from W-7 (Lookup): W-7 hard-crashes the preparer; W-9 silently
+drops the query at translate time and never reaches the preparer with the
+query in hand. The fix is in dataset_parsers.py + preparer wiring, not in
+copy_activity_translator.py.
+
+Acceptance criterion: rerun `lmv sweep-activity-contexts --contexts copy_query`
+on the new ref and observe 0 / 200 dropped_expression_field warnings AND
+>= 200 / 200 resolved expressions on the copy_query cell.
+
+Provenance: dev/wkmigrate-handoff-ledger.md (W-9 handoff block) +
+dev/wkmigrate-issue-map.json (W-9 failure_signature entry) in the lmv repo.
+```
 
 ---
 
