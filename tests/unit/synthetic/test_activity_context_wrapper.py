@@ -284,3 +284,130 @@ def test_sweep_skips_unknown_context_names():
     # Only set_variable was actually exercised
     assert "string,set_variable" in result["by_cell"]
     assert not any("imaginary_context" in k for k in result["by_cell"])
+
+
+# ---------------------------------------------------------------------------
+# Parameter-injection tests (corpus growth follow-up to L-F19)
+#
+# Pairs that reference @pipeline().parameters.X carry an optional
+# `referenced_params: [{name, type}]` array. Wrappers must inject these into
+# the synthetic pipeline's `parameters` block so wkmigrate's parameter
+# resolver can find them. Pairs without the field — including the entire
+# legacy expressions.json corpus — must continue to work unchanged.
+# ---------------------------------------------------------------------------
+
+
+def test_wrap_in_set_variable_omits_parameters_when_referenced_params_is_none():
+    """Backward compatibility: pairs with no referenced_params produce a
+    pipeline with NO `parameters` key, matching the legacy shape."""
+    pipe = wrap_in_set_variable("@concat('a', 'b')", referenced_params=None)
+    assert "parameters" not in pipe
+
+
+def test_wrap_in_set_variable_omits_parameters_when_referenced_params_is_empty_list():
+    """Empty list = same as None: no parameters block."""
+    pipe = wrap_in_set_variable("@concat('a', 'b')", referenced_params=[])
+    assert "parameters" not in pipe
+
+
+def test_wrap_in_set_variable_injects_parameters_block_when_referenced_params_present():
+    """When referenced_params is non-empty, the wrapper injects a
+    `parameters` block in wkmigrate's expected dict shape:
+    {paramName: {type: <ADFType>}}."""
+    pipe = wrap_in_set_variable(
+        "@pipeline().parameters.tableName",
+        referenced_params=[{"name": "tableName", "type": "String"}],
+    )
+    assert "parameters" in pipe
+    assert pipe["parameters"] == {"tableName": {"type": "String"}}
+
+
+def test_wrap_in_set_variable_injects_multiple_typed_parameters():
+    """Multiple referenced params build a multi-key parameters dict, each
+    carrying its own declared ADF type (String, Int, Float, Bool)."""
+    pipe = wrap_in_set_variable(
+        "@add(pipeline().parameters.qty, pipeline().parameters.price)",
+        referenced_params=[
+            {"name": "qty", "type": "Int"},
+            {"name": "price", "type": "Float"},
+        ],
+    )
+    assert pipe["parameters"] == {
+        "qty": {"type": "Int"},
+        "price": {"type": "Float"},
+    }
+
+
+def test_all_wrappers_accept_referenced_params_keyword():
+    """Every wrapper in ACTIVITY_CONTEXTS must accept the `referenced_params`
+    keyword so the sweep loop can call them uniformly. This test pins the
+    contract — adding a new wrapper without the keyword will break here."""
+    for context_name, wrap_fn in ACTIVITY_CONTEXTS.items():
+        # Smoke: every wrapper should accept the keyword and produce a valid pipeline shape.
+        pipe = wrap_fn(
+            "@pipeline().parameters.x",
+            name=f"smoke_{context_name}",
+            referenced_params=[{"name": "x", "type": "String"}],
+        )
+        assert isinstance(pipe, dict), f"{context_name} returned non-dict"
+        assert pipe.get("parameters") == {
+            "x": {"type": "String"}
+        }, f"{context_name} did not inject the parameters block"
+
+
+def test_wrapper_normalises_missing_param_type_to_string():
+    """Defensive: a referenced_params entry missing `type` defaults to
+    String. The corpus schema test rejects this case at load time so it
+    should never happen in practice, but the wrapper stays robust."""
+    pipe = wrap_in_set_variable(
+        "@pipeline().parameters.foo",
+        referenced_params=[{"name": "foo"}],
+    )
+    assert pipe["parameters"] == {"foo": {"type": "String"}}
+
+
+def test_wrapper_skips_malformed_referenced_params_entries():
+    """Defensive: malformed entries (non-dict, missing name) are silently
+    skipped so a single bad pair can't crash the entire sweep run."""
+    pipe = wrap_in_set_variable(
+        "@pipeline().parameters.real",
+        referenced_params=[
+            "not a dict",
+            {},  # missing name
+            {"name": ""},  # empty name
+            {"name": "real", "type": "String"},  # only this one is kept
+        ],
+    )
+    assert pipe["parameters"] == {"real": {"type": "String"}}
+
+
+def test_sweep_threads_referenced_params_to_wrappers():
+    """End-to-end: a corpus entry with referenced_params should produce a
+    wrapped pipeline that carries the parameters block when it reaches
+    convert_fn. Verified by recording every payload the mock receives."""
+    corpus = [
+        {
+            "adf_expression": "@pipeline().parameters.tableName",
+            "category": "string",
+            "expected_python": "dbutils.widgets.get('tableName')",
+            "referenced_params": [{"name": "tableName", "type": "String"}],
+        },
+        {
+            "adf_expression": "@concat('a', 'b')",  # no params — control row
+            "category": "string",
+            "expected_python": "str('a') + str('b')",
+        },
+    ]
+    payloads_seen: list[dict] = []
+
+    def mock_convert(payload):
+        payloads_seen.append(payload)
+        return _make_mock_snapshot(resolved_count=1)
+
+    sweep_activity_contexts(corpus, mock_convert, contexts=["set_variable"])
+
+    assert len(payloads_seen) == 2
+    # First payload (referenced_params present) carries the parameters block.
+    assert payloads_seen[0]["parameters"] == {"tableName": {"type": "String"}}
+    # Second payload (no referenced_params) has no parameters key.
+    assert "parameters" not in payloads_seen[1]
