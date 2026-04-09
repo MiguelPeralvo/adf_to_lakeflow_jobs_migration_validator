@@ -3,7 +3,9 @@
   "$comment_methodology": "Each pair was hand-written with these criteria: (1) the ADF expression is unambiguous per the ADF expression-language docs, (2) the `expected_python` is the most natural Python translation a human would write for the same semantics, (3) the pair probes a specific axis (function arity, nesting, type coercion, ternary, dispatch). When future X-2 measurements compare wkmigrate's emitter output against these `expected_python` values and they disagree, the disagreement is a real signal — wkmigrate either has a bug, or our human-derived expected is wrong, or there's a semantic gap worth filing as a finding. (Trust-but-verify: whichever side is wrong gets fixed.)",
   "$comment_schema": "Same shape as golden_sets/expressions.json (count, expressions[]) so it can be loaded with the same code path. The only difference is the source of expected_python.",
   "$comment_categories": "category labels match expressions.json: string, math, datetime, logical, collection, nested. The `axis` field is L-F3-specific and tags the specific edge case being probed.",
-  "count": 20,
+  "$comment_referenced_params": "Pairs that reference @pipeline().parameters.X include a `referenced_params` array of {name, type} dicts. The activity_context_wrapper helpers (wrap_in_set_variable, wrap_in_if_condition, etc.) inject these into the synthetic pipeline's `parameters` block so wkmigrate's parameter resolver can find them. Type strings follow ADF conventions (String, Int, Float, Bool). Pairs without referenced_params are pure literal expressions and need no injection — the field is optional and absent on the original L-F3 starter pairs.",
+  "$comment_w_targets": "Pairs added in the L-F3 corpus growth (PR follow-up to L-F19) carry a `targets` array of W-finding IDs from dev/wkmigrate-issue-map.json. This lets sweep tooling cross-reference each adversarial pair with the failure signatures it is meant to exercise. Examples: targets=['W-2'] for parameter refs in non-notebook contexts; targets=['W-3'] for math on parameters; targets=['W-10'] for bare ForEach arrays.",
+  "count": 28,
   "expressions": [
     {
       "adf_expression": "@concat('hello', ' ', 'world')",
@@ -144,6 +146,77 @@
       "axis": "ternary_with_nested_predicate",
       "expected_python": "('odd' if ((5 % 2) == 1) else 'even')",
       "rationale": "ADF if(cond, then, else) = Python ternary expression. Tests both the ternary translation AND the nested mod-equals predicate."
+    },
+    {
+      "adf_expression": "@createArray('alpha', 'beta', 'gamma')",
+      "category": "collection",
+      "axis": "bare_array_string_literals",
+      "expected_python": "['alpha', 'beta', 'gamma']",
+      "rationale": "Bare @createArray(...) is the canonical ForEach.items input. The W-10 corrected diagnosis showed that the original 33 collection-category entries in expressions.json all wrap createArray inside a scalar function (length, first, last, empty), so the bare-array path was never exercised. This pair fills that gap so the sweep can prove ForEach with createArray actually resolves on alpha_1.",
+      "targets": ["W-10"]
+    },
+    {
+      "adf_expression": "@createArray(1, 2, 3)",
+      "category": "collection",
+      "axis": "bare_array_int_literals",
+      "expected_python": "[1, 2, 3]",
+      "rationale": "Same as the string variant — exercises bare integer-array ForEach items. Two variants instead of one because wkmigrate's _parse_array_string in for_each_activity_translator strips quotes uniformly, so int and string handling could diverge silently if only one is tested.",
+      "targets": ["W-10"]
+    },
+    {
+      "adf_expression": "@createArray('only_one')",
+      "category": "collection",
+      "axis": "bare_array_singleton",
+      "expected_python": "['only_one']",
+      "rationale": "Singleton-array edge case. The _parse_array_string regex splits on commas; a singleton tests that the no-comma path doesn't degenerate."
+    },
+    {
+      "adf_expression": "@pipeline().parameters.tableName",
+      "category": "string",
+      "axis": "param_ref_bare",
+      "expected_python": "dbutils.widgets.get('tableName')",
+      "rationale": "Bare @pipeline().parameters.X reference. wkmigrate maps this to dbutils.widgets.get(name). W-2 says this should work in non-notebook contexts (SetVariable, IfCondition, Copy); the existing 200-pair corpus uses literal values only and never references parameters, so the resolution path is not exercised. This pair flows through every activity context via sweep-activity-contexts.",
+      "referenced_params": [{"name": "tableName", "type": "String"}],
+      "targets": ["W-2"]
+    },
+    {
+      "adf_expression": "@toUpper(pipeline().parameters.region)",
+      "category": "string",
+      "axis": "param_ref_inside_string_function",
+      "expected_python": "str(dbutils.widgets.get('region')).upper()",
+      "rationale": "Parameter ref nested inside a string function call. Tests that wkmigrate's resolver walks into the function args, finds the parameter ref, and emits dbutils.widgets.get(name) inline (not as a temp variable).",
+      "referenced_params": [{"name": "region", "type": "String"}],
+      "targets": ["W-2"]
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.env, 'prod')",
+      "category": "logical",
+      "axis": "param_ref_inside_predicate",
+      "expected_python": "(dbutils.widgets.get('env') == 'prod')",
+      "rationale": "Parameter ref inside an IfCondition predicate. The IfCondition activity context is where W-2 has historically been weakest because the predicate is decomposed into op/left/right at IR construction time and the operand resolution must happen inside that decomposition. Probes the L-F17 IfCondition synthesis path AND any wkmigrate-side IR op-name → Python operator mapping.",
+      "referenced_params": [{"name": "env", "type": "String"}],
+      "targets": ["W-2"]
+    },
+    {
+      "adf_expression": "@add(pipeline().parameters.count, 1)",
+      "category": "math",
+      "axis": "param_ref_int_arithmetic",
+      "expected_python": "(int(dbutils.widgets.get('count')) + 1)",
+      "rationale": "Math on a parameter declared as Int. The W-3 fix should use the declared type to wrap the dbutils.widgets.get call with int(). wkmigrate's emitter on alpha_1 actually uses a defensive runtime lambda — if it disagrees with this human-written expected, that's an L-F3 oracle disagreement worth investigating (the static int() wrap is more readable and could be chosen if the parameter type is statically known).",
+      "referenced_params": [{"name": "count", "type": "Int"}],
+      "targets": ["W-3"]
+    },
+    {
+      "adf_expression": "@mul(pipeline().parameters.qty, pipeline().parameters.price)",
+      "category": "math",
+      "axis": "param_refs_two_typed_operands",
+      "expected_python": "(int(dbutils.widgets.get('qty')) * float(dbutils.widgets.get('price')))",
+      "rationale": "Math over two typed parameter operands — Int qty and Float price. Tests that the type coercion path picks the correct wrapper per parameter, not a single uniform cast. If wkmigrate emits float() for both (or int() for both), the type info from the declaration was lost.",
+      "referenced_params": [
+        {"name": "qty", "type": "Int"},
+        {"name": "price", "type": "Float"}
+      ],
+      "targets": ["W-3"]
     }
   ]
 }

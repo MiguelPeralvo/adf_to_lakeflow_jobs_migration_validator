@@ -34,13 +34,53 @@ def _expression_node(value: str) -> dict[str, str]:
     return {"type": "Expression", "value": value}
 
 
-def wrap_in_set_variable(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def _normalise_referenced_params(referenced_params: list[dict] | None) -> dict[str, dict[str, str]]:
+    """Convert a corpus-style ``referenced_params`` list into wkmigrate's
+    pipeline ``parameters`` dict shape.
+
+    The L-F3 corpus declares parameters as ``[{name: ..., type: ...}]`` so
+    each pair carries a self-contained list of the parameter references it
+    needs. wkmigrate's pipeline IR consumes ``{paramName: {type: ...}}``
+    (a dict, not a list — see wkmigrate's
+    ``parameter_translator.translate_parameters``). This helper bridges the
+    two shapes so the wrappers can stay agnostic of either.
+
+    Returns ``{}`` for ``None`` / empty input so callers can always
+    ``**unpack`` the result without conditionals. Entries missing a
+    ``name`` are skipped defensively (the corpus schema test rejects this
+    case at load time, but the helper stays robust against malformed input
+    so a sweep doesn't crash mid-run).
+    """
+    if not referenced_params:
+        return {}
+    result: dict[str, dict[str, str]] = {}
+    for entry in referenced_params:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        param_type = entry.get("type") or "String"
+        result[name] = {"type": param_type}
+    return result
+
+
+def wrap_in_set_variable(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as a ``SetVariable.value`` (the baseline context).
 
     SetVariable was adopted in pr/27-1-expression-parser, so this is expected
     to resolve cleanly on alpha_1. Acts as a control row in the sweep.
+
+    When *adf_expression* references ``@pipeline().parameters.X``, pass
+    ``referenced_params=[{"name": "X", "type": "String"}, ...]`` so the
+    wrapper injects them into the pipeline's ``parameters`` block. wkmigrate's
+    parameter resolver looks them up there to emit ``dbutils.widgets.get(name)``.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -53,9 +93,17 @@ def wrap_in_set_variable(adf_expression: str, name: str = "expr_test") -> dict[s
         ],
         "variables": {"result": {"type": "String"}},
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_if_condition(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_if_condition(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as the ``IfCondition.expression`` predicate.
 
     wkmigrate's IfCondition translator expects a boolean expression. Non-boolean
@@ -75,7 +123,7 @@ def wrap_in_if_condition(adf_expression: str, name: str = "expr_test") -> dict[s
         "depends_on": [],
         "notebook_path": "/Workspace/noop",
     }
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -88,9 +136,17 @@ def wrap_in_if_condition(adf_expression: str, name: str = "expr_test") -> dict[s
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_for_each(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_for_each(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as the ``ForEach.items`` array source.
 
     wkmigrate's ForEach translator expects an array. Non-array inputs probe
@@ -102,7 +158,7 @@ def wrap_in_for_each(adf_expression: str, name: str = "expr_test") -> dict[str, 
     cause wkmigrate to fall back to a placeholder activity, which would
     obscure the items-translation signal we actually want to measure.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -121,16 +177,24 @@ def wrap_in_for_each(adf_expression: str, name: str = "expr_test") -> dict[str, 
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_web_body(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_web_body(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as the ``WebActivity.body`` payload.
 
     WebActivity.body is a permissive string-typed field, so most expressions
     should resolve here. The url and method are also populated so wkmigrate
     can validate the activity shape.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -144,9 +208,17 @@ def wrap_in_web_body(adf_expression: str, name: str = "expr_test") -> dict[str, 
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_lookup_query(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_lookup_query(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as the ``Lookup.source.sql_reader_query`` property.
 
     **This is the primary L-F5 target.** The Lookup translator adoption is
@@ -158,7 +230,7 @@ def wrap_in_lookup_query(adf_expression: str, name: str = "expr_test") -> dict[s
 
     Either signal lets ``sweep_activity_contexts`` quantify the deferred gap.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -191,9 +263,17 @@ def wrap_in_lookup_query(adf_expression: str, name: str = "expr_test") -> dict[s
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_copy_query(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_copy_query(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as the ``Copy.source.sql_reader_query`` property.
 
     The other deferred wkmigrate#28 target. Same expectations as
@@ -208,7 +288,7 @@ def wrap_in_copy_query(adf_expression: str, name: str = "expr_test") -> dict[str
     past validation and actually exercise the source.sql_reader_query
     translation path.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -270,16 +350,24 @@ def wrap_in_copy_query(adf_expression: str, name: str = "expr_test") -> dict[str
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
-def wrap_in_notebook_base_param(adf_expression: str, name: str = "expr_test") -> dict[str, Any]:
+def wrap_in_notebook_base_param(
+    adf_expression: str,
+    name: str = "expr_test",
+    referenced_params: list[dict] | None = None,
+) -> dict[str, Any]:
     """Wrap *adf_expression* as a ``DatabricksNotebook.base_parameters`` value.
 
     base_parameters expressions were adopted in pr/27-3-translator-adoption,
     so this should resolve cleanly on alpha_1 — another control row in the
     sweep alongside SetVariable.
     """
-    return {
+    pipeline: dict[str, Any] = {
         "name": name,
         "activities": [
             {
@@ -293,12 +381,19 @@ def wrap_in_notebook_base_param(adf_expression: str, name: str = "expr_test") ->
             }
         ],
     }
+    params = _normalise_referenced_params(referenced_params)
+    if params:
+        pipeline["parameters"] = params
+    return pipeline
 
 
 # Registry — drives ``sweep_activity_contexts``. Order is significant for the
 # emitted report (control rows first, deferred-#28 targets last so they're
-# easy to scan).
-ACTIVITY_CONTEXTS: dict[str, Callable[[str, str], dict[str, Any]]] = {
+# easy to scan). Each wrapper takes ``(adf_expression, name, referenced_params)``
+# — the third arg is keyword-only by convention so the sweep loop can call
+# every wrapper through the same `wrap_fn(expr, name=..., referenced_params=...)`
+# shape regardless of which fields the corpus entry carries.
+ACTIVITY_CONTEXTS: dict[str, Callable[..., dict[str, Any]]] = {
     "set_variable": wrap_in_set_variable,
     "notebook_base_param": wrap_in_notebook_base_param,
     "if_condition": wrap_in_if_condition,
@@ -372,6 +467,14 @@ def sweep_activity_contexts(
     for entry in corpus:
         adf_expression = entry["adf_expression"]
         category = entry.get("category", "unknown")
+        # `referenced_params` is the L-F3 corpus extension introduced in the
+        # corpus-growth follow-up to L-F19. Pairs without it (the original
+        # 20 starter pairs and all of expressions.json) get None and the
+        # wrappers no-op the parameter injection. Pairs with it carry
+        # [{name, type}, ...] and the wrappers inject them into the
+        # synthetic pipeline's `parameters` block so wkmigrate's resolver
+        # can map @pipeline().parameters.X → dbutils.widgets.get(name).
+        referenced_params = entry.get("referenced_params")
         for context_name in selected:
             wrap_fn = ACTIVITY_CONTEXTS[context_name]
             cell_key = f"{category},{context_name}"
@@ -382,7 +485,11 @@ def sweep_activity_contexts(
             ctx_totals["total"] += 1
 
             try:
-                pipeline = wrap_fn(adf_expression, name=f"{context_name}_{category}_test")
+                pipeline = wrap_fn(
+                    adf_expression,
+                    name=f"{context_name}_{category}_test",
+                    referenced_params=referenced_params,
+                )
                 snap = convert_fn(pipeline)
             except Exception as exc:  # noqa: BLE001  defensive: any wkmigrate failure
                 cell["error_count"] += 1

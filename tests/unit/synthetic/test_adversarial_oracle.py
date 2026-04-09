@@ -95,6 +95,87 @@ def test_adversarial_adf_expressions_start_with_at_sign(adversarial_payload):
         )
 
 
+# ---------------------------------------------------------------------------
+# Optional-field schema (introduced by the L-F3 corpus growth follow-up to L-F19)
+# ---------------------------------------------------------------------------
+
+
+def test_adversarial_referenced_params_when_present_have_name_and_type(adversarial_payload):
+    """Pairs that reference @pipeline().parameters.X carry an optional
+    `referenced_params: [{name, type}]` array. The activity_context_wrapper
+    helpers inject these into the synthetic pipeline's parameters block.
+
+    The field is optional — pairs without parameter references omit it. When
+    present, every entry must have a non-empty `name` and a non-empty `type`
+    string so the wrapper can build a wkmigrate-compatible parameters dict.
+    """
+    for i, pair in enumerate(adversarial_payload["expressions"]):
+        rps = pair.get("referenced_params")
+        if rps is None:
+            continue  # Optional field — absence is fine.
+        assert isinstance(rps, list), f"pair {i} referenced_params must be a list, got {type(rps).__name__}"
+        for j, rp in enumerate(rps):
+            assert isinstance(rp, dict), f"pair {i} referenced_params[{j}] must be a dict"
+            name = rp.get("name")
+            type_ = rp.get("type")
+            assert isinstance(name, str) and name, f"pair {i} referenced_params[{j}] missing/empty 'name' field"
+            assert isinstance(type_, str) and type_, f"pair {i} referenced_params[{j}] missing/empty 'type' field"
+
+
+def test_adversarial_referenced_params_match_pipeline_parameters_in_expression(adversarial_payload):
+    """Cross-check: every name listed in `referenced_params` must actually
+    appear inside the `adf_expression` as `pipeline().parameters.<name>`.
+    Unused declared params are a corpus authoring smell — they would cause
+    the wrapper to inject parameters wkmigrate doesn't need, which doesn't
+    break anything but indicates the test author confused themselves about
+    which params the expression really uses.
+    """
+    import re
+
+    for i, pair in enumerate(adversarial_payload["expressions"]):
+        rps = pair.get("referenced_params") or []
+        adf = pair["adf_expression"]
+        for j, rp in enumerate(rps):
+            name = rp["name"]
+            pattern = rf"pipeline\(\)\.parameters\.{re.escape(name)}\b"
+            assert re.search(pattern, adf), (
+                f"pair {i} declares referenced_params[{j}].name={name!r} "
+                f"but {adf!r} does not contain pipeline().parameters.{name}"
+            )
+
+
+def test_adversarial_targets_when_present_reference_known_w_findings(adversarial_payload):
+    """Pairs added in the corpus growth carry an optional `targets` array of
+    W-finding IDs (e.g. `["W-2", "W-3"]`). When present, every value must
+    look like a `W-N` ID so cross-references with dev/wkmigrate-issue-map.json
+    are unambiguous.
+    """
+    import re
+
+    pattern = re.compile(r"^W-\d+$")
+    for i, pair in enumerate(adversarial_payload["expressions"]):
+        targets = pair.get("targets")
+        if targets is None:
+            continue  # Optional field.
+        assert isinstance(targets, list), f"pair {i} targets must be a list"
+        for t in targets:
+            assert isinstance(t, str) and pattern.match(t), f"pair {i} targets entry {t!r} is not a valid W-N ID"
+
+
+def test_adversarial_corpus_exercises_w2_w3_w10(adversarial_payload):
+    """The corpus growth pledged to exercise W-2 (param refs in non-notebook
+    contexts), W-3 (math on parameters), and W-10 (bare ForEach arrays).
+    Pin that pledge so a future trim of the corpus can't silently revert it.
+    """
+    targets_seen: set[str] = set()
+    for pair in adversarial_payload["expressions"]:
+        targets_seen.update(pair.get("targets") or [])
+    for required in ("W-2", "W-3", "W-10"):
+        assert required in targets_seen, (
+            f"corpus is missing pairs targeting {required}. " f"Currently exercised: {sorted(targets_seen)}"
+        )
+
+
 def test_adversarial_expected_python_is_not_byte_identical_to_legacy(adversarial_payload):
     """The whole point of L-F3 is INDEPENDENCE: the adversarial corpus must
     contain at least one pair whose ADF expression ALSO exists in the legacy
