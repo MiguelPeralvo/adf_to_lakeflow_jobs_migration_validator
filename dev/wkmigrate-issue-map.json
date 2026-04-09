@@ -242,6 +242,38 @@
       "weak_spots": ["activity_output_chaining"]
     },
     {
+      "id": "W-9",
+      "signature_key": "copy_sql_reader_query_dropped_in_format_options",
+      "regex": "(?i)dropped_expression_field.*Copy.*sql_reader_query|_parse_sql_format_options dropped",
+      "match_target": "not_translatable.message",
+      "title": "[expressions] wkmigrate Copy translator drops source.sql_reader_query in _parse_sql_format_options (sub-finding of wkmigrate#27)",
+      "category": "expressions",
+      "kind": "bug",
+      "area": "expressions",
+      "priority": "P1",
+      "upstream_issues": ["ghanse/wkmigrate#27 (deferred Copy adoption to proposed wkmigrate#28)"],
+      "lmv_issue": null,
+      "status": "open",
+      "discovered_via": "L-F19 dropped-expression-field detector (PR D follow-up to W-8 mis-diagnosis)",
+      "diagnosis": {
+        "session": "LMV-AUTODEV-2026-04-09",
+        "root_cause": "wkmigrate's parsers/dataset_parsers.py::_parse_sql_format_options builds CopyActivity.source_properties from a fixed key list (type, query_isolation_level, query_timeout_seconds, numPartitions, batchsize, sessionInitStatement, mode) that does NOT include sql_reader_query. The query — literal OR Expression — is silently lost the moment translate_copy_activity runs. The Copy preparer then generates a JDBC read with no query, which would either pull the entire table or omit the WHERE clause depending on downstream code.",
+        "evidence": "lmv L-F19 detector emits dropped_expression_field warnings on every Copy activity whose source dict has sql_reader_query as an Expression. Verified end-to-end via wrap_in_copy_query → adf_to_snapshot → expression_coverage drops to 0.0 (measurable=True).",
+        "differs_from_w7": "W-7 was the Lookup translator hard-crashing on Expression sql_reader_query. W-9 is the Copy translator silently dropping it (literal or Expression). Different code paths, different fixes.",
+        "differs_from_w8": "W-8 was an lmv fixture bug (missing sink.type). W-9 is a real wkmigrate gap that the W-8 fixture fix unblocked us to see."
+      },
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-09",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
+        "corpus": "manual probe via wrap_in_copy_query (also affects pr/27-3-translator-adoption)",
+        "result": "Copy with Expression sql_reader_query: 0 resolved_expressions, 1 dropped_expression_field warning, expression_coverage=0.0 (measurable=True). Same on pr/27-3 — the sql_format_options drop is unchanged on that branch.",
+        "raw_artifact": "tests/unit/validation/test_wkmigrate_adapter_lf17.py::test_adapter_emits_dropped_field_warning_for_copy_with_expression_sql_reader_query"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
+      "fix_sketch": "Extend _parse_sql_format_options in wkmigrate/parsers/dataset_parsers.py to extract sql_reader_query from the source definition. For literal strings, store directly. For {type: Expression, value: ...} dicts, route through get_literal_or_expression() with an appropriate ExpressionContext (analogous to ExpressionContext.LOOKUP_QUERY introduced in pr/27-1). Then have the Copy preparer / code generator embed the resolved query in the JDBC read expression's WHERE clause.",
+      "weak_spots": ["activity_output_chaining"]
+    },
+    {
       "id": "W-10",
       "signature_key": "for_each_items_silent_placeholder",
       "regex": "(?i)\\(type:\\s*ForEach\\)",

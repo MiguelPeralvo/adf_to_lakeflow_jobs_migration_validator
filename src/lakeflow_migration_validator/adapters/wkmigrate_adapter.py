@@ -94,6 +94,123 @@ def _source_expression_at(source_activity: dict | None, *property_path: str) -> 
     return None
 
 
+def _detect_dropped_expression_fields(
+    prepared_pipeline: Any,
+    source_index: dict[str, dict],
+) -> list[dict]:
+    """L-F19: detect expression-bearing fields that wkmigrate silently dropped.
+
+    L-F17 closes the gap where wkmigrate *does* resolve an expression but the
+    adapter forgot to walk it. This function closes the complementary gap:
+    wkmigrate's translator silently *drops* the expression at translate time,
+    so even a perfect walker has nothing to extract.
+
+    The first concrete instance is ``Copy.source.sql_reader_query`` (W-9):
+    wkmigrate's ``_parse_sql_format_options`` (parsers/dataset_parsers.py)
+    builds the ``CopyActivity.source_properties`` dict from a fixed key list
+    that does **not** include ``sql_reader_query``. The query — literal or
+    Expression — is therefore lost the moment ``translate_copy_activity``
+    runs. Both alpha_1 and pr/27-3-translator-adoption have this gap; it is
+    distinct from W-7 (Lookup translator crashes on Expression sql_reader_query)
+    and W-8 (initially mis-diagnosed Copy fixture).
+
+    A second instance is the post-W-7 Lookup case where ``LookupActivity``
+    is constructed but ``source_query`` ends up empty/non-string (e.g. when
+    a future regression slips through and the dict-typed value reappears).
+    The check is intentionally narrow — it only fires when the source dict
+    actually has an Expression and the IR has nothing usable — so it does
+    not double-count W-7 (which manifests as a hard crash before the adapter
+    is even reached).
+
+    Each detected drop is emitted as a synthetic ``not_translatable`` warning
+    with ``kind == "dropped_expression_field"``. The warning message contains
+    the substring ``"expression"`` so ``compute_expression_coverage`` counts it
+    in its ``unsupported`` denominator (matching the existing dimension's
+    keyword filter at dimensions/expression_coverage.py:46). The structured
+    fields (``original_activity_type``, ``property``) let failure-signature
+    regexes in ``dev/wkmigrate-issue-map.json`` (e.g. W-9) match cleanly
+    without depending on a brittle task_key substring.
+
+    Args:
+        prepared_pipeline: wkmigrate's ``Pipeline`` IR.
+        source_index: pre-built ``{name → source_activity_dict}`` map (built
+            once in ``from_wkmigrate`` and reused for L-F12 / L-F17 / L-F19).
+    """
+    from wkmigrate.models.ir.pipeline import CopyActivity, LookupActivity
+
+    warnings_out: list[dict] = []
+
+    for task in prepared_pipeline.tasks:
+        task_name = getattr(task, "name", None)
+        if not isinstance(task_name, str):
+            continue
+        source_activity = source_index.get(task_name)
+        if not isinstance(source_activity, dict):
+            continue
+
+        if isinstance(task, CopyActivity):
+            source_expr = _source_expression_at(source_activity, "source", "sql_reader_query")
+            if source_expr is None:
+                continue
+            # The IR's CopyActivity.source_properties never carries
+            # sql_reader_query — _parse_sql_format_options drops it. So as
+            # long as the source dict has an Expression there, the field is
+            # dropped, period.
+            ir_props = task.source_properties or {}
+            if "sql_reader_query" in ir_props and ir_props.get("sql_reader_query"):
+                # Future-proofing: if wkmigrate ever wires sql_reader_query
+                # into source_properties, do not double-warn — L-F17 should
+                # be extended to extract it as a regular ExpressionPair.
+                continue
+            warnings_out.append(
+                {
+                    "kind": "dropped_expression_field",
+                    "task_key": task_name,
+                    "property": "source.sql_reader_query",
+                    "original_activity_type": "Copy",
+                    "adf_expression": source_expr,
+                    "message": (
+                        f"Activity '{task_name}' (type: Copy) has source.sql_reader_query "
+                        f"as an ADF expression ('{source_expr}'), but wkmigrate's "
+                        f"_parse_sql_format_options dropped it during translation "
+                        f"(CopyActivity.source_properties has no 'sql_reader_query' key). "
+                        f"The query is lost in the generated notebook."
+                    ),
+                }
+            )
+            continue
+
+        if isinstance(task, LookupActivity):
+            source_expr = _source_expression_at(source_activity, "source", "sql_reader_query") or _source_expression_at(
+                source_activity, "source", "query"
+            )
+            if source_expr is None:
+                continue
+            ir_query = task.source_query
+            if isinstance(ir_query, str) and ir_query:
+                # Walker handles this case via the existing Lookup branch in
+                # _extract_resolved_expression_pairs — do not double-emit.
+                continue
+            warnings_out.append(
+                {
+                    "kind": "dropped_expression_field",
+                    "task_key": task_name,
+                    "property": "source.sql_reader_query",
+                    "original_activity_type": "Lookup",
+                    "adf_expression": source_expr,
+                    "message": (
+                        f"Activity '{task_name}' (type: Lookup) has source.sql_reader_query "
+                        f"as an ADF expression ('{source_expr}'), but the IR's "
+                        f"LookupActivity.source_query was not populated with a usable string. "
+                        f"The query expression was dropped before reaching the adapter."
+                    ),
+                }
+            )
+            continue
+
+    return warnings_out
+
+
 def _extract_resolved_expression_pairs(
     prepared_pipeline: Any,
     source_pipeline: dict,
@@ -410,10 +527,20 @@ def from_wkmigrate(source_pipeline: dict, prepared_workflow) -> ConversionSnapsh
         source_index=source_index,
     )
 
+    # L-F19: detect expression-bearing fields that wkmigrate silently dropped
+    # at translate time (Copy.source.sql_reader_query is the first concrete
+    # case — see W-9 in dev/wkmigrate-issue-map.json). These dropped-field
+    # warnings are merged into not_translatable so compute_expression_coverage
+    # counts them in its denominator and the gap shows up in the X-1 sweep.
+    dropped_field_warnings = _detect_dropped_expression_fields(prepared.pipeline, source_index)
+
     # Merge wkmigrate's pipeline-level warnings with the L-F12 placeholder
-    # warnings we synthesised above. Placeholder warnings come last so they
-    # appear in source-order beneath any pipeline-level translation warnings.
-    all_not_translatable = tuple(prepared.pipeline.not_translatable) + tuple(placeholder_warnings)
+    # warnings and L-F19 dropped-field warnings we synthesised above. Order:
+    # wkmigrate-emitted first (preserves source order), then placeholders,
+    # then dropped-field — both groups appear after any wkmigrate warnings.
+    all_not_translatable = (
+        tuple(prepared.pipeline.not_translatable) + tuple(placeholder_warnings) + tuple(dropped_field_warnings)
+    )
 
     return ConversionSnapshot(
         tasks=tuple(tasks),

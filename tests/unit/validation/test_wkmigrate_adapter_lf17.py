@@ -32,6 +32,7 @@ import pytest
 try:
     from wkmigrate.parsers.expression_parsers import ResolvedExpression
     from wkmigrate.models.ir.pipeline import (
+        CopyActivity,
         DatabricksNotebookActivity,
         ForEachActivity,
         IfConditionActivity,
@@ -341,6 +342,248 @@ def test_adapter_existing_set_variable_extraction_still_works():
     pairs_with_concat = [p for p in snap.resolved_expressions if "@concat" in p.adf_expression]
     assert len(pairs_with_concat) == 1
     assert pairs_with_concat[0].python_code == "str('a') + str('b')"
+
+
+# ---------------------------------------------------------------------------
+# L-F19: dropped-expression-field detection (W-9 — Copy.source.sql_reader_query)
+#
+# These tests cover the second half of the lmv-side feedback loop. L-F17
+# extracts pairs *when wkmigrate resolved the expression*. L-F19 emits a
+# synthetic not_translatable warning *when wkmigrate silently dropped the
+# expression at translate time* — the gap that makes
+# expression_coverage drop in the lmv sweep where it would otherwise be a
+# silent zero.
+# ---------------------------------------------------------------------------
+
+
+def test_adapter_emits_dropped_field_warning_for_copy_with_expression_sql_reader_query():
+    """W-9: Copy.source.sql_reader_query is dropped by wkmigrate's
+    _parse_sql_format_options. The adapter must emit a synthetic
+    dropped_expression_field warning so the dimension can count it."""
+    source = {
+        "activities": [
+            {
+                "name": "copy",
+                "type": "Copy",
+                "depends_on": [],
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": {
+                        "type": "Expression",
+                        "value": "@concat('SELECT * FROM ', pipeline().parameters.t)",
+                    },
+                },
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+            }
+        ]
+    }
+    # CopyActivity built with the same shape wkmigrate would produce: source_properties
+    # is the dict from _parse_sql_format_options, which has no sql_reader_query key.
+    task = CopyActivity(
+        name="copy",
+        task_key="copy",
+        source_properties={"type": "sqlserver", "query_isolation_level": "READ_COMMITTED"},
+        sink_properties={"type": "delta"},
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 1
+    drop = drops[0]
+    assert drop["original_activity_type"] == "Copy"
+    assert drop["property"] == "source.sql_reader_query"
+    assert drop["adf_expression"] == "@concat('SELECT * FROM ', pipeline().parameters.t)"
+    # Message must contain "expression" so compute_expression_coverage counts it.
+    assert "expression" in drop["message"].lower()
+    assert "Copy" in drop["message"]
+
+
+def test_adapter_skips_dropped_field_warning_when_copy_has_no_sql_reader_query():
+    """No source.sql_reader_query in the source dict → no warning."""
+    source = {
+        "activities": [
+            {
+                "name": "copy",
+                "type": "Copy",
+                "depends_on": [],
+                "source": {"type": "AzureSqlSource"},
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+            }
+        ]
+    }
+    task = CopyActivity(name="copy", task_key="copy", source_properties={"type": "sqlserver"})
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 0
+
+
+def test_adapter_skips_dropped_field_warning_when_copy_has_literal_sql_reader_query():
+    """Literal (non-Expression) sql_reader_query in source dict → no warning.
+
+    The L-F19 detector only fires on `{type: Expression, value: ...}` shapes
+    because plain string literals could be picked up by a future wkmigrate
+    enhancement without needing the same Expression-resolution path. This
+    keeps the false-positive rate low while the wkmigrate gap is still open.
+    """
+    source = {
+        "activities": [
+            {
+                "name": "copy",
+                "type": "Copy",
+                "depends_on": [],
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": "SELECT * FROM static_table",
+                },
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+            }
+        ]
+    }
+    task = CopyActivity(name="copy", task_key="copy", source_properties={"type": "sqlserver"})
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 0
+
+
+def test_adapter_skips_dropped_field_warning_for_copy_when_ir_already_has_sql_reader_query():
+    """Future-proofing: if wkmigrate ever wires sql_reader_query into
+    source_properties, do not double-warn — L-F17 should be extended to
+    extract it as a regular ExpressionPair instead. This test pins that
+    contract so the W-9 fix can land cleanly without churning L-F19."""
+    source = {
+        "activities": [
+            {
+                "name": "copy",
+                "type": "Copy",
+                "depends_on": [],
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": {"type": "Expression", "value": "@x"},
+                },
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+            }
+        ]
+    }
+    task = CopyActivity(
+        name="copy",
+        task_key="copy",
+        # Hypothetical post-W-9 IR shape: source_properties carries the resolved query.
+        source_properties={"type": "sqlserver", "sql_reader_query": "resolved_python"},
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 0
+
+
+def test_adapter_skips_dropped_field_warning_for_lookup_when_ir_has_resolved_string():
+    """The L-F17 walker already extracts LookupActivity.source_query as a
+    pair when it's a non-empty string (post-W-7 / pr/27-3). L-F19 must NOT
+    double-emit a warning for the same activity."""
+    source = {
+        "activities": [
+            {
+                "name": "lk",
+                "type": "Lookup",
+                "depends_on": [],
+                "first_row_only": True,
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": {
+                        "type": "Expression",
+                        "value": "@concat('SELECT * FROM ', pipeline().parameters.t)",
+                    },
+                },
+            }
+        ]
+    }
+    task = LookupActivity(
+        name="lk",
+        task_key="lk",
+        first_row_only=True,
+        source_query="'SELECT * FROM ' + dbutils.widgets.get('t')",
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 0
+    # Walker emits a pair for this case, so resolved_expressions should be 1.
+    assert len(snap.resolved_expressions) == 1
+
+
+def test_adapter_emits_dropped_field_warning_for_lookup_with_empty_ir_source_query():
+    """If a future regression slips a non-string sql_reader_query into the
+    LookupActivity.source_query field (e.g. None because the resolver
+    returned UnsupportedValue and the translator forgot to fail), L-F19
+    must catch it. This complements the W-7 hard-crash signal which fires
+    much earlier (in the preparer)."""
+    source = {
+        "activities": [
+            {
+                "name": "lk",
+                "type": "Lookup",
+                "depends_on": [],
+                "first_row_only": True,
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": {"type": "Expression", "value": "@concat('a', 'b')"},
+                },
+            }
+        ]
+    }
+    task = LookupActivity(name="lk", task_key="lk", first_row_only=True, source_query=None)
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    drops = [nt for nt in snap.not_translatable if nt.get("kind") == "dropped_expression_field"]
+    assert len(drops) == 1
+    assert drops[0]["original_activity_type"] == "Lookup"
+    assert drops[0]["property"] == "source.sql_reader_query"
+
+
+def test_adapter_dropped_field_warning_lifts_expression_coverage_denominator():
+    """End-to-end: a Copy with a dropped sql_reader_query should make the
+    expression_coverage dimension report a measurable failure (score < 1.0,
+    measurable=True), not the silent vacuous-100% case."""
+    from lakeflow_migration_validator.dimensions.expression_coverage import compute_expression_coverage
+
+    source = {
+        "activities": [
+            {
+                "name": "copy",
+                "type": "Copy",
+                "depends_on": [],
+                "source": {
+                    "type": "AzureSqlSource",
+                    "sql_reader_query": {"type": "Expression", "value": "@concat('a', 'b')"},
+                },
+                "sink": {"type": "AzureDatabricksDeltaLakeSink"},
+            }
+        ]
+    }
+    task = CopyActivity(name="copy", task_key="copy", source_properties={"type": "sqlserver"})
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    score, details = compute_expression_coverage(snap)
+    assert details["measurable"] is True
+    assert score == 0.0
+    assert details["total"] == 1
+    assert details["resolved"] == 0
 
 
 def test_adapter_skips_if_condition_with_missing_operands():
