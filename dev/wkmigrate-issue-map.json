@@ -206,7 +206,7 @@
     {
       "id": "W-8",
       "signature_key": "copy_sql_reader_query_silent_placeholder",
-      "regex": "(?i)\\(type:\\s*Copy\\)",
+      "regex": "(?i)dropped_expression_field.*Copy.*sql_reader_query",
       "match_target": "not_translatable.message",
       "title": "[expressions] wkmigrate Copy translator silently falls to placeholder for Expression-typed source.sql_reader_query (sub-finding of wkmigrate#27)",
       "category": "expressions",
@@ -277,7 +277,7 @@
     {
       "id": "W-10",
       "signature_key": "for_each_items_silent_placeholder",
-      "regex": "(?i)\\(type:\\s*ForEach\\)",
+      "regex": "(?i)ForEach.*items.*(?:unsupported|not.*array|cannot.*resolve)",
       "match_target": "not_translatable.message",
       "title": "[expressions] wkmigrate ForEach translator silently falls to placeholder for arbitrary items expressions (sub-finding of wkmigrate#27)",
       "category": "collection",
@@ -313,6 +313,30 @@
       "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
       "fix_sketch": "wkmigrate's ForEach translator should use get_literal_or_expression() for the items property and emit either a resolved Python list (when the expression statically evaluates to a literal array) or a runtime expression that produces an array. The pr/27-3-translator-adoption work covered the items field on the IR side but the placeholder fallback indicates the preparer never got the integration.",
       "weak_spots": ["nested_expressions"]
+    }
+  ],
+    {
+      "id": "W-11",
+      "signature_key": "generic_activity_placeholder",
+      "regex": "(?i)was substituted with a placeholder.*did not recognise",
+      "match_target": "not_translatable.message",
+      "title": "[activity_coverage] Activity became placeholder — wkmigrate did not recognise the source ADF activity structure",
+      "category": "activity_coverage",
+      "kind": "structural",
+      "area": "translators",
+      "priority": "P2",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": null,
+      "status": "open",
+      "discovered_via": "adversarial loop Campaign A (2026-04-11): all 60 pipelines hit this",
+      "diagnosis": {
+        "session": "Campaign-A-2026-04-11",
+        "root_cause": "The adversarial generator creates Copy/ForEach/WebActivity/Lookup activities with expression-heavy properties but without the full structural elements wkmigrate requires (dataset definitions for Copy, linked service refs, etc.). wkmigrate correctly rejects these as unrecognized and substitutes placeholders. This is NOT an expression handling bug — it is a structural gap in how the generator constructs activities.",
+        "action": "Either (a) improve the adversarial generator to produce structurally complete activities, or (b) accept that activity_coverage will be low for LLM-generated pipelines and focus adversarial testing on expression-level sweeps instead."
+      },
+      "labels": ["wkmigrate-feedback", "area:translators", "kind:structural"],
+      "fix_sketch": "Two-pronged: (1) Teach the adversarial generator to produce structurally valid Copy/Lookup/ForEach activities with proper dataset definitions. (2) In wkmigrate, improve error messages to distinguish 'activity type not supported' from 'activity structure incomplete'.",
+      "weak_spots": ["unsupported_types"]
     }
   ],
   "notes": [
