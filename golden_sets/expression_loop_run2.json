@@ -1,0 +1,2506 @@
+{
+  "count": 200,
+  "source": "adversarial_expression_loop",
+  "expressions": [
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@replace(toLower(trim(pipeline().parameters.fileName)), ' ', '_')",
+      "category": "string",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@substring(activity('Lookup').output.firstRow.full_name, add(indexOf(activity('Lookup').output.firstRow.full_name, '_'), 1), 5)",
+      "category": "nested",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@if(equals(toUpper(pipeline().parameters.env), 'PROD'), concat('abfss://', pipeline().parameters.container, '@', pipeline().parameters.account), concat('abfss://', toLower(pipeline().parameters.env), '-', pipeline().parameters.container, '@', pipeline().parameters.account))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "account",
+          "type": "String"
+        },
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), int(pipeline().parameters.offset)), 2)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        },
+        {
+          "name": "parallelism",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(add(int(pipeline().parameters.sequence), length(activity('Lookup').output.firstRow.config_value)), 7)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "sequence",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(and(greater(int(pipeline().parameters.retries), 0), less(int(pipeline().parameters.retries), 5)), equals(variables('forceRun'), 'true'))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "retries",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue, 'fallback')",
+      "category": "string",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "defaultValue",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.region, pipeline().parameters.env, formatDateTime(utcNow(),'yyyyMMdd')), '-')",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.csv_values, ','))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.basePath, '/', pipeline().parameters.fileName), '/'))",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        },
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@length(createArray(pipeline().parameters.env, activity('Lookup').output.firstRow.config_value, variables('runId')))",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toUpper(substring(pipeline().parameters.env, 0, 1)), '-', replace(formatDateTime(utcNow(),'HH:mm:ss'), ':', ''), '-', string(add(int(pipeline().parameters.partitionId), 100)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "partitionId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(equals(activity('Lookup').output.firstRow.is_active, 'Y'), greater(int(pipeline().parameters.rowCount), 1000)), concat(pipeline().parameters.targetPath, '/full/', formatDateTime(utcNow(),'yyyy/MM/dd')), concat(pipeline().parameters.targetPath, '/delta/', formatDateTime(utcNow(),'yyyy/MM/dd/HH')))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "rowCount",
+          "type": "String"
+        },
+        {
+          "name": "targetPath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.env), '/', replace(activity('Lookup').output.firstRow.entity_name, ' ', ''), '/dt=', formatDateTime(utcNow(),'yyyy-MM-dd'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(not(equals(trim(coalesce(pipeline().parameters.overrideValue, activity('Lookup').output.firstRow.default_value)), '')), or(greater(add(int(pipeline().parameters.count), int(activity('Lookup').output.firstRow.increment)), 10), less(int(pipeline().parameters.threshold), 5)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        },
+        {
+          "name": "overrideValue",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.domain)), '/', replace(toUpper(pipeline().parameters.region), ' ', '_'), '/', substring(formatDateTime(utcNow(),'yyyyMMddHHmmss'), 0, 8))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "domain",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), sub(int(pipeline().parameters.retryCount), 1)), int(variables('offset'))), 3)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(div(add(mul(int(pipeline().parameters.records), 5), int(pipeline().parameters.increment)), sub(int(pipeline().parameters.divisor), 1)), 7)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "divisor",
+          "type": "String"
+        },
+        {
+          "name": "increment",
+          "type": "String"
+        },
+        {
+          "name": "records",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(int(pipeline().parameters.threshold), 90), less(int(pipeline().parameters.threshold), 10)), not(equals(toLower(trim(pipeline().parameters.env)), 'prod')))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(equals(activity('Lookup').output.firstRow.is_active, 'Y'), concat('enabled/', toLower(activity('Lookup').output.firstRow.config_value)), concat('disabled/', toLower(pipeline().parameters.env)))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.override_path, concat(pipeline().parameters.basePath, '/', formatDateTime(utcNow(),'yyyy/MM/dd')))",
+      "category": "nested",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.sourceSystem, pipeline().parameters.entityName, formatDateTime(utcNow(),'yyyyMMdd')), '/')",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "entityName",
+          "type": "String"
+        },
+        {
+          "name": "sourceSystem",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.file_name, '.'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.full_path, '\\\\', '/'), '/'))",
+      "category": "collection",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@substring(pipeline().parameters.fileName, add(indexOf(pipeline().parameters.fileName, '_'), 1), sub(length(pipeline().parameters.fileName), add(indexOf(pipeline().parameters.fileName, '_'), 1)))",
+      "category": "string",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(trim(pipeline().parameters.env)), '/', formatDateTime(utcNow(),'yyyy'), '/', formatDateTime(utcNow(),'MM'), '/', formatDateTime(utcNow(),'dd'), '/batch_', string(add(mul(int(pipeline().parameters.batchId), 10), mod(int(pipeline().parameters.shardId), 3))))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchId",
+          "type": "String"
+        },
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "shardId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(div(mul(int(pipeline().parameters.totalCount), add(int(pipeline().parameters.multiplier), 2)), sub(int(pipeline().parameters.window), 1)), 100), or(not(equals(pipeline().parameters.env, 'prod')), equals(activity('Lookup').output.firstRow.force_run, 'true')))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "multiplier",
+          "type": "String"
+        },
+        {
+          "name": "totalCount",
+          "type": "String"
+        },
+        {
+          "name": "window",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(replace(toLower(activity('Lookup').output.firstRow.schema_name), '-', '_'), '/', if(greater(length(trim(pipeline().parameters.subFolder)), 0), trim(pipeline().parameters.subFolder), 'default'), '/', formatDateTime(utcNow(),'yyyy/MM/dd/HH'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "subFolder",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(div(add(mul(int(pipeline().parameters.a), int(pipeline().parameters.b)), sub(int(pipeline().parameters.c), int(variables('delta')))), add(int(pipeline().parameters.d), 1)), add(mod(int(pipeline().parameters.e), 5), 1))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "a",
+          "type": "String"
+        },
+        {
+          "name": "b",
+          "type": "String"
+        },
+        {
+          "name": "c",
+          "type": "String"
+        },
+        {
+          "name": "d",
+          "type": "String"
+        },
+        {
+          "name": "e",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(join(createArray(toUpper(pipeline().parameters.env), replace(activity('Lookup').output.firstRow.country, ' ', ''), substring(formatDateTime(utcNow(),'yyyyMMddHHmm'), 0, 12)), '_'), '/', if(and(greater(int(pipeline().parameters.priority), 5), not(equals(activity('Lookup').output.firstRow.skip_flag, '1'))), 'process', 'hold'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "priority",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@toUpper(trim(coalesce(activity('Lookup').output.firstRow.region, pipeline().parameters.defaultRegion, 'unknown')))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "defaultRegion",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@replace(concat(pipeline().parameters.filePrefix, '_', substring(formatDateTime(utcNow(),'yyyyMMddHHmmss'),0,8)), ' ', '_')",
+      "category": "string",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "filePrefix",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(trim(pipeline().parameters.customerId)), 0), concat('cust=', toLower(trim(pipeline().parameters.customerId))), 'cust=anonymous')",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "customerId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelCopies)), sub(int(pipeline().parameters.maxRecords), 1)), 10)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "maxRecords",
+          "type": "String"
+        },
+        {
+          "name": "parallelCopies",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(add(int(pipeline().parameters.offset), length(split(activity('Lookup').output.firstRow.csv_ids, ','))), 7)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "offset",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.env, toLower(activity('Lookup').output.firstRow.source_system), formatDateTime(utcNow(),'yyyyMMdd')), '/')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(replace(activity('Lookup').output.firstRow.full_path, '\\\\', '/'), '/'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.baseName, '.', activity('Lookup').output.firstRow.file_ext), '.'))",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "baseName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(and(greater(int(pipeline().parameters.retryCount), 3), less(int(pipeline().parameters.retryCount), 10)), equals(toLower(pipeline().parameters.env), 'qa'))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.domain), '/', formatDateTime(utcNow(),'yyyy/MM/dd'), '/', replace(activity('Lookup').output.firstRow.entity_name, ' ', '_'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "domain",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(equals(indexOf(activity('Lookup').output.firstRow.file_name, '.csv'), -1), concat(activity('Lookup').output.firstRow.file_name, '.csv'), activity('Lookup').output.firstRow.file_name)",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@join(createArray(substring(toUpper(pipeline().parameters.env),0,1), string(add(int(pipeline().parameters.version), 1)), formatDateTime(utcNow(),'HHmm')), '-')",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "version",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(not(equals(trim(pipeline().parameters.runMode), 'full')), or(greater(int(activity('Lookup').output.firstRow.record_count), 0), greater(length(activity('Lookup').output.firstRow.warning_message), 0)))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "runMode",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(variables('targetSchema'), activity('Lookup').output.firstRow.schema_name, pipeline().parameters.defaultSchema)",
+      "category": "string",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "defaultSchema",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(join(createArray(pipeline().parameters.container, pipeline().parameters.folder, formatDateTime(utcNow(),'yyyy'), formatDateTime(utcNow(),'MM'), formatDateTime(utcNow(),'dd')), '/'), '/part-', string(add(mul(int(pipeline().parameters.partitionId), 10), int(variables('shardOffset')))), '-', toLower(replace(activity('Lookup').output.firstRow.table_name, ' ', '_')))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "folder",
+          "type": "String"
+        },
+        {
+          "name": "partitionId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.domain)), '/', replace(toUpper(activity('Lookup').output.firstRow.region), ' ', '_'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "domain",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(int(pipeline().parameters.retryCount), 3), less(mod(int(pipeline().parameters.batchId), 10), 5)), concat('retry/', string(add(int(pipeline().parameters.batchId), 100))), 'normal/0')",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchId",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.env, toLower(activity('Lookup').output.firstRow.source_system), formatDateTime(utcNow(), 'HHmm')), '/')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@substring(replace(trim(activity('Lookup').output.firstRow.file_name), '.csv', ''), 0, indexOf(replace(trim(activity('Lookup').output.firstRow.file_name), '.csv', ''), '_'))",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.rowsPerFile), int(pipeline().parameters.fileCount)), sub(int(pipeline().parameters.offset), 1)), 2)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileCount",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        },
+        {
+          "name": "rowsPerFile",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(and(equals(toLower(pipeline().parameters.env), 'dev'), greater(int(pipeline().parameters.threshold), 10)), and(not(equals(toLower(pipeline().parameters.env), 'prod')), less(int(pipeline().parameters.threshold), 100)))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.dataset), '/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'))",
+      "category": "datetime",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "dataset",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_path, concat('default/', pipeline().parameters.env, '/', formatDateTime(utcNow(),'yyyyMMdd')))",
+      "category": "nested",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.full_path, '\\\\', '/'), '/'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@concat(first(split(activity('Lookup').output.firstRow.table_name, '.')), '/', last(split(activity('Lookup').output.firstRow.table_name, '.')), '/', string(mod(add(int(pipeline().parameters.partitionId), 7), 3)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "partitionId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(split(trim(pipeline().parameters.fileList), ',')), 1), join(split(trim(pipeline().parameters.fileList), ','), '|'), trim(pipeline().parameters.fileList))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileList",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(int(pipeline().parameters.minRows), 0), equals(variables('forceRun'), 'true')), not(or(equals(activity('Lookup').output.firstRow.status, 'disabled'), less(int(pipeline().parameters.timeoutSeconds), 30))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "minRows",
+          "type": "String"
+        },
+        {
+          "name": "timeoutSeconds",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(replace(toLower(pipeline().parameters.container), '-', '_'), '/', substring(formatDateTime(utcNow(),'yyyyMMddHHmmss'), 0, 8), '/part_', string(add(mul(int(pipeline().parameters.shard), 10), mod(int(pipeline().parameters.runId), 10))))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "runId",
+          "type": "String"
+        },
+        {
+          "name": "shard",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(concat('env=', pipeline().parameters.env), concat('cfg=', activity('Lookup').output.firstRow.config_value), concat('dt=', formatDateTime(utcNow(),'yyyy-MM-dd')), concat('seq=', string(add(int(pipeline().parameters.sequence), 1)))), ';')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "sequence",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(length(trim(activity('Lookup').output.firstRow.config_value)), 0), not(equals(toLower(trim(pipeline().parameters.env)), 'prod'))), concat(toUpper(substring(activity('Lookup').output.firstRow.config_value, 0, 3)), '_', formatDateTime(utcNow(),'yyyyMMdd'), '_', string(div(add(int(pipeline().parameters.count), mul(int(pipeline().parameters.offset), 2)), 3))), concat('fallback_', toLower(pipeline().parameters.env)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.region)), '/', replace(toUpper(activity('Lookup').output.firstRow.file_name), ' ', '_'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), sub(int(pipeline().parameters.retryCount), 1)), 2)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "parallelism",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(length(trim(pipeline().parameters.fileName)), 5), not(equals(toLower(pipeline().parameters.env), 'dev'))), concat(substring(pipeline().parameters.fileName, 0, 5), '_', formatDateTime(utcNow(),'HHmmss')), 'skip')",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(and(greater(int(pipeline().parameters.maxRecords), 1000), less(int(pipeline().parameters.maxRecords), 100000)), and(equals(pipeline().parameters.env, 'qa'), not(equals(activity('Lookup').output.firstRow.enabled, 'false'))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "maxRecords",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.container, pipeline().parameters.folder, formatDateTime(utcNow(),'yyyy'), formatDateTime(utcNow(),'MM'), formatDateTime(utcNow(),'dd')), '/')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "folder",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@substring(replace(activity('Lookup').output.firstRow.source_path, '\\\\', '/'), add(indexOf(activity('Lookup').output.firstRow.source_path, '/'), 1), 10)",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, variables('defaultValue'), pipeline().parameters.fallbackValue)",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "fallbackValue",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(first(split(activity('Lookup').output.firstRow.email, '@')), '_', last(split(activity('Lookup').output.firstRow.email, '@')))",
+      "category": "collection",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@formatDateTime(addDays(utcNow(), mod(add(int(pipeline().parameters.offsetDays), int(pipeline().parameters.retryCount)), 7)), 'yyyy-MM-dd')",
+      "category": "datetime",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "offsetDays",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(not(equals(trim(toLower(pipeline().parameters.env)), 'prod')), or(greater(div(mul(int(pipeline().parameters.recordsPerFile), int(pipeline().parameters.fileCount)), 10), 500), equals(activity('Lookup').output.firstRow.force_run, 'true')))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "fileCount",
+          "type": "String"
+        },
+        {
+          "name": "recordsPerFile",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.basePath, '/', toLower(pipeline().parameters.env), '/', replace(formatDateTime(utcNow(),'yyyy-MM-dd-HH'), '-', '/'), '/', activity('Lookup').output.firstRow.table_name)",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(div(mul(add(int(pipeline().parameters.a), int(pipeline().parameters.b)), sub(int(pipeline().parameters.c), int(pipeline().parameters.d))), int(pipeline().parameters.e)), 3)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "a",
+          "type": "String"
+        },
+        {
+          "name": "b",
+          "type": "String"
+        },
+        {
+          "name": "c",
+          "type": "String"
+        },
+        {
+          "name": "d",
+          "type": "String"
+        },
+        {
+          "name": "e",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(split(pipeline().parameters.csvList, ',')), 3), join(split(pipeline().parameters.csvList, ','), '|'), concat(first(split(pipeline().parameters.csvList, ',')), '|', last(split(pipeline().parameters.csvList, ','))))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "csvList",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(replace(toLower(trim(activity('Lookup').output.firstRow.schema_name)), ' ', ''), '.', replace(toLower(trim(activity('Lookup').output.firstRow.table_name)), ' ', '_'))",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@and(or(greater(add(mul(int(pipeline().parameters.x), 2), sub(int(pipeline().parameters.y), 3)), 100), less(div(int(pipeline().parameters.z), 2), 10)), not(or(equals(toLower(pipeline().parameters.env), 'prod'), equals(activity('Lookup').output.firstRow.is_locked, 'true'))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "x",
+          "type": "String"
+        },
+        {
+          "name": "y",
+          "type": "String"
+        },
+        {
+          "name": "z",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.env)), '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ'), ':', '-'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), sub(int(pipeline().parameters.retryCount), 1)), coalesce(int(pipeline().parameters.offset), 0))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        },
+        {
+          "name": "parallelism",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(int(pipeline().parameters.maxRecords), 1000), equals(toUpper(pipeline().parameters.mode), 'FULL')), not(less(int(pipeline().parameters.timeout), 30)))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "maxRecords",
+          "type": "String"
+        },
+        {
+          "name": "mode",
+          "type": "String"
+        },
+        {
+          "name": "timeout",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(activity('GetMetadata').output.firstRow.folder, '/', toLower(activity('Lookup').output.firstRow.fileName))",
+      "category": "string",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.env, 'prod'), concat(pipeline().parameters.basePath, '/curated/', formatDateTime(utcNow(),'yyyy/MM/dd')), concat(pipeline().parameters.basePath, '/raw/', formatDateTime(utcNow(),'yyyy/MM/dd')))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.region, pipeline().parameters.env, formatDateTime(utcNow(),'yyyyMMdd')), '/')",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@substring(replace(toUpper(trim(activity('Lookup').output.firstRow.customer_name)), ' ', '_'), 0, 12)",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@mod(div(mul(add(int(pipeline().parameters.rowCount), int(pipeline().parameters.delta)), 10), sub(int(pipeline().parameters.partitions), 1)), 3)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "delta",
+          "type": "String"
+        },
+        {
+          "name": "partitions",
+          "type": "String"
+        },
+        {
+          "name": "rowCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', pipeline().parameters.subject, '/', formatDateTime(utcNow(),'yyyy'), '/', formatDateTime(utcNow(),'MM'), '/', formatDateTime(utcNow(),'dd'))",
+      "category": "datetime",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "subject",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(and(greater(length(split(pipeline().parameters.fileList, ',')), 3), not(equals(toLower(pipeline().parameters.env), 'dev'))), equals(activity('Lookup').output.firstRow.is_enabled, 'true'))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "fileList",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.composite_key, '|'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.schema, '.', activity('Lookup').output.firstRow.table_name), '.'))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "schema",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(variables('runPrefix'), '_', substring(formatDateTime(utcNow(),'yyyyMMddHHmmss'), 0, 8), '_', string(add(int(pipeline().parameters.sequence), 100)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "sequence",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(indexOf(toLower(activity('Lookup').output.firstRow.file_name), '.csv'), 0), equals(pipeline().parameters.compression, 'gzip')), concat(replace(activity('Lookup').output.firstRow.file_name, '.csv', ''), '.csv.gz'), activity('Lookup').output.firstRow.file_name)",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "compression",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(coalesce(activity('Lookup').output.firstRow.base_path, pipeline().parameters.fallbackPath), '/', toLower(trim(pipeline().parameters.env)), '/', join(createArray(formatDateTime(utcNow(),'yyyy'), formatDateTime(utcNow(),'MM'), formatDateTime(utcNow(),'dd')), '/'), '/', string(div(add(mul(int(pipeline().parameters.count), 4), sub(int(pipeline().parameters.offset), 2)), 3)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "fallbackPath",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.region)), '/', replace(toUpper(pipeline().parameters.dataset), ' ', '_'))",
+      "category": "string",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "dataset",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(trim(pipeline().parameters.fileName)), 10), substring(trim(pipeline().parameters.fileName), 0, 10), trim(pipeline().parameters.fileName))",
+      "category": "string",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.recordsPerFile), int(pipeline().parameters.fileCount)), int(variables('carryOver'))), sub(int(pipeline().parameters.batchSize), 1))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "fileCount",
+          "type": "String"
+        },
+        {
+          "name": "recordsPerFile",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@mod(div(add(int(pipeline().parameters.totalBytes), mul(int(pipeline().parameters.retryCount), 1024)), 512), 7)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "retryCount",
+          "type": "String"
+        },
+        {
+          "name": "totalBytes",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(int(pipeline().parameters.threshold), 100), equals(toLower(pipeline().parameters.env), 'uat')), not(or(equals(activity('Lookup').output.firstRow.is_disabled, 'true'), less(int(pipeline().parameters.maxRetries), 1))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "maxRetries",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(indexOf(toLower(activity('Lookup').output.firstRow.file_path), '.csv'), 0), not(equals(pipeline().parameters.env, 'prod'))), replace(activity('Lookup').output.firstRow.file_path, '.csv', '.parquet'), activity('Lookup').output.firstRow.file_path)",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.container, pipeline().parameters.folder, formatDateTime(utcNow(),'yyyyMMdd')), '/')",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "folder",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.delimited_ids, ','))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.basePath, '/', activity('Lookup').output.firstRow.file_name), '/'))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.override_schema, pipeline().parameters.defaultSchema, 'dbo')",
+      "category": "string",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "defaultSchema",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.env), '/', formatDateTime(utcNow(),'yyyy/MM/dd/HH'), '/', substring(replace(activity('Lookup').output.firstRow.entity_name, ' ', '_'), 0, 12))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(equals(mod(add(int(pipeline().parameters.partitionId), int(variables('offset'))), 2), 0), concat('even/', string(add(int(pipeline().parameters.partitionId), 1))), concat('odd/', string(sub(int(pipeline().parameters.partitionId), 1))))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "partitionId",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(not(equals(trim(toLower(pipeline().parameters.triggerType)), 'manual')), or(greater(int(activity('Lookup').output.firstRow.row_count), int(pipeline().parameters.minRows)), equals(activity('Lookup').output.firstRow.force_run, 'Y')))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "minRows",
+          "type": "String"
+        },
+        {
+          "name": "triggerType",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(replace(toLower(activity('Lookup').output.firstRow.source_system), ' ', '-'), '/', formatDateTime(utcNow(),'yyyy-MM-dd'), '/run_', add(mul(int(pipeline().parameters.runIdSeed), 10), int(variables('attempt'))))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "runIdSeed",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(split(activity('Lookup').output.firstRow.partition_keys, ',')), 1), join(split(activity('Lookup').output.firstRow.partition_keys, ','), '|'), coalesce(activity('Lookup').output.firstRow.partition_keys, pipeline().parameters.defaultPartitionKey))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "defaultPartitionKey",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@toUpper(trim(replace(activity('Lookup').output.firstRow.file_name, '.csv', '')))",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@if(and(greater(int(pipeline().parameters.retries), 0), less(int(pipeline().parameters.retries), 5)), concat('retry_', string(add(int(pipeline().parameters.retries), 1))), 'retry_max')",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "retries",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.env, toLower(activity('Lookup').output.firstRow.region), formatDateTime(utcNow(),'HHmm')), '-')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(substring(trim(pipeline().parameters.filePrefix), 0, 3), '_', string(mod(add(int(pipeline().parameters.batchId), 7), 5)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchId",
+          "type": "String"
+        },
+        {
+          "name": "filePrefix",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(equals(toLower(pipeline().parameters.env), 'dev'), and(greater(int(activity('Lookup').output.firstRow.priority), 10), not(equals(variables('isDisabled'), 'true'))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.basePath, '/', toLower(pipeline().parameters.env), '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'), ':', '-'))",
+      "category": "datetime",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.maxRecords), int(activity('Lookup').output.firstRow.multiplier)), int(pipeline().parameters.offset)), add(mod(int(pipeline().parameters.divisor), 3), 1))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "divisor",
+          "type": "String"
+        },
+        {
+          "name": "maxRecords",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, concat('default_', pipeline().parameters.env))",
+      "category": "string",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@length(split(replace(trim(activity('Lookup').output.firstRow.csv_list), ' ,', ','), ','))",
+      "category": "collection",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@first(split(concat(activity('Lookup').output.firstRow.schema_name, '.', activity('Lookup').output.firstRow.table_name), '.'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.container, '/', pipeline().parameters.folder, '/', activity('Lookup').output.firstRow.file_name), '/'))",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "folder",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(indexOf(toLower(activity('Lookup').output.firstRow.file_name), '.parquet'), -1), concat(pipeline().parameters.archivePath, '/', formatDateTime(utcNow(),'yyyy/MM/dd'), '/', activity('Lookup').output.firstRow.file_name), concat(pipeline().parameters.rejectPath, '/', activity('Lookup').output.firstRow.file_name))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "archivePath",
+          "type": "String"
+        },
+        {
+          "name": "rejectPath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(equals(pipeline().parameters.loadType, 'full'), equals(pipeline().parameters.loadType, 'delta')), not(and(equals(toLower(pipeline().parameters.env), 'prod'), less(int(pipeline().parameters.parallelism), 4))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "loadType",
+          "type": "String"
+        },
+        {
+          "name": "parallelism",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(substring(toUpper(pipeline().parameters.domain), 0, 2), string(add(mul(int(pipeline().parameters.sequence), 10), int(activity('Lookup').output.firstRow.increment))), formatDateTime(utcNow(),'yyyyMMdd')), '_')",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "domain",
+          "type": "String"
+        },
+        {
+          "name": "sequence",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(coalesce(variables('rootFolder'), pipeline().parameters.container), '/', toLower(trim(pipeline().parameters.env)), '/', substring(replace(activity('Lookup').output.firstRow.entity_name, ' ', '_'), 0, 10), '/', formatDateTime(utcNow(),'yyyy/MM/dd/HH'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.count), 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(int(pipeline().parameters.threshold), 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.env)), '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'),'T','/'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(div(mul(int(pipeline().parameters.batchSize), add(int(pipeline().parameters.retryCount), 1)), 2), mod(int(pipeline().parameters.offset), 3))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "offset",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(int(pipeline().parameters.threshold), 90), equals(toLower(pipeline().parameters.env), 'qa')), not(or(equals(activity('Lookup').output.firstRow.is_enabled, 'false'), less(int(pipeline().parameters.count), 1))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(substring(toUpper(activity('Lookup').output.firstRow.file_prefix), 0, 3), '_', formatDateTime(utcNow(),'yyyyMMdd'))",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.region, pipeline().parameters.env, activity('Lookup').output.firstRow.config_value), '/')",
+      "category": "collection",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(split(pipeline().parameters.fileName, '.')), 1), last(split(pipeline().parameters.fileName, '.')), 'unknown')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "fileName",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.domain), '/', formatDateTime(utcNow(),'yyyy/MM/dd'), '/', replace(activity('Lookup').output.firstRow.file_name, ' ', '_'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "domain",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(int(pipeline().parameters.threshold), 10), less(int(pipeline().parameters.threshold), 100)), concat('valid_', string(add(int(pipeline().parameters.threshold), 5))), 'invalid')",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_path, concat(pipeline().parameters.fallbackContainer, '/', formatDateTime(utcNow(),'yyyyMMdd')))",
+      "category": "nested",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "fallbackContainer",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(split(replace(toLower(trim(pipeline().parameters.csvList)), ' ,', ','), ','), '|')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "csvList",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(first(split(activity('Lookup').output.firstRow.source_path, '/')), '/', last(split(activity('Lookup').output.firstRow.source_path, '/')))",
+      "category": "collection",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@or(and(equals(toLower(pipeline().parameters.loadType), 'full'), greater(int(pipeline().parameters.count), 0)), and(equals(toLower(pipeline().parameters.loadType), 'delta'), not(equals(activity('Lookup').output.firstRow.watermark, ''))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        },
+        {
+          "name": "loadType",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(variables('basePath'), '/', pipeline().parameters.env, '/', substring(formatDateTime(utcNow(),'yyyyMMddHHmmss'), 0, 8))",
+      "category": "datetime",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(length(split(activity('Lookup').output.firstRow.id_list, ',')), mul(int(pipeline().parameters.extraCount), 2))",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "extraCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(join(createArray(toUpper(pipeline().parameters.region), toLower(trim(pipeline().parameters.env)), replace(activity('Lookup').output.firstRow.dataset_name, ' ', '_')), '/'), '/', if(greater(indexOf(activity('Lookup').output.firstRow.file_name, '.'), 0), substring(activity('Lookup').output.firstRow.file_name, 0, indexOf(activity('Lookup').output.firstRow.file_name, '.')), activity('Lookup').output.firstRow.file_name), '_', formatDateTime(utcNow(),'yyyyMMdd'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@add(mul(pipeline().parameters.count, 2), 1)",
+      "category": "math",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "count",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(greater(pipeline().parameters.threshold, 50), not(equals(pipeline().parameters.env, 'prod')))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "category": "string",
+      "difficulty": "simple"
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "category": "datetime",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(toLower(trim(pipeline().parameters.region)), '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'), ':', '-'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "region",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(and(greater(add(pipeline().parameters.batchSize, 5), 100), less(mod(pipeline().parameters.retryCount, 3), 2)), concat('large_', toUpper(pipeline().parameters.env)), concat('small_', toLower(pipeline().parameters.env)))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        },
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.sourceSystem, pipeline().parameters.entity, formatDateTime(utcNow(),'yyyyMMdd')), '/')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "entity",
+          "type": "String"
+        },
+        {
+          "name": "sourceSystem",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@substring(activity('Lookup').output.firstRow.file_name, add(indexOf(activity('Lookup').output.firstRow.file_name, '_'), 1), 8)",
+      "category": "string",
+      "difficulty": "complex"
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.override_path, concat(pipeline().parameters.basePath, '/', variables('folderName')))",
+      "category": "nested",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "basePath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@or(equals(toLower(trim(pipeline().parameters.mode)), 'full'), and(greater(pipeline().parameters.priority, 5), not(equals(activity('Lookup').output.firstRow.is_disabled, 'true'))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "mode",
+          "type": "String"
+        },
+        {
+          "name": "priority",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@div(sub(mul(add(pipeline().parameters.recordCount, 10), 3), pipeline().parameters.offset), 2)",
+      "category": "math",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "offset",
+          "type": "String"
+        },
+        {
+          "name": "recordCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', toLower(pipeline().parameters.domain), '/', formatDateTime(utcNow(),'yyyy/MM/dd/HH'), '/', replace(activity('Lookup').output.firstRow.file_prefix, ' ', '_'))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "container",
+          "type": "String"
+        },
+        {
+          "name": "domain",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@length(split(replace(trim(pipeline().parameters.csvList), ' ,', ','), ','))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "csvList",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.composite_key, '|'))",
+      "category": "collection",
+      "difficulty": "moderate"
+    },
+    {
+      "adf_expression": "@last(split(concat(pipeline().parameters.storagePath, '/', variables('fileName')), '/'))",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "storagePath",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@if(greater(length(trim(coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue))), 0), toUpper(coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue)), 'MISSING')",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "defaultValue",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@concat(join(createArray(toLower(pipeline().parameters.env), formatDateTime(utcNow(),'yyyy'), formatDateTime(utcNow(),'MM')), '/'), '/', substring(replace(activity('Lookup').output.firstRow.table_name, '-', '_'), 0, 12))",
+      "category": "nested",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@and(or(greater(pipeline().parameters.threshold, add(pipeline().parameters.minThreshold, 10)), equals(toLower(pipeline().parameters.env), 'qa')), not(or(equals(activity('Lookup').output.firstRow.status, 'inactive'), less(pipeline().parameters.retryCount, 1))))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "minThreshold",
+          "type": "String"
+        },
+        {
+          "name": "retryCount",
+          "type": "String"
+        },
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@join(createArray(concat('dt=', formatDateTime(utcNow(),'yyyy-MM-dd')), concat('env=', toLower(pipeline().parameters.env)), concat('id=', replace(activity('Lookup').output.firstRow.config_value, ' ', '_')), concat('shard=', mod(add(pipeline().parameters.partitionId, 7), 5))), '/')",
+      "category": "collection",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        },
+        {
+          "name": "partitionId",
+          "type": "String"
+        }
+      ]
+    }
+  ]
+}
