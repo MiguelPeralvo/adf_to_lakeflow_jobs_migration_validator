@@ -14,6 +14,7 @@
 | [lakeflow-jobs-patterns.md](lakeflow-jobs-patterns.md) | Databricks Lakeflow Jobs patterns and constraints | Before evaluating translation output quality |
 | [cost-model.md](cost-model.md) | LLM API cost tracking per model and operation | After any LLM-consuming operation |
 | [learnings.md](learnings.md) | Session-by-session discoveries (append-only log) | After every /lmv-autodev or adversarial session |
+| [wkmigrate-fix-spec-W9-W10.md](wkmigrate-fix-spec-W9-W10.md) | Full fix spec for W-9 (Copy sql_reader_query) and W-10 (ForEach items) | When invoking /wkmigrate-autodev for these findings |
 
 ## Usage Protocol
 
