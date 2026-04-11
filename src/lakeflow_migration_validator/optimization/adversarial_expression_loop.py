@@ -306,7 +306,8 @@ class AdversarialExpressionLoop:
             else:
                 response = self._provider.judge(prompt, model=self._model)
                 raw = response.get("reasoning", "")
-            return _parse_expression_list(raw)
+            expressions = _parse_expression_list(raw)
+            return _enrich_with_referenced_params(expressions)
         except Exception:
             return []
 
@@ -386,6 +387,23 @@ def _parse_expression_list(raw: str) -> list[dict]:
             e for e in parsed if isinstance(e, dict) and "adf_expression" in e and isinstance(e["adf_expression"], str)
         ]
     return []
+
+
+def _enrich_with_referenced_params(expressions: list[dict]) -> list[dict]:
+    """Extract pipeline().parameters.X references and add referenced_params.
+
+    The activity context wrappers use ``referenced_params`` to inject parameter
+    definitions into the synthetic pipeline so wkmigrate's resolver can map
+    ``pipeline().parameters.X`` to ``dbutils.widgets.get('X')``. Without this,
+    expressions referencing parameters fail silently.
+    """
+    param_pattern = re.compile(r"pipeline\(\)\.parameters\.(\w+)")
+    for expr_dict in expressions:
+        adf = expr_dict.get("adf_expression", "")
+        params = param_pattern.findall(adf)
+        if params:
+            expr_dict["referenced_params"] = [{"name": p, "type": "String"} for p in sorted(set(params))]
+    return expressions
 
 
 def _extract_failure_pattern(expr: str) -> str | None:

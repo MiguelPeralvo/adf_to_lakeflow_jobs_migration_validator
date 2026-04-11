@@ -90,6 +90,29 @@ Pipeline spec:
 - Stress area: {target_description}
 {extra_instructions}
 
+STRUCTURAL REQUIREMENTS (the migration tool rejects activities missing these):
+
+For Copy activities, you MUST include:
+- "input_dataset_definitions": [{{"type": "AzureSqlSource", "schema": [], "linkedServiceName": {{"referenceName": "ls_sql", "type": "LinkedServiceReference"}}}}]
+- "output_dataset_definitions": [{{"type": "AzureDatabricksDeltaLakeSink", "schema": [], "linkedServiceName": {{"referenceName": "ls_delta", "type": "LinkedServiceReference"}}}}]
+- "source": {{"type": "AzureSqlSource", "sql_reader_query": <your expression here>}}
+- "sink": {{"type": "AzureDatabricksDeltaLakeSink"}}
+- "translator": {{"type": "TabularTranslator", "mappings": [{{"source": {{"name": "src_col"}}, "sink": {{"name": "tgt_col", "type": "String"}}}}]}}
+
+For Lookup activities, you MUST include:
+- "input_dataset_definitions": [{{"type": "AzureSqlSource", "schema": [], "linkedServiceName": {{"referenceName": "ls_sql", "type": "LinkedServiceReference"}}}}]
+- "source": {{"type": "AzureSqlSource", "sql_reader_query": <your expression here>}}
+
+For ForEach activities, "items" MUST evaluate to an array:
+- "items": {{"type": "Expression", "value": "@createArray(...)"}}
+- "activities": [<at least one inner activity>]
+
+For IfCondition activities, "expression" MUST be a boolean comparison:
+- "expression": {{"type": "Expression", "value": "@equals(...)"}} or @greater, @less, @and, @or
+
+For all parameters referenced in expressions, define them in the pipeline:
+- "parameters": {{"env": {{"type": "String"}}, "count": {{"type": "String"}}, ...}}
+
 Output format — a single JSON object:
 {{"name": "{pipeline_name}", "properties": {{"parameters": {{...}}, "variables": {{...}}, "activities": [...]}}}}
 
