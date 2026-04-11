@@ -1,0 +1,606 @@
+{
+  "count": 60,
+  "source": "adversarial_loop",
+  "expressions": [
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env, '/', if(equals(pipeline().parameters.region,'us'),'north-america',if(equals(pipeline().parameters.region,'eu'),'europe','other')), '/', concat(pipeline().parameters.source_system, '/', pipeline().parameters.batch_id))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expressions_string_logic",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.route_key",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expressions_dynamic_routing",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@add(mul(int(pipeline().parameters.base_threshold), int(pipeline().parameters.multiplier)), 1)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_threshold_eval",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@add(mul(pipeline().parameters.file_count, 2), 1)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_partition_calc",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT TOP (@{pipeline().parameters.max_items}) name AS table_name FROM sys.tables WHERE name LIKE '@{pipeline().parameters.table_filter}' ORDER BY name",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_lookup_driven",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('started_', pipeline().parameters.env, '_', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_param_array_transform",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(pipeline().parameters.is_full_load,'FULL','INCREMENTAL')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_multi_branch_flags",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT CAST('@{pipeline().parameters.run_date}' AS date) AS run_date, @{pipeline().parameters.cutoff_hour} AS cutoff_hour, '@{pipeline().parameters.timezone}' AS timezone, @{pipeline().parameters.sla_minutes} AS sla_minutes",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_temporal_gating",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_lookup_copy_notify",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('Lookup_Config').output.firstRow.config_value",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_notebook_web_followup",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_multi_segment_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_env_region_dataset",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT COUNT(1) AS row_count FROM ', pipeline().parameters.control_table, ' WHERE environment = ''', pipeline().parameters.env, '''')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_if_foreach_expression_stack",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(variables('itemsToProcess')), 0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_chained_conditions_and_paths",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('env=', pipeline().parameters.env, ';batch=', pipeline().parameters.batch_id, ';objectLike=', pipeline().parameters.object_like_param)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_types_param_validation_guardrails",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@json(concat('{\"env\":\"', pipeline().parameters.env, '\",\"batch\":\"', pipeline().parameters.batch_id, '\",\"payload\":', pipeline().parameters.payload_json, '}'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_setvariable_object_assignment",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.items",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_setvariable_array_flow_branch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_object_result_to_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_array_result_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('tabular-from-', pipeline().parameters.env, '-binary-source')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_binary_to_tabular_mismatch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_complex_column_mapping",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('Preparing Databricks call for env=', pipeline().parameters.env)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_object_baseparameters",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_array_parameter_fanout",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('{','\"environment\":\"',pipeline().parameters.env,'\",','\"source\":\"adf\",','\"payload\":',pipeline().parameters.payload_json,',','\"meta\":',string(createArray('web','object-body','unsupported-pattern')),',','\"attemptedObject\":',string(json(concat('{\"raw\":',pipeline().parameters.payload_json,'}'))),'}')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_body_object_payload",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('{\"environment\":\"', pipeline().parameters.env, '\",\"issuedAt\":\"', utcNow(), '\"}')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_headers_array_shape",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.items_source,'scalar'),'42',if(equals(pipeline().parameters.items_source,'object'),string(json(concat('{\"id\":\"',pipeline().parameters.run_id,'\",\"env\":\"',pipeline().parameters.env,'\"}'))),string(createArray('a','b'))))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_items_scalar_instead_of_array",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_nested_objects_with_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@string(pipeline().parameters.feature_flags)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_object_boolean_coercion",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('LookupRules').output.value",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_array_truthiness_branching",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_cross_activity_chained_complex_outputs",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT '@{pipeline().parameters.env}' AS env, '@{pipeline().parameters.source_path}' AS source_path, '@{pipeline().parameters.sink_table}' AS sink_table, '@{pipeline().parameters.batch_id}' AS batch_id",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_binary_to_tabular_failure",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('select ''', pipeline().parameters.env, ''' as env, ''', pipeline().parameters.batch_id, ''' as batch_id, ''{\"metadata\":{\"source\":\"api\",\"tags\":[\"blue\",\"green\"],\"window\":{\"start\":\"2024-01-01\",\"end\":\"2024-01-31\"}},\"items\":[{\"id\":1,\"attrs\":{\"k\":\"a\",\"scores\":[10,20]}},{\"id\":2,\"attrs\":{\"k\":\"b\",\"scores\":[30,40]}}],\"flags\":[true,false],\"queryEcho\":\"', replace(pipeline().parameters.query_text,'''',''''''), '\"}'' as payloadJson')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_complex_object_projection",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.api_url,'/v1/batches/',pipeline().parameters.batch_id,'?env=',pipeline().parameters.env)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_non_scalar_response_branching",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('Lookup_MixedItems').output.value",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_items_object_array_mismatch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@equals(json(activity('Lookup_ControlPayload').output.firstRow.payload), 'ready')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_expression_on_array_payload",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('Lookup_Metadata').output.firstRow",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_setvariable_assign_object_value",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('Lookup_Config').output.firstRow.payload",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_param_complex_map_payload",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'/landing/',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_schema_drift_with_nested_source",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.api_url,'?env=',pipeline().parameters.env,'&batch=',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_web_to_copy_json_fragment_reuse",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_xml_or_variant_emulation",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.items_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_nested_iteration_output_cast",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.query_text",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_null_object_array_ambiguity",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.notebook_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_output_referenced_as_scalar",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.source_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_mixed_array_column_mapping",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.query_text",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_full_activity_chain_cross_type_propagation",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.items_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_inside_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.feature_flag",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_in_ifcondition",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_chained_to_databricks",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('starting-', pipeline().parameters.env)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_binary_mixed_with_web_call",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.request_items",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_nested_foreach_webactivity_fanout",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'-',pipeline().parameters.run_mode)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_databricks_else_branch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.lookup_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_null_driven_webactivity",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_copy_then_notebook",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.endpoint_url",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_response_routing",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.notebook_path,'/',pipeline().parameters.env,'/batch_',pipeline().parameters.batch_id,'/',if(equals(toLower(pipeline().parameters.env),'prod'),'hardened','standard'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_parameter_expression_heavy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@equals(string(activity('LookupDecision').output.firstRow.useWeb),'1')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_dual_unsupported_branch_mix",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.items_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_conditional_web_calls",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.source_query",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_to_copy_to_web_notify",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.source_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_guarded_notebook_retry_flag",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('START|', pipeline().parameters.env, '|', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_multi_stage_coverage_matrix",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    }
+  ]
+}
