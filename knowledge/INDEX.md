@@ -17,6 +17,8 @@
 | [wkmigrate-fix-spec-W9-W10.md](wkmigrate-fix-spec-W9-W10.md) | Full fix spec for W-9 (Copy sql_reader_query) and W-10 (ForEach items) | When invoking /wkmigrate-autodev for these findings |
 | [wkmigrate-fix-spec-W11-structural.md](wkmigrate-fix-spec-W11-structural.md) | Fix spec for W-11 (structural activity coverage gaps post W-9/W-10 fix) | When invoking /wkmigrate-autodev for structural resilience |
 | [wkmigrate-fix-spec-W12-W13-copy-ifcondition.md](wkmigrate-fix-spec-W12-W13-copy-ifcondition.md) | Fix spec for W-12 (Copy query unreachable) + W-13 (IfCondition compound predicates) | When invoking /wkmigrate-autodev for remaining expression gaps |
+| [wkmigrate-fix-spec-W14-parameter-activity-resolution.md](wkmigrate-fix-spec-W14-parameter-activity-resolution.md) | Fix spec for W-14 (best-effort resolution for undefined params/activities) | When invoking /wkmigrate-autodev for parameter resolution |
+| [wkmigrate-fix-spec-W15-W16-join-variables.md](wkmigrate-fix-spec-W15-W16-join-variables.md) | Fix spec for W-15 (@join not supported) + W-16 (variables() not resolved) | The final 19.5% gap — fixes push adversarial rate from 80.5% to ~100% |
 
 ## Usage Protocol
 
