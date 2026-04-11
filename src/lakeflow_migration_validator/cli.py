@@ -569,6 +569,195 @@ def history_command(
     _emit(entries)
 
 
+@app.command("optimize-judge")
+def optimize_judge_command(
+    calibration_set: Path = typer.Option(
+        "golden_sets/calibration_pairs.json",
+        "--calibration-set",
+        exists=True,
+        readable=True,
+        help="Path to calibration pairs JSON",
+    ),
+    optimizer: str = typer.Option("MIPROv2", "--optimizer", help="DSPy optimizer: MIPROv2 or SIMBA"),
+    model: str = typer.Option(
+        "databricks-claude-sonnet-4-6",
+        "--model",
+        help="Model for optimization (primary: databricks-claude-opus-4-6, batch: databricks-gpt-5-4)",
+    ),
+    num_trials: int = typer.Option(20, "--num-trials", help="Number of optimization trials"),
+    output: Path | None = typer.Option(None, "--output", help="Save optimized state to this path"),
+    evaluate_only: bool = typer.Option(False, "--evaluate-only", help="Only evaluate current judge, no optimization"),
+) -> None:
+    """Optimize the LLM judge using DSPy against human-labelled calibration pairs.
+
+    Uses Databricks Anthropic (Opus 4.6 for high-stakes, Sonnet 4.6 for optimization)
+    as primary; Databricks ChatGPT 5.4 as batch fallback.
+    """
+    _auto_configure()
+    if _JUDGE_PROVIDER is None:
+        typer.echo("ERROR: FMAPI judge not configured — set DATABRICKS_HOST and DATABRICKS_TOKEN env vars.", err=True)
+        raise typer.Exit(code=2)
+
+    if evaluate_only:
+        from lakeflow_migration_validator.optimization.dspy_judge import evaluate_judge_quality
+        from lakeflow_migration_validator.optimization.judge_optimizer import ManualCalibrator
+
+        calibrator = ManualCalibrator.from_file(calibration_set)
+        judge = calibrator.to_optimized_judge(_JUDGE_PROVIDER, model=model)
+        scores = evaluate_judge_quality(judge, calibration_set)
+        _emit({"mode": "evaluate_only", "agreement_scores": scores})
+        return
+
+    try:
+        from lakeflow_migration_validator.optimization.dspy_judge import DSPyJudgeOptimizer
+
+        opt = DSPyJudgeOptimizer(
+            _JUDGE_PROVIDER,
+            optimizer=optimizer,
+            model=model,
+            num_trials=num_trials,
+        )
+        typer.echo(f"Running {optimizer} optimization with {num_trials} trials on {model}...", err=True)
+        result = opt.optimize(calibration_set)
+        _emit(
+            {
+                "mode": "dspy",
+                "optimizer": optimizer,
+                "model": model,
+                "train_agreement": result.train_agreement,
+                "dev_agreement": result.dev_agreement,
+                "improvement_over_baseline": result.improvement_over_baseline,
+                "num_trials": result.num_trials,
+            }
+        )
+        if output:
+            opt.save(output)
+            typer.echo(f"\nOptimized state saved to {output}", err=True)
+    except ImportError:
+        typer.echo("DSPy not installed — falling back to ManualCalibrator.", err=True)
+        from lakeflow_migration_validator.optimization.judge_optimizer import ManualCalibrator
+
+        calibrator = ManualCalibrator.from_file(calibration_set)
+        judge = calibrator.to_optimized_judge(_JUDGE_PROVIDER, model=model)
+        agreement = calibrator.evaluate_agreement(judge)
+        _emit(
+            {
+                "mode": "manual_calibrator",
+                "model": model,
+                "agreement": agreement,
+                "examples_selected": len(calibrator.select_examples()),
+            }
+        )
+
+
+@app.command("adversarial-loop")
+def adversarial_loop_command(
+    rounds: int = typer.Option(10, "--rounds", help="Maximum rounds"),
+    pipelines_per_round: int = typer.Option(10, "--pipelines", help="Pipelines to generate per round"),
+    patience: int = typer.Option(3, "--patience", help="Stop if no new clusters for this many rounds"),
+    time_budget: float = typer.Option(3600.0, "--time-budget", help="Max seconds (default 1 hour)"),
+    llm_budget: int = typer.Option(500, "--llm-budget", help="Max LLM calls"),
+    threshold: float = typer.Option(0.75, "--threshold", help="Score below this = failure"),
+    weak_spots: str = typer.Option(
+        "nested_expressions,math_on_params,foreach_expression_items,complex_conditions",
+        "--weak-spots",
+        help="Comma-separated weak spots to target",
+    ),
+    golden_set_output: Path | None = typer.Option(
+        None, "--golden-set-output", help="Write discovered failures as a golden set"
+    ),
+    model: str = typer.Option(
+        "databricks-claude-opus-4-6",
+        "--model",
+        help="Model for pipeline generation (primary: opus-4-6, batch: gpt-5-4)",
+    ),
+    quiet: bool = typer.Option(False, "--quiet", help="Only print final result JSON"),
+) -> None:
+    """Run a closed-loop adversarial testing loop against wkmigrate.
+
+    Generates ADF pipelines targeting weak spots, converts them through wkmigrate,
+    scores dimensions, clusters failures, and feeds results back to generate harder
+    test cases each round.
+
+    Uses Databricks Anthropic Opus 4.6 for generation (primary) and
+    Databricks ChatGPT 5.4 for batch scoring (secondary).
+    """
+    _auto_configure()
+    if _JUDGE_PROVIDER is None:
+        typer.echo("ERROR: FMAPI judge not configured — set DATABRICKS_HOST and DATABRICKS_TOKEN env vars.", err=True)
+        raise typer.Exit(code=2)
+    if _CONVERT_FN is snapshot_from_adf_payload:
+        typer.echo(
+            "ERROR: wkmigrate not available — adversarial loop requires the real converter. "
+            "Install wkmigrate via 'poetry install --with dev' first.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    from lakeflow_migration_validator.optimization.adversarial_loop import (
+        AdversarialLoop,
+        LoopConfig,
+    )
+
+    config = LoopConfig(
+        max_rounds=rounds,
+        pipelines_per_round=pipelines_per_round,
+        convergence_patience=patience,
+        max_time_seconds=time_budget,
+        max_llm_calls=llm_budget,
+        failure_threshold=threshold,
+        target_weak_spots=tuple(s.strip() for s in weak_spots.split(",") if s.strip()),
+        golden_set_output_path=str(golden_set_output) if golden_set_output else None,
+    )
+
+    loop = AdversarialLoop(
+        _JUDGE_PROVIDER,
+        convert_fn=_CONVERT_FN,
+        config=config,
+        model=model,
+    )
+
+    if quiet:
+        result = loop.run()
+    else:
+        typer.echo(f"Adversarial loop: {rounds} rounds, {pipelines_per_round} pipelines/round", err=True)
+        typer.echo(f"Targets: {', '.join(config.target_weak_spots)}", err=True)
+        typer.echo(f"Model: {model} | Budget: {llm_budget} calls, {time_budget:.0f}s", err=True)
+        typer.echo("---", err=True)
+        result = None
+        for event in loop.run_stream():
+            if event["type"] == "round_start":
+                typer.echo(f"\n[Round {event['round']}]", err=True)
+            elif event["type"] == "round_end":
+                r = event["result"]
+                typer.echo(
+                    f"  Generated: {r.pipelines_generated} | Failures: {r.failures_found} | "
+                    f"New clusters: {r.new_clusters} | Worst: {r.worst_dimension}",
+                    err=True,
+                )
+            elif event["type"] == "new_cluster":
+                typer.echo(
+                    f"  NEW CLUSTER: {event['signature']} — {event.get('example_expression', '')[:60]}", err=True
+                )
+            elif event["type"] == "budget_warning":
+                typer.echo(f"  BUDGET: {event['resource']} {event['used']}/{event['limit']}", err=True)
+            elif event["type"] == "complete":
+                result = event["result"]
+
+    assert result is not None
+    summary = {
+        "rounds_completed": result.rounds_completed,
+        "total_pipelines": result.total_pipelines,
+        "total_failures": result.total_failures,
+        "unique_clusters": result.unique_clusters,
+        "termination_reason": result.termination_reason,
+        "elapsed_seconds": round(result.elapsed_seconds, 1),
+        "discovered_signatures": result.discovered_signatures,
+        "golden_set_path": result.golden_set_path,
+    }
+    _emit(summary)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

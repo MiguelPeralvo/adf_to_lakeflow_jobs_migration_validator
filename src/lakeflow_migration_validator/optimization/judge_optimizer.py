@@ -229,7 +229,7 @@ class ManualCalibrator:
         provider: JudgeProvider,
         *,
         threshold: float = 0.7,
-        model: str = "claude-opus-4-6",
+        model: str = "databricks-claude-opus-4-6",
     ) -> LLMJudge:
         """Return an improved LLMJudge with calibrated prompt + examples."""
         examples = self.select_examples()
@@ -280,7 +280,7 @@ class JudgeOptimizer:
         provider: JudgeProvider,
         *,
         optimizer: str = "MIPROv2",
-        model: str = "claude-opus-4-6",
+        model: str = "databricks-claude-opus-4-6",
         threshold: float = 0.7,
     ) -> None:
         try:
