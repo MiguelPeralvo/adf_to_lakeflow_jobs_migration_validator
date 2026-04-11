@@ -758,6 +758,107 @@ def adversarial_loop_command(
     _emit(summary)
 
 
+@app.command("expression-loop")
+def expression_loop_command(
+    rounds: int = typer.Option(10, "--rounds", help="Maximum rounds"),
+    expressions: int = typer.Option(20, "--expressions", help="Expressions to generate per round"),
+    patience: int = typer.Option(3, "--patience", help="Stop if no new patterns for this many rounds"),
+    time_budget: float = typer.Option(3600.0, "--time-budget", help="Max seconds"),
+    llm_budget: int = typer.Option(100, "--llm-budget", help="Max LLM calls"),
+    weak_spots: str = typer.Option(
+        "nested_expressions,math_on_params,complex_conditions,activity_output_chaining,parameterized_paths",
+        "--weak-spots",
+        help="Comma-separated weak spots to target",
+    ),
+    contexts: str | None = typer.Option(None, "--contexts", help="Comma-separated activity contexts (default: all 7)"),
+    golden_set_output: Path | None = typer.Option(
+        None, "--golden-set-output", help="Write generated expressions as golden set"
+    ),
+    model: str = typer.Option("databricks-gpt-5-4", "--model", help="Model for expression generation"),
+    quiet: bool = typer.Option(False, "--quiet", help="Only print final result JSON"),
+) -> None:
+    """Run an expression-focused adversarial loop against wkmigrate.
+
+    Generates adversarial ADF expressions via LLM, sweeps each one across
+    all 7 activity contexts, clusters failures, and feeds patterns back to
+    generate harder expressions. 7x more signal per LLM call than the
+    pipeline-level adversarial-loop.
+    """
+    _auto_configure()
+    if _JUDGE_PROVIDER is None:
+        typer.echo("ERROR: FMAPI judge not configured — set DATABRICKS_HOST and DATABRICKS_TOKEN.", err=True)
+        raise typer.Exit(code=2)
+    if _CONVERT_FN is snapshot_from_adf_payload:
+        typer.echo("ERROR: wkmigrate not available.", err=True)
+        raise typer.Exit(code=2)
+
+    from lakeflow_migration_validator.optimization.adversarial_expression_loop import (
+        AdversarialExpressionLoop,
+        ExpressionLoopConfig,
+    )
+
+    parsed_contexts = tuple(c.strip() for c in contexts.split(",") if c.strip()) if contexts else None
+    config = ExpressionLoopConfig(
+        max_rounds=rounds,
+        expressions_per_round=expressions,
+        convergence_patience=patience,
+        max_time_seconds=time_budget,
+        max_llm_calls=llm_budget,
+        contexts=parsed_contexts,
+        target_weak_spots=tuple(s.strip() for s in weak_spots.split(",") if s.strip()),
+        golden_set_output_path=str(golden_set_output) if golden_set_output else None,
+    )
+
+    loop = AdversarialExpressionLoop(
+        _JUDGE_PROVIDER,
+        convert_fn=_CONVERT_FN,
+        config=config,
+        model=model,
+    )
+
+    if quiet:
+        result = loop.run()
+    else:
+        typer.echo(f"Expression loop: {rounds} rounds, {expressions} expressions/round", err=True)
+        typer.echo(f"Targets: {', '.join(config.target_weak_spots)}", err=True)
+        typer.echo(f"Model: {model} | Contexts: {parsed_contexts or 'all 7'}", err=True)
+        typer.echo("---", err=True)
+        result = None
+        for event in loop.run_stream():
+            if event["type"] == "round_start":
+                typer.echo(f"\n[Round {event['round']}]", err=True)
+            elif event["type"] == "generated":
+                typer.echo(f"  Generated: {event['count']} expressions ({event['categories']})", err=True)
+            elif event["type"] == "new_pattern":
+                typer.echo(f"  NEW: {event['pattern']} — {event.get('expression', '')[:60]}", err=True)
+            elif event["type"] == "round_end":
+                r = event["result"]
+                rate = r.cells_resolved / r.total_cells * 100 if r.total_cells else 0
+                typer.echo(
+                    f"  Resolved: {r.cells_resolved}/{r.total_cells} ({rate:.1f}%) | "
+                    f"New patterns: {r.new_failure_patterns}",
+                    err=True,
+                )
+            elif event["type"] == "complete":
+                result = event["result"]
+
+    assert result is not None
+    summary = {
+        "rounds_completed": result.rounds_completed,
+        "total_expressions": result.total_expressions,
+        "total_cells": result.total_cells,
+        "total_resolved": result.total_resolved,
+        "overall_resolution_rate": round(result.overall_resolution_rate, 3),
+        "unique_failure_patterns": result.unique_failure_patterns,
+        "termination_reason": result.termination_reason,
+        "elapsed_seconds": round(result.elapsed_seconds, 1),
+        "per_context_rates": {k: round(v, 3) for k, v in result.per_context_rates.items()},
+        "discovered_patterns": result.discovered_patterns,
+        "golden_set_path": result.golden_set_path,
+    }
+    _emit(summary)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
