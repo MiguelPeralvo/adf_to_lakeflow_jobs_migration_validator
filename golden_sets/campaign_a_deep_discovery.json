@@ -1,0 +1,606 @@
+{
+  "count": 60,
+  "source": "adversarial_loop",
+  "expressions": [
+    {
+      "adf_expression": "@concat('/data/', pipeline().parameters.env, '/', if(equals(pipeline().parameters.run_mode, 'full'), 'full', 'delta'), '/', pipeline().parameters.region, '/', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expression_variable_resolution",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('/landing/', pipeline().parameters.env, '/', pipeline().parameters.tenant, '/', pipeline().parameters.source_system, '/', formatDateTime(pipeline().parameters.dataset_date, 'yyyy/MM/dd'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expression_path_builder",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@add(mul(pipeline().parameters.retry_count, 2), pipeline().parameters.offset)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_threshold_compute",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.start_partition",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_partition_range",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT sourceSchema, sourceTable, sinkFolder, isActive FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' ORDER BY sourceSchema, sourceTable')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_lookup_driven",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@string(length(filter(pipeline().parameters.table_list, contains(pipeline().parameters.enabled_flags, item().name))))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_param_array_selective",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(or(pipeline().parameters.is_full_load, equals(pipeline().parameters.watermark_value, null), equals(trim(string(pipeline().parameters.watermark_value)), '')), 'FULL', 'INCREMENTAL')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_multi_branch_flags",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "dbo.OrdersStage",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_data_quality_gate",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT ''', pipeline().parameters.env, ''' as env, COUNT(1) as expected_rows, MAX(modified_at) as max_modified_at FROM (', pipeline().parameters.source_query, ') q')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_lookup_copy_notify",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT TOP 1 api_base_url, notify_path, expected_status FROM @{pipeline().parameters.audit_table} WHERE env = '@{pipeline().parameters.env}' ORDER BY 1",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_notebook_to_web",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('/landing/', pipeline().parameters.env, '/', pipeline().parameters.container, '/', pipeline().parameters.folder, '/dt=', formatDateTime(pipeline().parameters.dataset_date,'yyyy-MM-dd'), '/')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_multi_env_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_foreach_sink_variants",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.env,'prod'),'strict',if(equals(pipeline().parameters.env,'test'),'validation','standard'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_foreach_if_expr_chain",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'|',pipeline().parameters.run_mode,'|',pipeline().parameters.entity_group)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_multi_layer_controlflow",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(or(equals(pipeline().parameters.raw_payload, null), equals(trim(string(pipeline().parameters.raw_payload)), '')), '', if(equals(toLower(pipeline().parameters.expected_type), 'integer'), string(int(pipeline().parameters.raw_payload)), if(equals(toLower(pipeline().parameters.expected_type), 'float'), string(float(pipeline().parameters.raw_payload)), if(equals(toLower(pipeline().parameters.expected_type), 'boolean'), string(bool(pipeline().parameters.raw_payload)), string(pipeline().parameters.raw_payload)))))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_types_coercion_and_guardrails",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.source_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_copy_binary_to_tabular",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.config_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_lookup_complex_object_branch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@activity('lkp_metadata_payload').output.value",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_setvariable_array_assignment",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.api_url",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_webactivity_nonjson_response",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_foreach_over_scalar_value",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@and(not(empty(variables('resolvedProfile'))), not(equals(pipeline().parameters.source_dataset, '')), not(equals(pipeline().parameters.sink_dataset, '')))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_copy_with_nested_json_mapping",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@string(pipeline().parameters.job_payload)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_databricks_param_object_payload",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.rules_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_ifcondition_object_comparison",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.schema_api,'?env=',pipeline().parameters.env)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_web_to_copy_schema_drift",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(item().collections), 0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_foreach_nested_collection_access",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_copy_parquet_decimal_interval_edge",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.endpoint,'?env=',pipeline().parameters.env,'&batch_id=',pipeline().parameters.batch_id,'&mode=',pipeline().parameters.parse_mode)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_lookup_xml_like_payload_handling",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.notebook_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_databricks_return_complex_result",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.seed_url,'?env=',pipeline().parameters.env,'&batch=',pipeline().parameters.batch_id,'&cid=',pipeline().parameters.correlation_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_multistage_activity_output_chaining",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('select top 1 ''', pipeline().parameters.env, ''' as env, ''', pipeline().parameters.source_ref, ''' as sourceRef, ''', pipeline().parameters.sink_ref, ''' as sinkRef, ''', pipeline().parameters.batch_id, ''' as batchId, ''[1,2,{\"k\":\"v\"}]'' as mixedPayload, ''{\"items\":[\"a\",\"b\"],\"copy\":{\"mode\":\"merge\"}}'' as jsonPayload from ', pipeline().parameters.config_table)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_dynamic_expression_type_confusion",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_with_complex_type_lookup_guard",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('Monitoring Databricks notebook output for table ', pipeline().parameters.table_name, ' in ', pipeline().parameters.env, ' batch ', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_array_map_detection",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.table_list_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_per_table_copy_scan",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 CASE WHEN EXISTS (SELECT 1 FROM dbo.SchemaDriftAudit WHERE environment = ''', pipeline().parameters.env, ''' AND source_name = ''', pipeline().parameters.source_name, ''' AND target_name = ''', pipeline().parameters.target_name, ''' AND schema_version = ''', pipeline().parameters.schema_version, ''' AND (unsupported_type_signature LIKE ''%hierarchyid%'' OR unsupported_type_signature LIKE ''%sql_variant%'' OR unsupported_type_signature LIKE ''%geography%'' OR unsupported_type_signature LIKE ''%geometry%'' OR unsupported_type_signature LIKE ''%xml%'' OR unsupported_type_signature LIKE ''%image%'' OR unsupported_type_signature LIKE ''%timestamp%'')) THEN ''true'' ELSE ''false'' END AS hasUnsupportedTypes, ISNULL(MAX(unsupported_type_signature), '''') AS unsupportedSignature FROM dbo.SchemaDriftAudit WHERE environment = ''', pipeline().parameters.env, ''' AND source_name = ''', pipeline().parameters.source_name, ''' AND target_name = ''', pipeline().parameters.target_name, ''' AND schema_version = ''', pipeline().parameters.schema_version, '''')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_on_schema_drift_copy_block",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.registry_url,'/schemas/',pipeline().parameters.entity_name,'?env=',pipeline().parameters.env,'&batchId=',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_schema_registry_rejection",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT column_name, data_type, full_data_type, nesting_path, contains_unsupported_deep_object, unsupported_leaf_type FROM ', pipeline().parameters.catalog_name, '.information_schema.column_metadata_expanded WHERE table_schema = ''', pipeline().parameters.schema_name, ''' AND table_name = ''', pipeline().parameters.table_name, ''' ORDER BY ordinal_position')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_nested_struct_expansion_failure",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'|',pipeline().parameters.batch_id,'|',pipeline().parameters.source_path)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_binary_xml_json_mixture",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 table_name, source_system, has_unsupported_types FROM control.source_tables WHERE table_name = ''', pipeline().parameters.table_name, '''')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_then_copy_cast_fallback",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.column_manifest_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_column_level_classifier",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.validator_url",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_to_notebook_remediation_chain",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'/',pipeline().parameters.mapping_config_path)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_missing_mapping_for_variant_columns",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_after_iterative_schema_sampling",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@or(contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'decimal('), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'maptype'), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'arraytype'), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'structtype'), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'binarytype'), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'calendarintervaltype'), and(equals(pipeline().parameters.schema_mode, 'strict'), or(contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'voidtype'), contains(toLower(string(activity('Inspect_Schema_Notebook').output.runOutput)), 'nulltype'))), and(not(empty(activity('Inspect_Schema_Notebook').output.runOutput.unsupportedTypes)), greater(length(activity('Inspect_Schema_Notebook').output.runOutput.unsupportedTypes), 0)))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_expression_on_activity_outputs",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.entity_name",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_setvariable_error_context_aggregation",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_full_activity_chain_with_conditional_abort",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT CASE WHEN ''', pipeline().parameters.source_table, ''' LIKE ''%Binary%'' THEN ''COPY_BINARY'' ELSE ''SKIP'' END AS routeDecision, ''', pipeline().parameters.source_table, ''' AS sourceTable, ''', pipeline().parameters.sink_path, ''' AS sinkPath, ''', pipeline().parameters.batch_id, ''' AS batchId')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_binary_lookup_copy_path",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.notebook_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_array_from_notebook_branch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.schema_config_table",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_struct_schema_lookup_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@or(contains(toLower(variables('copyErrorMessage')), 'map'), contains(toLower(variables('copyErrorMessage')), 'dictionary'), contains(toLower(variables('copyErrorMessage')), 'unsupported type'), contains(toLower(variables('copyErrorMessage')), 'complex type'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_map_type_copy_retry_signal",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.schema_api_url,'?env=',pipeline().parameters.env,'&object=',pipeline().parameters.source_object,'&batchId=',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_xml_variant_with_web_callback",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.metadata_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_nested_json_foreach_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT CASE WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ''', pipeline().parameters.source_table, ''' AND (DATA_TYPE IN (''geography'',''geometry'') OR LOWER(COLUMN_NAME) LIKE ''%geog%'' OR LOWER(COLUMN_NAME) LIKE ''%geom%'' OR LOWER(COLUMN_NAME) LIKE ''%shape%'' OR LOWER(COLUMN_NAME) LIKE ''%spatial%'')) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS hasUnsupportedSpatial, STRING_AGG(COLUMN_NAME, '','') WITHIN GROUP (ORDER BY ORDINAL_POSITION) AS flaggedColumns FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ''', pipeline().parameters.source_table, ''' AND (DATA_TYPE IN (''geography'',''geometry'') OR LOWER(COLUMN_NAME) LIKE ''%geog%'' OR LOWER(COLUMN_NAME) LIKE ''%geom%'' OR LOWER(COLUMN_NAME) LIKE ''%shape%'' OR LOWER(COLUMN_NAME) LIKE ''%spatial%'')')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_geospatial_copy_guardrail",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(activity('lk_read_schema_probe').output.firstRow.precision_issue_flag, 'true'), contains(activity('lk_read_schema_probe').output.firstRow.schema_json, 'DECIMAL(76,38)'), contains(activity('lk_read_schema_probe').output.firstRow.schema_json, 'NUMERIC(99,10)'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_decimal_precision_notebook_handoff",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_union_type_metadata_branching",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_nulltype_schema_drift_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_udt_from_notebook_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@or(contains(variables('contractRaw'),'\"headers\":{'),contains(variables('contractRaw'),'\"payload\":['),contains(string(activity('lk_materialize_contract').output.firstRow),'\"complexHeader\"'),contains(string(activity('lk_materialize_contract').output.firstRow),'\"payloadSchema\":{\"type\":\"array\"}'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_complex_header_web_lookup_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.flatten_rules_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_multilevel_object_flatten_failure",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@and(equals(item().enabled, true), not(or(equals(item().collectionType, 'array_struct'), equals(item().collectionType, 'map'))))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_mixed_collection_types_controlflow",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_type_alerting_end_to_end",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    }
+  ]
+}
