@@ -1,0 +1,456 @@
+{
+  "count": 45,
+  "source": "adversarial_loop",
+  "expressions": [
+    {
+      "adf_expression": "@and(contains(variables('resolvedUrl'), concat('batch=', substring(pipeline().parameters.batch_id,0,6))), contains(variables('resolvedUrl'), if(equals(pipeline().parameters.run_mode,'full'),'load','delta')), startsWith(variables('baseToken'), concat(pipeline().parameters.env,'-')) )",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expression_string_resolution",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@{if(empty(pipeline().parameters.process_date), formatDateTime(utcnow(),'yyyy-MM-dd'), pipeline().parameters.process_date)}",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_nested_expression_path_and_flags",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@add(mul(pipeline().parameters.batch_id, 2), sub(div(pipeline().parameters.timeout_secs, 10), mod(pipeline().parameters.max_retries, 3)))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_thresholds",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(mul(div(add(pipeline().parameters.input_size_mb, sub(pipeline().parameters.partition_base, 1)), pipeline().parameters.partition_base), pipeline().parameters.parallel_factor), 32)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_math_on_params_partition_scaling",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT endpoint_name, relative_url, http_method FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' AND is_active = 1 ORDER BY endpoint_name')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_lookup_array",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@join(createArray('0','1','2','3','4','5','6','7','8','9'),'|')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_foreach_expression_items_synthetic_range",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(and(or(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.env,'uat')),or(equals(pipeline().parameters.priority,'high'),equals(pipeline().parameters.priority,'critical')),not(equals(pipeline().parameters.region,'deprecated'))),'ELEVATED','STANDARD')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_multi_branch_flags",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@and(greaterOrEquals(int(activity('lk_source_metrics').output.firstRow.record_count), pipeline().parameters.min_records), equals(int(activity('lk_source_metrics').output.firstRow.is_ready), 1), or(equals(pipeline().parameters.run_mode, 'force'), and(equals(pipeline().parameters.run_mode, 'auto'), not(empty(activity('lk_source_metrics').output.firstRow.record_count)))) )",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_complex_conditions_output_and_params",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_lookup_to_copy",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.notebook_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_activity_output_chaining_notebook_to_web",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.base_path, '/', pipeline().parameters.env, '/inbound/', pipeline().parameters.region, '/year=', substring(pipeline().parameters.process_date, 0, 4), '/month=', substring(pipeline().parameters.process_date, 5, 2), '/day=', substring(pipeline().parameters.process_date, 8, 2), '/batch=', pipeline().parameters.batch_id, '/input/')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_multi_segment",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('landing/', pipeline().parameters.env, '/inbound', if(equals(pipeline().parameters.env, 'prod'), '/priority', '/standard'), '/dt=', formatDateTime(pipeline().parameters.process_date, 'yyyyMMdd'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_parameterized_paths_conditional_folders",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 enabled, run_mode, item_list_json, notify_url, source_query FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' AND process_date = ''', pipeline().parameters.process_date, ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_condition_foreach_chain",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(greaterOrEquals(mul(pipeline().parameters.input_size_mb, if(equals(pipeline().parameters.run_mode, 'full'), 2, 1)), 1024), 'large', if(greaterOrEquals(mul(pipeline().parameters.input_size_mb, if(equals(pipeline().parameters.run_mode, 'full'), 2, 1)), 256), 'medium', 'small'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_deep_nesting_notebook_copy_decisions",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@string(coalesce(json(pipeline().parameters.raw_payload).value, pipeline().parameters.default_value))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "pl_unsupported_types_coercion_and_nulls",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('env=', pipeline().parameters.env, ';mode=', pipeline().parameters.run_mode)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_in_ifcondition",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('starting:', pipeline().parameters.env, ':', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_in_foreach_items_loop",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('init-', pipeline().parameters.source_system, '-', pipeline().parameters.mapping_version)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_with_complex_translator_config",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(pipeline().parameters.feature_flag,'array'), equals(activity('Lookup_ControlShape').output.firstRow.payload, 'unexpected-scalar'), equals(string(activity('Lookup_ControlShape').output.value), ''))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_return_shape_driving_ifcondition",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'-',pipeline().parameters.job_group)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_nested_foreach_with_databricks_notebook",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('https://', if(equals(pipeline().parameters.env,'prod'),'api.contoso.com',concat(pipeline().parameters.env,'-api.contoso.com')), '/v1')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_auth_header_expressions",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('config/', pipeline().parameters.env, '/')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_after_lookup_array_projection",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.env,'-',pipeline().parameters.execution_path)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_with_mixed_activity_branches",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.input_mode,'singleton'),'singleton_object','array_or_rows')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_over_lookup_singleton_and_array",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_parameter_object_depth",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('https://', pipeline().parameters.env, '.contoso.example.com/api/')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_response_consumed_by_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_inside_foreach_conditional_branch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_chained_to_webactivity_and_notebook",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(variables('complexResult')),0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_setvariable_with_complex_activity_outputs",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('started-', pipeline().parameters.env, '-', pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_full_mixed_activity_coverage_stress",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 table_name, payload_column, payload_type, CASE WHEN payload_type IN (''varbinary'',''binary'',''image'',''hierarchyid'',''geography'',''geometry'',''xml'',''sql_variant'',''udt'') OR payload_type LIKE ''%array%'' OR payload_type LIKE ''%struct%'' OR payload_type LIKE ''%map%'' THEN ''unsupported'' ELSE ''supported'' END AS route_to_copy FROM dbo.source_metadata WHERE environment = ''', pipeline().parameters.env, ''' AND table_name = ''', pipeline().parameters.source_table, '''')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_to_copy_binary_mismatch",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(string(activity('Run_Complex_Output_Notebook').output.runOutput.items[0].attrs)), 0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_databricks_notebook_returns_complex_json",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_over_object_array_items",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.api_endpoint,'?env=',pipeline().parameters.env,'&batch=',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_body_schema_conflict",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('{\"profile\":\"', pipeline().parameters.mapping_profile, '\",\"env\":\"', pipeline().parameters.env, '\",\"translator\":{\"type\":\"TabularTranslator\",\"mappings\":[{\"source\":{\"path\":\"$.id\",\"type\":\"String\"},\"sink\":{\"name\":\"id\",\"type\":\"Guid\"}},{\"source\":{\"path\":\"$.payload.metrics\",\"type\":\"Object\",\"map\":{\"innerKey\":{\"type\":\"Array\"},\"innerValue\":{\"type\":\"Map\",\"children\":[{\"name\":\"k\",\"type\":\"String\"},{\"name\":\"v\",\"type\":\"Decimal\"}]}}},\"sink\":{\"name\":\"metrics_blob\",\"type\":\"Binary\"}},{\"source\":{\"path\":\"$.payload.attributes\",\"type\":\"Map\",\"children\":[{\"name\":\"a\",\"type\":\"String\"},{\"name\":\"b\",\"type\":\"Map\",\"children\":[{\"name\":\"c\",\"type\":\"Int64\"},{\"name\":\"d\",\"type\":\"TimeSpan\"}]}]},\"sink\":{\"name\":\"attributes_json\",\"type\":\"Xml\"}},{\"source\":{\"path\":\"$.events[0].ts\",\"type\":\"DateTimeOffset\"},\"sink\":{\"name\":\"event_time\",\"type\":\"UInt64\"}}],\"collectionReference\":\"$.items[*]\"},\"meta\":{\"nested\":{\"level1\":{\"level2\":{\"unsupportedTargetTypes\":[\"Guid\",\"Binary\",\"Xml\",\"UInt64\"],\"branchHint\":\"activity_coverage\"}}}}}')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_with_nested_map_metadata",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 CAST(NULL AS sql_variant) AS unsupported_maybe_null, CAST(CASE WHEN ''', pipeline().parameters.env, ''' = ''prod'' THEN 1 ELSE ''variant-text'' END AS sql_variant) AS unsupported_variant, ''', pipeline().parameters.batch_id, ''' AS batch_id, ''', pipeline().parameters.control_table, ''' AS control_table')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_lookup_null_and_variant_branching",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_notebook_to_foreach_nested_results",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat('SELECT TOP 1 id, payload_struct, nested_info, created_at FROM ', pipeline().parameters.source_table)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_copy_source_sink_incompatible_struct",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.api_endpoint",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_web_to_lookup_control_payload_casting",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT TOP 1 name, value, type FROM dbo.PipelineConfig WHERE environment = '@{pipeline().parameters.env}' AND config_name = '@{pipeline().parameters.config_name}'",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_variable_assignment_from_complex_output",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.manifest_path",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_foreach_copy_per_item_schema_drift",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.env",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_ifcondition_on_array_object_properties",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@equals(activity('Copy_Staged_Semistructured_Roundtrip').Status,'Succeeded')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_notebook_copy_roundtrip_semistructured",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.api_endpoint,'?env=',pipeline().parameters.env,'&batch=',pipeline().parameters.batch_id)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_webactivity_headers_and_body_objects",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(activity('Lookup_Control_Config').output.value), 0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_types_end_to_end_multi_activity_failure_fanout",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    }
+  ]
+}
