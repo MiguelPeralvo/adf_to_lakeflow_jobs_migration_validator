@@ -1,0 +1,106 @@
+{
+  "count": 10,
+  "source": "adversarial_loop",
+  "expressions": [
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env, '/', replace(pipeline().parameters.region, '-', '_'))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "nested_expression_variable_chain",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@string(add(mul(pipeline().parameters.partition_count, pipeline().parameters.scale_factor), 1))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "math_operations_on_parameters",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "SELECT ConfigKey, ConfigValue FROM dbo.PipelineConfig WHERE Environment = '@{pipeline().parameters.env}' AND BatchId = '@{pipeline().parameters.batch_id}'",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "foreach_dynamic_item_expressions",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.is_full_load, true), 'full_extract', 'incremental_extract')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "complex_conditional_branching",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@and(equals(variables('processing_flag'), 'True'), greater(div(mul(pipeline().parameters.shard_count, 100), add(length(split(pipeline().parameters.input_paths_csv, ',')), 1)), pipeline().parameters.threshold))",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "mixed_nested_math_foreach_conditions",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.notebook_base_path, '/', pipeline().parameters.env, '/discovery')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_databricks_nested_foreach",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.api_endpoint, '/subscriptions/', pipeline().parameters.subscription_id, '/providers/Microsoft.Resources/subscriptions?api-version=2021-04-01')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_web_activity_auth_types",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@greater(length(activity('LookupSourceTables').output.value), 0)",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_copy_with_exotic_sources",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@if(and(equals(pipeline().parameters.feature_flag, true), greater(pipeline().parameters.threshold_value, 0.5)), 'ENABLED', 'DISABLED')",
+      "python_code": "",
+      "category": "activity_coverage",
+      "pipeline_name": "unsupported_ifcondition_expression_types",
+      "score": 0.0,
+      "expected_dimensions": {
+        "activity_coverage": 1.0
+      }
+    },
+    {
+      "adf_expression": "@union(activity('LookupIterationSource').output.value, pipeline().parameters.item_list, createArray(json(concat('{\"circular_ref\": \"', variables('intermediate_result'), '\"}'))))",
+      "python_code": "",
+      "category": "conversion_crash",
+      "pipeline_name": "unsupported_foreach_mixed_activity_graph",
+      "score": 0.0,
+      "expected_dimensions": {
+        "conversion_crash": 1.0
+      }
+    }
+  ]
+}
