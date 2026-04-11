@@ -511,6 +511,16 @@ def sweep_activity_contexts(
             if resolved_count > 0:
                 cell["resolved"] += 1
                 ctx_totals["resolved"] += 1
+                # Capture resolved pairs for downstream semantic evaluation
+                for pair in snap.resolved_expressions:
+                    cell.setdefault("resolved_pairs", []).append(
+                        {
+                            "adf_expression": adf_expression,
+                            "python_code": pair.python_code,
+                            "category": category,
+                            "context": context_name,
+                        }
+                    )
             if placeholder_count > 0:
                 cell["placeholder_count"] += 1
                 ctx_totals["placeholder_count"] += 1
@@ -527,8 +537,14 @@ def sweep_activity_contexts(
                     }
                 )
 
+    # Collect all resolved pairs across cells for easy downstream consumption
+    all_resolved_pairs: list[dict[str, str]] = []
+    for cell_data in by_cell.values():
+        all_resolved_pairs.extend(cell_data.get("resolved_pairs", []))
+
     return {
         "by_cell": dict(by_cell),
         "by_context": dict(by_context),
         "contexts_run": selected,
+        "resolved_pairs": all_resolved_pairs,
     }

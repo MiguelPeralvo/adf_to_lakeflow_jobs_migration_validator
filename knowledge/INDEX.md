@@ -19,6 +19,8 @@
 | [wkmigrate-fix-spec-W12-W13-copy-ifcondition.md](wkmigrate-fix-spec-W12-W13-copy-ifcondition.md) | Fix spec for W-12 (Copy query unreachable) + W-13 (IfCondition compound predicates) | When invoking /wkmigrate-autodev for remaining expression gaps |
 | [wkmigrate-fix-spec-W14-parameter-activity-resolution.md](wkmigrate-fix-spec-W14-parameter-activity-resolution.md) | Fix spec for W-14 (best-effort resolution for undefined params/activities) | When invoking /wkmigrate-autodev for parameter resolution |
 | [wkmigrate-fix-spec-W15-W16-join-variables.md](wkmigrate-fix-spec-W15-W16-join-variables.md) | Fix spec for W-15 (@join not supported) + W-16 (variables() not resolved) | The final 19.5% gap — fixes push adversarial rate from 80.5% to ~100% |
+| [wkmigrate-fix-spec-W17-W18-W19-semantic-bugs.md](wkmigrate-fix-spec-W17-W18-W19-semantic-bugs.md) | Fix spec for W-17 (firstRow flattening) + W-18 (missing type coercion) + W-19 (variables taskKey) | Semantic correctness bugs — expressions resolve but produce wrong Python |
+| [wkmigrate-fix-spec-issue-refs-extensibility.md](wkmigrate-fix-spec-issue-refs-extensibility.md) | Add GitHub issue reference comments to ExpressionContext enum | Documentation-only — breadcrumbs for future activity type implementers |
 
 ## Usage Protocol
 

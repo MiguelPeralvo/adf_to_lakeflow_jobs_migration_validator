@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import time
 from typing import Any, Callable
 from urllib import request
@@ -146,6 +147,43 @@ def _extract_content(raw: dict[str, Any]) -> str:
     raise ValueError(f"Cannot extract content from FMAPI response (keys: {list(raw.keys())})")
 
 
+def _extract_json_from_content(content: str) -> dict[str, Any]:
+    """Extract a JSON object from LLM response content.
+
+    Handles: raw JSON, markdown-fenced JSON (```json ... ```), and JSON
+    embedded in surrounding text.
+    """
+    # Try direct parse first
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    # Try extracting from markdown code block
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", content, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group(1))
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    # Try finding the first { ... } block
+    m = re.search(r"\{.*\}", content, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"Cannot extract JSON from FMAPI content: {content[:200]}")
+
+
 def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:
     """Parse and validate FMAPI judge payload."""
     if not isinstance(raw, dict):
@@ -166,10 +204,7 @@ def _parse_judge_response(raw: dict[str, Any]) -> dict[str, Any]:
         content = message.get("content")
         if not isinstance(content, str):
             raise ValueError("FMAPI message content must be a JSON string")
-        try:
-            raw = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise ValueError("FMAPI message content must be valid JSON") from exc
+        raw = _extract_json_from_content(content)
         if not isinstance(raw, dict):
             raise ValueError("FMAPI message content JSON must be an object")
 

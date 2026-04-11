@@ -12,6 +12,7 @@ Mirrors the REST API capabilities:
   lmv parallel-test   — ADF vs Databricks parallel run
   lmv adf-download    — download pipelines from Azure Data Factory
   lmv adf-upload      — upload local pipelines to Azure Data Factory
+  lmv semantic-eval   — evaluate semantic correctness of resolved expressions
   lmv status          — show available capabilities
   lmv history         — show activity log
 """
@@ -648,6 +649,154 @@ def optimize_judge_command(
                 "examples_selected": len(calibrator.select_examples()),
             }
         )
+
+
+@app.command("semantic-eval")
+def semantic_eval_command(
+    golden_set: Path = typer.Option(
+        ...,
+        "--golden-set",
+        exists=True,
+        readable=True,
+        help="Path to expressions JSON (e.g. golden_sets/expression_loop_post_w16.json)",
+    ),
+    context: str = typer.Option(
+        "set_variable",
+        "--context",
+        help="Activity context to resolve expressions in (default: set_variable)",
+    ),
+    model: str = typer.Option(
+        "databricks-claude-sonnet-4-6",
+        "--model",
+        help="Model for LLM judge evaluation",
+    ),
+    output: Path | None = typer.Option(None, "--output", help="Save full results JSON to this path"),
+    limit: int | None = typer.Option(None, "--limit", help="Cap number of expressions to evaluate"),
+    calibration_set: Path = typer.Option(
+        "golden_sets/calibration_pairs.json",
+        "--calibration-set",
+        exists=True,
+        readable=True,
+        help="Path to calibration pairs for judge prompt",
+    ),
+) -> None:
+    """Evaluate semantic correctness of wkmigrate's resolved expressions.
+
+    Resolves expressions through wkmigrate (via sweep), then runs each
+    (ADF expression, Python code) pair through the calibrated LLM judge
+    to score whether the Python ACTUALLY matches the ADF semantics.
+
+    This catches bugs where resolution succeeds but the output is wrong
+    (e.g. div(9,2) → 9/2 instead of int(9/2)).
+    """
+    _auto_configure()
+    if _CONVERT_FN is snapshot_from_adf_payload:
+        typer.echo("ERROR: wkmigrate not available — install via 'poetry install --with dev'.", err=True)
+        raise typer.Exit(code=2)
+    if _JUDGE_PROVIDER is None:
+        typer.echo("ERROR: FMAPI judge not configured — set DATABRICKS_HOST and DATABRICKS_TOKEN.", err=True)
+        raise typer.Exit(code=2)
+
+    from lakeflow_migration_validator.optimization.judge_optimizer import ManualCalibrator
+    from lakeflow_migration_validator.synthetic.activity_context_wrapper import sweep_activity_contexts
+
+    # Load corpus
+    raw = golden_set.read_text(encoding="utf-8")
+    payload = json.loads(raw)
+    if isinstance(payload, dict) and "expressions" in payload:
+        corpus = payload["expressions"]
+    elif isinstance(payload, list):
+        corpus = payload
+    else:
+        typer.echo("ERROR: --golden-set must be a JSON object with 'expressions' key OR a JSON array.", err=True)
+        raise typer.Exit(code=2)
+
+    if limit is not None:
+        corpus = corpus[:limit]
+
+    # Phase 1: Resolve expressions through wkmigrate
+    typer.echo(f"Resolving {len(corpus)} expressions in context '{context}'...", err=True)
+    sweep_result = sweep_activity_contexts(corpus, _CONVERT_FN, contexts=[context])
+    resolved_pairs = sweep_result.get("resolved_pairs", [])
+
+    if not resolved_pairs:
+        typer.echo("No expressions were resolved — nothing to evaluate.", err=True)
+        _emit({"context": context, "total_resolved": 0, "total_evaluated": 0, "overall_mean_score": 0.0})
+        return
+
+    typer.echo(f"Resolved {len(resolved_pairs)} pairs. Running LLM judge ({model})...", err=True)
+
+    # Phase 2: Build calibrated judge
+    calibrator = ManualCalibrator.from_file(calibration_set)
+    judge = calibrator.to_optimized_judge(_JUDGE_PROVIDER, model=model)
+
+    # Phase 3: Evaluate each pair
+    from collections import defaultdict
+
+    category_scores: dict[str, list[float]] = defaultdict(list)
+    all_scores: list[float] = []
+    low_scoring: list[dict] = []
+
+    for i, pair in enumerate(resolved_pairs):
+        adf_expr = pair["adf_expression"]
+        python_code = pair["python_code"]
+        category = pair.get("category", "unknown")
+
+        result = judge.evaluate(adf_expr, python_code)
+        score = result.score
+        reasoning = result.details.get("reasoning", "")
+
+        all_scores.append(score)
+        category_scores[category].append(score)
+
+        # Track failure modes from reasoning
+        if score < 0.7:
+            low_scoring.append(
+                {
+                    "adf_expression": adf_expr,
+                    "python_code": python_code,
+                    "category": category,
+                    "score": round(score, 3),
+                    "reasoning": reasoning,
+                }
+            )
+
+        if (i + 1) % 10 == 0:
+            running_mean = sum(all_scores) / len(all_scores)
+            typer.echo(f"  [{i + 1}/{len(resolved_pairs)}] running mean: {running_mean:.3f}", err=True)
+
+    # Phase 4: Aggregate
+    overall_mean = sum(all_scores) / len(all_scores) if all_scores else 0.0
+    by_category = {}
+    for cat, scores in sorted(category_scores.items()):
+        by_category[cat] = {
+            "count": len(scores),
+            "mean_score": round(sum(scores) / len(scores), 3),
+            "min_score": round(min(scores), 3),
+            "max_score": round(max(scores), 3),
+        }
+
+    report = {
+        "context": context,
+        "model": model,
+        "total_resolved": len(resolved_pairs),
+        "total_evaluated": len(all_scores),
+        "overall_mean_score": round(overall_mean, 3),
+        "by_category": by_category,
+        "low_scoring_count": len(low_scoring),
+        "low_scoring": sorted(low_scoring, key=lambda x: x["score"])[:20],
+    }
+
+    _emit(report)
+    if output:
+        output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        typer.echo(f"\nFull report saved to {output}", err=True)
+
+    typer.echo(
+        f"\nSemantic eval complete: {overall_mean:.3f} overall mean "
+        f"({len(low_scoring)} pairs scored < 0.7 out of {len(all_scores)})",
+        err=True,
+    )
 
 
 @app.command("adversarial-loop")
