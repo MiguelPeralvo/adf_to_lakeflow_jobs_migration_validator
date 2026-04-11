@@ -250,6 +250,7 @@ def _extract_resolved_expression_pairs(
     # .adapters.wkmigrate_adapter` working in environments without wkmigrate
     # installed (LA-3 graceful degradation invariant; see PR #18).
     from wkmigrate.models.ir.pipeline import (
+        CopyActivity,
         DatabricksNotebookActivity,
         ForEachActivity,
         IfConditionActivity,
@@ -334,6 +335,19 @@ def _extract_resolved_expression_pairs(
                     or f"@lookup('{task_name}').source.sql_reader_query"
                 )
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=source_query_code))
+            continue
+
+        if isinstance(task, CopyActivity):
+            source_props = getattr(task, "source_properties", None)
+            if isinstance(source_props, dict):
+                query_val = source_props.get("sql_reader_query")
+                code = _coerce_resolved_value(query_val)
+                if code is not None:
+                    adf = (
+                        _source_expression_at(source_activity, "source", "sql_reader_query")
+                        or f"@copy('{task_name}').source.sql_reader_query"
+                    )
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
             continue
 
         if isinstance(task, ForEachActivity):
