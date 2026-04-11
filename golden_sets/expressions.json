@@ -1,5 +1,5 @@
 {
-  "count": 200,
+  "count": 208,
   "expressions": [
     {
       "adf_expression": "@concat('hello', 'world')",
@@ -1000,6 +1000,46 @@
       "adf_expression": "@int('42')",
       "category": "math",
       "expected_python": "int('42')"
+    },
+    {
+      "adf_expression": "@createArray('a', 'b', 'c')",
+      "category": "collection",
+      "expected_python": "['a', 'b', 'c']"
+    },
+    {
+      "adf_expression": "@createArray(1, 2, 3)",
+      "category": "collection",
+      "expected_python": "[1, 2, 3]"
+    },
+    {
+      "adf_expression": "@createArray('only_one')",
+      "category": "collection",
+      "expected_python": "['only_one']"
+    },
+    {
+      "adf_expression": "@createArray('alpha', 'beta', 'gamma', 'delta')",
+      "category": "collection",
+      "expected_python": "['alpha', 'beta', 'gamma', 'delta']"
+    },
+    {
+      "adf_expression": "@createArray(string(1), string(2), string(3))",
+      "category": "collection",
+      "expected_python": "[str(1), str(2), str(3)]"
+    },
+    {
+      "adf_expression": "@createArray(true, false, true)",
+      "category": "collection",
+      "expected_python": "[True, False, True]"
+    },
+    {
+      "adf_expression": "@createArray(concat('item_', 'a'), concat('item_', 'b'))",
+      "category": "collection",
+      "expected_python": "[str('item_') + str('a'), str('item_') + str('b')]"
+    },
+    {
+      "adf_expression": "@createArray('x')",
+      "category": "collection",
+      "expected_python": "['x']"
     }
   ],
   "version": 1
