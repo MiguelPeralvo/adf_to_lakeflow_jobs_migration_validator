@@ -15,6 +15,7 @@
 | [cost-model.md](cost-model.md) | LLM API cost tracking per model and operation | After any LLM-consuming operation |
 | [learnings.md](learnings.md) | Session-by-session discoveries (append-only log) | After every /lmv-autodev or adversarial session |
 | [wkmigrate-fix-spec-W9-W10.md](wkmigrate-fix-spec-W9-W10.md) | Full fix spec for W-9 (Copy sql_reader_query) and W-10 (ForEach items) | When invoking /wkmigrate-autodev for these findings |
+| [wkmigrate-fix-spec-W11-structural.md](wkmigrate-fix-spec-W11-structural.md) | Fix spec for W-11 (structural activity coverage gaps post W-9/W-10 fix) | When invoking /wkmigrate-autodev for structural resilience |
 
 ## Usage Protocol
 
