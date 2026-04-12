@@ -1,0 +1,79 @@
+{
+  "context": "if_condition",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 26,
+  "total_evaluated": 26,
+  "overall_mean_score": 0.769,
+  "by_category": {
+    "collection": {
+      "count": 1,
+      "mean_score": 0.85,
+      "min_score": 0.85,
+      "max_score": 0.85
+    },
+    "logical": {
+      "count": 24,
+      "mean_score": 0.767,
+      "min_score": 0.05,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 1,
+      "mean_score": 0.75,
+      "min_score": 0.75,
+      "max_score": 0.75
+    }
+  },
+  "low_scoring_count": 7,
+  "low_scoring": [
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.skipValidation, 'true'))",
+      "python_code": "(dbutils.widgets.get('skipValidation') NOT_EQUAL true)",
+      "category": "logical",
+      "score": 0.05,
+      "reasoning": "The Python translation is completely incorrect. It uses pseudo-code syntax 'NOT_EQUAL' which is not valid Python. The correct translation should be: `not (dbutils.widgets.get('skipValidation') == 'true')`. The issues are: (1) 'NOT_EQUAL' is not valid Python syntax - it should use `!=` or `not ... ==`; (2) `true` is not valid Python - it should be `True` (capitalized) or the string `'true'`; (3) The outer `@not()` wrapping is missing entirely; (4) The comparison value should be the string `'true'` not a boolean. This code would raise a NameError at runtime and does not reproduce the ADF expression's behaviour at all."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.env, 'prod')",
+      "python_code": "(dbutils.widgets.get('env') == prod)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation has a critical error: 'prod' is referenced as a bare variable name `prod` instead of the string literal `'prod'`. This would cause a NameError at runtime (unless a variable named `prod` happens to exist in scope), completely breaking the semantic equivalence. The left side correctly maps `pipeline().parameters.env` to `dbutils.widgets.get('env')`, and the `==` operator correctly maps `@equals()`, but the missing quotes around 'prod' is a fundamental syntax/semantic error that makes the expression non-functional as written."
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.env, 'prod'))",
+      "python_code": "(dbutils.widgets.get('env') NOT_EQUAL prod)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation is syntactically invalid Python code. 'NOT_EQUAL' is not a valid Python operator, and 'prod' is an unquoted identifier rather than a string literal. The correct translation should be something like: not (dbutils.widgets.get('env') == 'prod'). The original ADF expression uses @not(equals(...)) which should map to Python's 'not' operator combined with an equality check (==). The output fails to produce valid, executable Python code and does not correctly reproduce the ADF expression's semantics."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.status, 'complete')",
+      "python_code": "(dbutils.widgets.get('status') == complete)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation has a critical error: 'complete' is used as a bare variable name instead of the string literal 'complete'. This would cause a NameError at runtime (unless a variable named 'complete' happens to exist in scope). The correct translation should be `(dbutils.widgets.get('status') == 'complete')` with quotes around the string. The parameter reference mapping (dbutils.widgets.get('status')) is correct, and the equality operator (==) correctly maps from @equals(), but the missing quotes around 'complete' fundamentally breaks the semantic equivalence."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.mode, 'incremental')",
+      "python_code": "(dbutils.widgets.get('mode') == incremental)",
+      "category": "logical",
+      "score": 0.2,
+      "reasoning": "The Python translation has a critical error: 'incremental' is referenced as a bare variable name instead of the string literal 'incremental'. In the ADF expression, 'incremental' is a string literal, so the Python equivalent should be `(dbutils.widgets.get('mode') == 'incremental')`. Without the quotes, Python will attempt to look up a variable named `incremental`, which will likely raise a NameError at runtime (unless such a variable happens to exist in scope). The parameter reference `dbutils.widgets.get('mode')` is correctly mapped from `pipeline().parameters.mode`, but the missing quotes around the string literal make this translation semantically incorrect and non-functional in most contexts."
+    },
+    {
+      "adf_expression": "@greaterOrEquals(pipeline().parameters.score, 85.5)",
+      "python_code": "(dbutils.widgets.get('score') >= 85.5)",
+      "category": "logical",
+      "score": 0.6,
+      "reasoning": "The translation maps pipeline().parameters.score to dbutils.widgets.get('score'), which is correct for parameter references. However, there is a type coercion issue: dbutils.widgets.get() always returns a string, so comparing it directly to the float 85.5 with >= will either raise a TypeError or produce incorrect results in Python. In ADF, pipeline().parameters.score would be treated as a numeric value if the parameter is defined as a number type, so the comparison greaterOrEquals(score, 85.5) works numerically. The Python translation should include an explicit numeric conversion, e.g., float(dbutils.widgets.get('score')) >= 85.5, to preserve the correct semantic behaviour. Without this coercion, the comparison will fail at runtime or produce wrong results when the string value is compared to a float."
+    },
+    {
+      "adf_expression": "@lessOrEquals(pipeline().parameters.percentage, 100)",
+      "python_code": "(dbutils.widgets.get('percentage') <= 100)",
+      "category": "logical",
+      "score": 0.6,
+      "reasoning": "The Python translation maps pipeline().parameters.percentage to dbutils.widgets.get('percentage') correctly. However, there is a type coercion issue: dbutils.widgets.get() always returns a string, so comparing a string directly to the integer 100 using <= will not produce the correct numeric comparison. In ADF, pipeline().parameters.percentage would be treated as a numeric value when compared with lessOrEquals against 100. The Python translation should cast the widget value to a numeric type (e.g., float(dbutils.widgets.get('percentage')) <= 100 or int(dbutils.widgets.get('percentage')) <= 100) to preserve the correct semantic. As written, the string-to-integer comparison in Python would either raise a TypeError or produce incorrect results depending on the Python version, making this a meaningful semantic difference."
+    }
+  ]
+}

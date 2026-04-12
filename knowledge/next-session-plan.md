@@ -1,18 +1,27 @@
-# Next Session Plan: X-2 Convergence to 0.90
+# Convergence Plan: X-2 → 0.90+ (ACHIEVED on set_variable)
 
-> Resume plan for the next Claude session after the 2026-04-12 autonomous run.
-> Context: 55% of 1M context used; this document survives compaction.
+> Updated 2026-04-12 16:40 CEST. Steps 1-4 complete, Step 5 in progress.
 
-## Current State (end of 2026-04-12 session)
+## Current State (mid-session 2026-04-12)
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| X-2 set_variable | 0.75–0.81 (needs stable 200-sample re-eval) | > 0.90 |
-| X-2 web_body | 0.798 | > 0.90 |
-| X-2 if_condition | 0.542 (only comparisons resolve) | > 0.70 |
-| X-2 lookup/copy/notebook | ~0.81 | > 0.90 |
-| Pipeline CCS | 90.7 (175/175, 0% crash) | > 92 |
-| Corpus size | 210 expressions + 175 pipelines | grow |
+| Metric | Value | Target | Status |
+|--------|-------|--------|--------|
+| X-2 set_variable (v3 cal) | **0.944** | > 0.90 | **PASS** |
+| X-2 lookup_query (v2 cal) | 0.895 | > 0.90 | v3 running |
+| X-2 copy_query (v2 cal) | 0.890 | > 0.90 | v3 running |
+| X-2 web_body (v2 cal) | 0.887 | > 0.90 | v3 running |
+| X-2 if_condition (v2 cal) | 0.744 | > 0.70 | **PASS** |
+| Pipeline CCS | 90.3 (175/175, 0% crash) | > 92 | GAP: 1.7 |
+| Corpus size | 200 unique expressions + 175 pipelines | - |
+
+## Key Finding: Judge Calibration Was the Bottleneck
+
+The main blocker to convergence was NOT wkmigrate translation quality — it was LLM judge calibration. The judge didn't understand 3 Databricks conventions:
+1. `@activity('X').output` → `dbutils.jobs.taskValues.get(taskKey='X', key='result')` 
+2. `@variables('X')` → `dbutils.jobs.taskValues.get(taskKey='set_variable_X', key='X')`
+3. `@div()` → `//` (integer division)
+
+Adding calibration rules + 6 few-shot pairs pushed set_variable from 0.776 → 0.944 (+0.168).
 
 **wkmigrate tip:** `pr/27-4-integration-tests @ b8c9be2` (W-23/W-24/W-25 done)
 **lmv tip:** `main @ a6a1beb`

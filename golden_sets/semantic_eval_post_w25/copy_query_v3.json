@@ -1,0 +1,83 @@
+{
+  "context": "copy_query",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 195,
+  "total_evaluated": 195,
+  "overall_mean_score": 0.944,
+  "by_category": {
+    "collection": {
+      "count": 38,
+      "mean_score": 0.924,
+      "min_score": 0.45,
+      "max_score": 1.0
+    },
+    "datetime": {
+      "count": 11,
+      "mean_score": 0.977,
+      "min_score": 0.95,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 56,
+      "mean_score": 0.969,
+      "min_score": 0.7,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 18,
+      "mean_score": 0.969,
+      "min_score": 0.75,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 49,
+      "mean_score": 0.942,
+      "min_score": 0.6,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 23,
+      "mean_score": 0.884,
+      "min_score": 0.4,
+      "max_score": 1.0
+    }
+  },
+  "low_scoring_count": 5,
+  "low_scoring": [
+    {
+      "adf_expression": "@replace(pipeline().parameters.path, '\\\\', '/')",
+      "python_code": "str(dbutils.widgets.get('path')).replace('\\\\\\\\', '/')",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The parameter reference and function mapping are correct, but there's a critical escaping error. In ADF, '\\\\' in the expression represents a single backslash character. The Python translation uses '\\\\\\\\' (four backslashes in source = two backslashes at runtime), whereas it should use '\\\\' (two backslashes in source = one backslash at runtime). This means the Python code searches for double backslashes instead of single backslashes, producing different behavior for typical paths like 'C:\\Users\\file'."
+    },
+    {
+      "adf_expression": "@coalesce(trim(activity('Lookup').output.firstRow.optional_value), pipeline().parameters.defaultValue, 'fallback')",
+      "python_code": "next((v for v in [str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value']).strip(), dbutils.widgets.get('defaultValue'), 'fallback'] if v is not None), None)",
+      "category": "string",
+      "score": 0.45,
+      "reasoning": "The translation has a significant semantic error: when `optional_value` is null/None, ADF's `trim(null)` returns null, allowing `coalesce` to fall through to `defaultValue`. However, in the Python translation, `str(None).strip()` produces the string `'None'`, which is not None, so the coalesce generator would return `'None'` instead of falling through to `dbutils.widgets.get('defaultValue')`. The correct approach would be to handle the null case before applying strip(), e.g., checking for None first. The activity output mapping, trim\u2192strip, coalesce pattern, and parameter reference are all individually correct, but the null-safety of trim() is broken by the unconditional str() wrapping."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.45,
+      "reasoning": "The translation has a semantic error in the replace() call. In ADF, '\\\\' represents a single backslash character. In Python source code, '\\\\\\\\' would be needed to represent two backslashes, and '\\\\' represents a single backslash. The Python translation uses .replace('\\\\\\\\', '/') which in runtime replaces double-backslashes (\\) rather than single backslashes (\\). This means the replace logic is incorrect. The activity output reference, split, and last ([-1]) mappings are all correct, but the core replace operation targets the wrong string pattern, causing a semantic difference in behavior."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.full_path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['full_path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.5,
+      "reasoning": "The overall structure is correct (activity output reference, replace, split, last via [-1]), but there is a semantic error in the backslash replacement. The ADF expression uses '\\\\' (representing a single backslash character in ADF syntax), but the Python translation uses '\\\\\\\\' (four backslashes in source = two actual backslash characters at runtime). This means the Python code replaces double-backslashes instead of single backslashes, which is incorrect for typical Windows-style paths. The extra str() wrapping is harmless. This constitutes a partial equivalence failure on a key parameter."
+    },
+    {
+      "adf_expression": "@concat('abfss://', pipeline().parameters.container, '@', toLower(pipeline().parameters.storageAccount), '.dfs.core.windows.net/', replace(trim(activity('Lookup').output.firstRow.relative_path), '\\\\', '/'))",
+      "python_code": "str('abfss://') + str(dbutils.widgets.get('container')) + str('@') + str(str(dbutils.widgets.get('storageAccount')).lower()) + str('.dfs.core.windows.net/') + str(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['relative_path']).strip()).replace('\\\\\\\\', '/'))",
+      "category": "nested",
+      "score": 0.6,
+      "reasoning": "The translation is mostly correct \u2014 parameter references, activity output mapping, toLower\u2192.lower(), trim\u2192.strip(), and concat\u2192str()+str() are all properly handled. However, there is a semantic error in the replace() call: ADF's replace(value, '\\\\', '/') uses a single backslash as the search string, but the Python translation uses .replace('\\\\\\\\', '/') which searches for a double backslash. In Python source, '\\\\\\\\' represents two backslashes, while '\\\\' represents one. This means the Python code will fail to replace single backslashes in paths, producing incorrect ABFSS paths when the relative_path contains single backslash separators."
+    }
+  ]
+}
