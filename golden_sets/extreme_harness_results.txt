@@ -1,0 +1,41 @@
+=== extreme_bool_coercion_complex_branching ===
+  score=85 label=REVIEW_RECOMMENDED sem=0.32
+=== extreme_coalesce_with_nested_expressions ===
+  score=76 label=REVIEW_RECOMMENDED sem=0.05
+=== extreme_collection_operations_with_split_join ===
+  score=91 label=HIGH_CONFIDENCE sem=0.52
+=== extreme_compound_logical_predicates ===
+  score=89 label=REVIEW_RECOMMENDED sem=0.42
+=== extreme_concat_many_args_interpolation ===
+  score=83 label=REVIEW_RECOMMENDED sem=0.60
+=== extreme_datetime_formatting_nested_conditionals ===
+  score=82 label=REVIEW_RECOMMENDED sem=0.32
+=== extreme_dayofweek_conditional_routing ===
+  score=82 label=REVIEW_RECOMMENDED sem=0.47
+=== extreme_division_modulo_chain_with_coercion ===
+  score=97 label=HIGH_CONFIDENCE sem=0.51
+=== extreme_float_precision_math_expressions ===
+  ERROR: could not parse
+=== extreme_foreach_dynamic_array_generation ===
+  score=77 label=REVIEW_RECOMMENDED sem=0.53
+=== extreme_greaterorequals_range_validation ===
+  score=93 label=HIGH_CONFIDENCE sem=0.35
+=== extreme_mixed_math_string_type_conversion ===
+  score=93 label=HIGH_CONFIDENCE sem=0.59
+=== extreme_multi_replace_substring_indexing ===
+  score=95 label=HIGH_CONFIDENCE sem=0.41
+=== extreme_nested_if_with_startswith_endswith ===
+  score=77 label=REVIEW_RECOMMENDED sem=0.10
+=== extreme_nested_ternary_string_interpolation ===
+  score=77 label=REVIEW_RECOMMENDED sem=0.32
+=== extreme_string_manipulation_cascade ===
+  score=82 label=REVIEW_RECOMMENDED sem=0.46
+=== extreme_ticks_based_computation_chain ===
+  score=84 label=REVIEW_RECOMMENDED sem=0.60
+=== extreme_union_createarray_dynamic_iteration ===
+  score=57 label=MANUAL_INTERVENTION sem=1.00
+=== extreme_utcnow_addhours_timezone_logic ===
+  score=85 label=REVIEW_RECOMMENDED sem=0.53
+=== extreme_variable_self_reference_accumulation ===
+  score=86 label=REVIEW_RECOMMENDED sem=0.35
+=== ALL DONE ===
