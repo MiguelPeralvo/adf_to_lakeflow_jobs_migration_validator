@@ -1,14 +1,14 @@
 {
   "description": "Human-labelled ADF expression / Python translation pairs for judge calibration. Scores range from 0.0 (completely wrong) to 1.0 (perfect semantic equivalence).",
   "version": "1.0",
-  "count": 20,
+  "count": 26,
   "calibration_pairs": [
     {
       "adf_expression": "@concat('hello', 'world')",
       "python_code": "str('hello') + str('world')",
       "human_score": 1.0,
       "category": "string",
-      "notes": "Perfect translation — concat maps to string concatenation with str() coercion."
+      "notes": "Perfect translation \u2014 concat maps to string concatenation with str() coercion."
     },
     {
       "adf_expression": "@replace('abc', 'a', 'z')",
@@ -22,21 +22,21 @@
       "python_code": "'abc'.upper()",
       "human_score": 0.9,
       "category": "string",
-      "notes": "Correct behaviour but missing str() wrapper — minor deviation from wkmigrate convention."
+      "notes": "Correct behaviour but missing str() wrapper \u2014 minor deviation from wkmigrate convention."
     },
     {
       "adf_expression": "@concat('a', 'b', 'c')",
       "python_code": "str('a') + str('b')",
       "human_score": 0.3,
       "category": "string",
-      "notes": "Missing third argument — concat('a','b','c') should produce 'abc', not 'ab'."
+      "notes": "Missing third argument \u2014 concat('a','b','c') should produce 'abc', not 'ab'."
     },
     {
       "adf_expression": "@add(1, 2)",
       "python_code": "(1 + 2)",
       "human_score": 1.0,
       "category": "math",
-      "notes": "Perfect — add(1,2) maps directly to (1 + 2)."
+      "notes": "Perfect \u2014 add(1,2) maps directly to (1 + 2)."
     },
     {
       "adf_expression": "@add(mul(pipeline().parameters.count, 2), 1)",
@@ -50,7 +50,7 @@
       "python_code": "(9 / 2)",
       "human_score": 0.5,
       "category": "math",
-      "notes": "ADF div() returns integer division — Python / returns float. Should be int(9 / 2)."
+      "notes": "ADF div() returns integer division \u2014 Python / returns float. Should be int(9 / 2)."
     },
     {
       "adf_expression": "@mod(9, 2)",
@@ -71,14 +71,14 @@
       "python_code": "datetime.now()",
       "human_score": 0.4,
       "category": "datetime",
-      "notes": "Missing timezone — utcNow() must return UTC-aware datetime. datetime.now() returns local time."
+      "notes": "Missing timezone \u2014 utcNow() must return UTC-aware datetime. datetime.now() returns local time."
     },
     {
       "adf_expression": "@equals(1, 1)",
       "python_code": "(1 == 1)",
       "human_score": 1.0,
       "category": "logical",
-      "notes": "Perfect — direct equality comparison."
+      "notes": "Perfect \u2014 direct equality comparison."
     },
     {
       "adf_expression": "@and(greater(pipeline().parameters.threshold, 50), not(equals(pipeline().parameters.env, 'prod')))",
@@ -99,14 +99,14 @@
       "python_code": "'big'",
       "human_score": 0.1,
       "category": "logical",
-      "notes": "Hardcoded result — completely ignores the conditional logic and parameter reference."
+      "notes": "Hardcoded result \u2014 completely ignores the conditional logic and parameter reference."
     },
     {
       "adf_expression": "@length(createArray(1, 2, 3))",
       "python_code": "len([1, 2, 3])",
       "human_score": 1.0,
       "category": "collection",
-      "notes": "Perfect — createArray maps to list literal, length maps to len()."
+      "notes": "Perfect \u2014 createArray maps to list literal, length maps to len()."
     },
     {
       "adf_expression": "@coalesce(null, 'x')",
@@ -120,7 +120,7 @@
       "python_code": "str(str('x').upper()) + str(str((1 + 2)))",
       "human_score": 1.0,
       "category": "nested",
-      "notes": "Correct nesting — toUpper inside concat, add inside string inside concat."
+      "notes": "Correct nesting \u2014 toUpper inside concat, add inside string inside concat."
     },
     {
       "adf_expression": "@concat(formatDateTime(utcNow(), 'yyyy-MM-dd'), '/', pipeline().parameters.env)",
@@ -134,14 +134,56 @@
       "python_code": "str(len(str('a-b-c').split('-')))",
       "human_score": 1.0,
       "category": "nested",
-      "notes": "Perfect — split to .split(), length to len(), string to str()."
+      "notes": "Perfect \u2014 split to .split(), length to len(), string to str()."
     },
     {
       "adf_expression": "@concat(pipeline().parameters.prefix, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'), '/data.csv')",
       "python_code": "dbutils.widgets.get('prefix')",
       "human_score": 0.0,
       "category": "nested",
-      "notes": "Completely wrong — only emits the first parameter, drops the path construction, date formatting, and filename."
+      "notes": "Completely wrong \u2014 only emits the first parameter, drops the path construction, date formatting, and filename."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['config_value']",
+      "human_score": 0.95,
+      "category": "string",
+      "notes": "Correct mapping: ADF activity output \u2192 Databricks taskValues.get(). The taskKey matches the activity name, key='result' is the convention for storing upstream output. firstRow chain access is correct."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.row_count",
+      "python_code": "dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['row_count']",
+      "human_score": 0.95,
+      "category": "collection",
+      "notes": "Standard activity output mapping. The dbutils.jobs.taskValues pattern is the CORRECT Databricks equivalent of ADF inter-task communication."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue)",
+      "python_code": "next((v for v in [dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value'], dbutils.widgets.get('defaultValue')] if v is not None), None)",
+      "human_score": 0.9,
+      "category": "string",
+      "notes": "Correct coalesce + activity output + parameter fallback. The taskValues access is the right pattern. Minor: null semantics in Python differ slightly from ADF null/undefined."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "human_score": 0.6,
+      "category": "string",
+      "notes": "The json.loads wrapper is unnecessary and fragile \u2014 taskValues stores Python objects natively. Without json.loads the code is better. Score reduced for the json.loads anti-pattern."
+    },
+    {
+      "adf_expression": "@variables('counter')",
+      "python_code": "dbutils.jobs.taskValues.get(taskKey='set_variable_counter', key='counter')",
+      "human_score": 0.9,
+      "category": "math",
+      "notes": "Correct mapping: ADF pipeline variables() map to Databricks taskValues. The taskKey prefix 'set_variable_' is the convention for variable storage. Do NOT penalise this pattern."
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.a), 2), 1), 3)",
+      "python_code": "(((int(dbutils.widgets.get('a')) * 2) + 1) // 3)",
+      "human_score": 0.95,
+      "category": "math",
+      "notes": "Correct nested arithmetic with integer division (//). The operator precedence and parenthesisation preserve ADF semantics exactly. div\u2192// is the correct Python mapping for ADF integer division."
     }
   ]
 }

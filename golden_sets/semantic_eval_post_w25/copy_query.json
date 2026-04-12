@@ -1,0 +1,188 @@
+{
+  "context": "copy_query",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 195,
+  "total_evaluated": 195,
+  "overall_mean_score": 0.89,
+  "by_category": {
+    "collection": {
+      "count": 38,
+      "mean_score": 0.881,
+      "min_score": 0.45,
+      "max_score": 0.97
+    },
+    "datetime": {
+      "count": 11,
+      "mean_score": 0.969,
+      "min_score": 0.95,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 56,
+      "mean_score": 0.937,
+      "min_score": 0.45,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 18,
+      "mean_score": 0.726,
+      "min_score": 0.3,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 49,
+      "mean_score": 0.91,
+      "min_score": 0.5,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 23,
+      "mean_score": 0.839,
+      "min_score": 0.3,
+      "max_score": 1.0
+    }
+  },
+  "low_scoring_count": 20,
+  "low_scoring": [
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.records), sub(int(pipeline().parameters.factor), 1)), int(variables('increment'))), 3)",
+      "python_code": "(((int(dbutils.widgets.get('records')) * (int(dbutils.widgets.get('factor')) - 1)) + int(dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment'))) // 3)",
+      "category": "math",
+      "score": 0.3,
+      "reasoning": "Two semantic issues: (1) `variables('increment')` is incorrectly mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')` \u2014 ADF pipeline variables are not activity outputs and should not use taskValues; this is a fundamental mapping error. (2) Python `//` (floor division) differs from ADF `div` (truncation toward zero) for negative numbers. The arithmetic structure (mul, sub, add nesting) is correctly preserved, and parameter references are correct, but the variable reference mapping is a significant semantic error."
+    },
+    {
+      "adf_expression": "@replace(pipeline().parameters.path, '\\\\', '/')",
+      "python_code": "str(dbutils.widgets.get('path')).replace('\\\\\\\\', '/')",
+      "category": "string",
+      "score": 0.3,
+      "reasoning": "The Python translation incorrectly uses '\\\\\\\\' (four backslashes in source = two literal backslashes) as the search pattern, whereas the ADF expression '\\\\' represents a single backslash character. In ADF string literals, '\\\\' is an escaped single backslash, so the replace should find single backslashes. The correct Python equivalent should be str(dbutils.widgets.get('path')).replace('\\\\', '/') \u2014 wait, let me recount: in Python source '\\\\' = two chars = one literal backslash. The ADF '\\\\' in the expression = one literal backslash. So actually the Python '\\\\' is correct for one backslash. But the translation uses '\\\\\\\\' which is two literal backslashes. This means the Python code replaces double-backslash sequences instead of single backslashes, which is semantically incorrect for typical path normalization use cases. The parameter mapping and str() coercion are correct, but the escape sequence is wrong by one level of escaping."
+    },
+    {
+      "adf_expression": "@if(and(greater(add(int(pipeline().parameters.retryCount), int(variables('offset'))), 3), less(mod(int(pipeline().parameters.batchId), 10), 5)), 'retry', 'skip')",
+      "python_code": "('retry' if (((int(dbutils.widgets.get('retryCount')) + int(dbutils.jobs.taskValues.get(taskKey='set_variable_offset', key='offset'))) > 3) and ((int(dbutils.widgets.get('batchId')) % 10) < 5)) else 'skip')",
+      "category": "logical",
+      "score": 0.45,
+      "reasoning": "The Python translation correctly maps most of the logic: parameter references via dbutils.widgets.get(), arithmetic operations (add\u2192+, mod\u2192%), comparisons (greater\u2192>, less\u2192<), logical and, and the if/else ternary. However, the critical semantic error is the mapping of ADF variables('offset') to dbutils.jobs.taskValues.get(taskKey='set_variable_offset', key='offset'). ADF pipeline variables are not activity outputs \u2014 they should not map to taskValues.get(). The taskValues pattern is reserved for activity output references (@activity('X').output...). This incorrect mapping introduces a wrong data source and an assumed task name ('set_variable_offset') that doesn't exist in the original expression, which is a significant semantic difference that would cause incorrect runtime behavior."
+    },
+    {
+      "adf_expression": "@coalesce(trim(activity('Lookup').output.firstRow.optional_value), pipeline().parameters.defaultValue, 'fallback')",
+      "python_code": "next((v for v in [str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value']).strip(), dbutils.widgets.get('defaultValue'), 'fallback'] if v is not None), None)",
+      "category": "string",
+      "score": 0.45,
+      "reasoning": "The translation correctly maps activity output references, trim() to .strip(), pipeline parameters to dbutils.widgets.get(), and the coalesce pattern. However, there is a critical semantic flaw: wrapping the activity output value with str() before calling .strip() means that if optional_value is None/null, str(None).strip() produces the string 'None' rather than None. In ADF, trim(null) returns null, which coalesce would skip in favor of the next argument. In the Python translation, 'None' (a non-None string) would be returned instead of falling through to pipeline().parameters.defaultValue. This null-handling bug represents a significant semantic difference in a common edge case."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.full_path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['full_path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.45,
+      "reasoning": "The translation has a critical semantic error in the replace() call. In ADF, '\\\\' in the expression represents a single backslash character. The Python translation uses .replace('\\\\\\\\', '/') which in Python string literal equals replacing '\\\\' (two backslashes) rather than '\\' (one backslash). This means Windows-style paths with single backslashes would not be correctly converted. The activity output mapping, split, and last ([-1]) are all correct. The double str() wrapping is harmless but unnecessary. The core replace logic is wrong, making this a partial equivalence."
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), int(pipeline().parameters.offset)), 2)",
+      "python_code": "(((int(dbutils.widgets.get('batchSize')) * int(dbutils.widgets.get('parallelism'))) - int(dbutils.widgets.get('offset'))) // 2)",
+      "category": "math",
+      "score": 0.5,
+      "reasoning": "The Python translation correctly maps pipeline().parameters.X to dbutils.widgets.get('X'), correctly applies int() coercion on the parameters, and correctly preserves the nesting order: mul first, then sub, then div. However, there is a semantic difference in the division operation: ADF's @div() performs integer division (truncating toward zero), while Python's // operator performs floor division (truncating toward negative infinity). For negative numbers, these differ: e.g., -7 // 2 = -4 in Python but ADF div(-7, 2) = -3. This is a meaningful semantic difference that could affect runtime behavior for negative values. The rest of the expression (mul, sub, int coercions, parameter references) is correctly translated, so partial credit is warranted."
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelCopies)), sub(100, int(pipeline().parameters.reserve))), 5)",
+      "python_code": "(((int(dbutils.widgets.get('batchSize')) * int(dbutils.widgets.get('parallelCopies'))) + (100 - int(dbutils.widgets.get('reserve')))) // 5)",
+      "category": "math",
+      "score": 0.5,
+      "reasoning": "The Python translation correctly maps all the nested arithmetic operations (mul\u2192*, add\u2192+, sub\u2192-) and parameter references (pipeline().parameters.X \u2192 dbutils.widgets.get('X')) with proper int() coercions. However, there is a critical semantic difference: ADF's @div() performs integer division (truncating toward zero), but the Python translation uses the // operator, which performs floor division (truncating toward negative infinity). These differ for negative numbers (e.g., -7 // 2 = -4 in Python floor division, but ADF div(-7, 2) = -3 truncating toward zero). Additionally, there is no division-by-zero guard, though the divisor here is a literal 5 so that's not a concern. The floor vs. truncation difference is a real semantic difference that affects negative values, warranting a score in the partial equivalence range."
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), sub(100, int(pipeline().parameters.offset))), 5)",
+      "python_code": "(((int(dbutils.widgets.get('batchSize')) * int(dbutils.widgets.get('parallelism'))) + (100 - int(dbutils.widgets.get('offset')))) // 5)",
+      "category": "math",
+      "score": 0.5,
+      "reasoning": "The Python translation correctly maps all parameter references (pipeline().parameters.X \u2192 dbutils.widgets.get('X')), correctly applies int() coercion, and correctly maps add(), mul(), and sub() to their Python arithmetic equivalents (+, *, -) with proper nesting and evaluation order. However, the critical issue is the division operator: ADF's @div() performs integer division (truncating toward zero), but the Python translation uses // (floor division). These differ for negative numbers \u2014 floor division rounds toward negative infinity while truncating division rounds toward zero. For example, div(-7, 2) in ADF returns -3 (truncation), but (-7 // 2) in Python returns -4 (floor). Since the inputs involve subtraction (100 - offset) which could produce negative values, this semantic difference is real and not just theoretical. The correct Python equivalent should use int((numerator) / 5) to replicate ADF's truncating integer division behavior. This constitutes a semantic difference that affects runtime behavior for negative intermediate values, warranting a score in the partial equivalence range."
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.rowsPerFile), int(pipeline().parameters.fileCount)), int(pipeline().parameters.bufferRows)), 2)",
+      "python_code": "(((int(dbutils.widgets.get('rowsPerFile')) * int(dbutils.widgets.get('fileCount'))) + int(dbutils.widgets.get('bufferRows'))) // 2)",
+      "category": "math",
+      "score": 0.5,
+      "reasoning": "The Python translation correctly maps all parameter references using dbutils.widgets.get() with proper int() coercion, and correctly maps mul() to *, add() to +, and preserves the nesting/evaluation order. However, the critical issue is the division operator: ADF's @div() performs integer division (truncating toward zero), but the Python translation uses // (floor division), which rounds toward negative infinity. For positive numbers these behave identically, but for negative numbers they differ (e.g., -7 // 2 = -4 in Python, but ADF div(-7, 2) = -3). Since the inputs here are row counts and file counts which are likely always positive, this may not cause practical issues, but semantically it is not equivalent for all inputs. Additionally, ADF's div() returns an integer result, while Python's // also returns an integer, so that aspect is correct. The semantic difference with negative numbers warrants a score in the 0.3-0.6 range, landing at 0.5."
+    },
+    {
+      "adf_expression": "@add(sub(mul(int(pipeline().parameters.recordCount), 3), div(int(pipeline().parameters.offset), 2)), mod(int(pipeline().parameters.shardId), 7))",
+      "python_code": "(((int(dbutils.widgets.get('recordCount')) * 3) - (int(dbutils.widgets.get('offset')) // 2)) + (int(dbutils.widgets.get('shardId')) % 7))",
+      "category": "math",
+      "score": 0.5,
+      "reasoning": "The Python translation correctly maps most of the ADF functions: add\u2192+, sub\u2192-, mul\u2192*, mod\u2192%, and the parameter references are correctly mapped to dbutils.widgets.get() with int() coercion. However, the critical issue is the mapping of div() to Python's integer division operator //. In ADF, @div() performs integer division (truncation toward zero), which matches Python's // operator for positive numbers but diverges for negative numbers. Python's // performs floor division (rounds toward negative infinity), while ADF's div() truncates toward zero. For example, div(-7, 2) in ADF returns -3, but (-7 // 2) in Python returns -4. Since pipeline().parameters.offset could be negative, this is a semantic difference that could affect runtime behavior. This constitutes a partial equivalence issue, warranting a score in the 0.3-0.6 range. The rest of the expression is correctly translated, so a score of 0.5 is appropriate."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, variables('fallbackValue'), pipeline().parameters.defaultValue)",
+      "python_code": "next((v for v in [dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value'], dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue'), dbutils.widgets.get('defaultValue')] if v is not None), None)",
+      "category": "nested",
+      "score": 0.5,
+      "reasoning": "The translation correctly maps the overall coalesce pattern using next() with a generator expression filtering None values, and correctly maps activity('Lookup').output.firstRow.optional_value to dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value'] and pipeline().parameters.defaultValue to dbutils.widgets.get('defaultValue'). However, the mapping of variables('fallbackValue') is incorrect. ADF variables are typically mapped to a local Python variable (e.g., variables['fallbackValue'] or a dedicated variable store), but here it's mapped to dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue'), which is a non-standard and likely incorrect mapping. ADF pipeline variables are not the same as activity outputs stored in task values \u2014 using taskKey='set_variable_fallbackValue' is an invented convention that doesn't reliably correspond to how ADF variables work, and could fail at runtime if no such task exists. This constitutes a meaningful semantic difference for the variables() reference, warranting a score in the partial equivalence range."
+    },
+    {
+      "adf_expression": "@equals(mod(add(pipeline().parameters.sequence, variables('increment')), 2), 0)",
+      "python_code": "((((lambda __wkm_p: int(__wkm_p) if __wkm_p.lstrip('-').isdigit() else float(__wkm_p))(str(dbutils.widgets.get('sequence'))) + dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')) % 2) == 0)",
+      "category": "math",
+      "score": 0.55,
+      "reasoning": "The translation preserves the overall structure (add \u2192 +, mod \u2192 %, equals \u2192 ==) and correctly maps pipeline().parameters.sequence to dbutils.widgets.get('sequence') with numeric coercion. However, there are issues: (1) variables('increment') is mapped to dbutils.jobs.taskValues.get() with an assumed taskKey 'set_variable_increment' that is inferred rather than derivable from the expression; (2) the increment value from taskValues lacks numeric type coercion while sequence has it, creating asymmetric handling that could cause runtime errors if the value is returned as a string; (3) ADF variables() and activity outputs are semantically different constructs, and the taskKey inference may be incorrect. These issues represent partial equivalence with at least one semantic difference."
+    },
+    {
+      "adf_expression": "@lessOrEquals(div(int(pipeline().parameters.size), 1024), 50)",
+      "python_code": "((int(dbutils.widgets.get('size')) // 1024) <= 50)",
+      "category": "logical",
+      "score": 0.55,
+      "reasoning": "The Python translation has a key semantic difference: ADF's `div()` function performs integer division (truncation toward zero), which matches Python's `//` operator for positive numbers but differs for negative numbers (Python `//` floors toward negative infinity, while ADF `div` truncates toward zero). For the typical use case with positive file sizes, this would behave identically. However, the more significant issue is that ADF's `div(int(...), 1024)` performs integer division that truncates toward zero, while Python's `//` floors. For positive values this is equivalent, so the practical impact is low. The `int()` coercion of the widget value is correctly handled. The `lessOrEquals` maps correctly to `<=`. The `pipeline().parameters.size` maps correctly to `dbutils.widgets.get('size')`. Overall, the translation is mostly correct for positive values (which is the expected use case for 'size'), but the use of `//` instead of `int(... / ...)` or `math.trunc(... / ...)` introduces a semantic difference for negative values. This warrants a moderate score reduction. The translation preserves the main logic but misses the exact integer division semantics of ADF's `div()` function."
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.env, toUpper(variables('stage')), activity('Lookup').output.firstRow.config_value), '|')",
+      "python_code": "'|'.join(str(x) for x in [dbutils.widgets.get('env'), str(dbutils.jobs.taskValues.get(taskKey='set_variable_stage', key='stage')).upper(), dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['config_value']])",
+      "category": "collection",
+      "score": 0.55,
+      "reasoning": "The overall join structure and type coercion (str(x) for x in [...]) are correct. The activity('Lookup') mapping is correct. However, variables('stage') is mapped to dbutils.jobs.taskValues.get(taskKey='set_variable_stage', key='stage') where the taskKey 'set_variable_stage' is invented/inferred and not derivable from the original ADF expression. The original uses a pipeline variable named 'stage', not an activity output. This is a semantic difference that could produce incorrect runtime behavior if no task named 'set_variable_stage' exists or if the variable was set differently. The correct approach would use a different mechanism for pipeline variables (e.g., a pre-defined Python variable or widget). This constitutes a partial equivalence issue."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.55,
+      "reasoning": "The translation correctly maps the activity output reference, split, and last operations. However, the replace operation uses '\\\\\\\\' (four backslashes in source = two backslashes at runtime) instead of '\\\\' (two backslashes in source = one backslash at runtime). This means the Python code replaces double-backslashes rather than single backslashes, which is semantically incorrect for typical Windows paths. The extra str() wrapping is harmless. The core logic structure (replace \u2192 split \u2192 last element) is preserved, but the backslash replacement is wrong, causing partial equivalence."
+    },
+    {
+      "adf_expression": "@join(createArray(pipeline().parameters.env, variables('runId'), formatDateTime(utcNow(),'HHmmss')), '-')",
+      "python_code": "'-'.join(str(x) for x in [dbutils.widgets.get('env'), dbutils.jobs.taskValues.get(taskKey='set_variable_runId', key='runId'), _wkmigrate_format_datetime(_wkmigrate_utc_now(), 'HHmmss')])",
+      "category": "collection",
+      "score": 0.55,
+      "reasoning": "The translation has several issues to evaluate:\n\n1. **`pipeline().parameters.env`** \u2192 `dbutils.widgets.get('env')`: This is correct.\n\n2. **`variables('runId')`** \u2192 `dbutils.jobs.taskValues.get(taskKey='set_variable_runId', key='runId')`: This is a significant semantic difference. ADF `variables('runId')` refers to a pipeline variable, not an activity output. The correct mapping for a pipeline variable would typically be something like a pre-set Python variable or a widget, not `dbutils.jobs.taskValues.get()`. The `taskValues.get()` pattern is reserved for activity outputs (`@activity('X').output...`). Using it for a pipeline variable is semantically incorrect \u2014 it maps the wrong ADF concept to this API. Additionally, `taskKey='set_variable_runId'` is an invented task name not present in the original expression.\n\n3. **`formatDateTime(utcNow(),'HHmmss')`** \u2192 `_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'HHmmss')`: This is correct, assuming the helper functions are properly defined.\n\n4. **`join(..., '-')`** \u2192 `'-'.join(str(x) for x in [...])`: The join logic is correct. The `str(x)` coercion is appropriate since ADF's `join` works on string arrays and the elements may need coercion.\n\n5. **`createArray(...)`** \u2192 `[...]`: Correct mapping to a Python list.\n\nThe main semantic error is the incorrect mapping of `variables('runId')` to a task value lookup with an invented task key. This is a meaningful semantic difference that could cause runtime failures or incorrect behavior. The rest of the translation is largely correct."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.fallbackValue, variables('defaultValue'))",
+      "python_code": "next((v for v in [dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value'], dbutils.widgets.get('fallbackValue'), dbutils.jobs.taskValues.get(taskKey='set_variable_defaultValue', key='defaultValue')] if v is not None), None)",
+      "category": "string",
+      "score": 0.6,
+      "reasoning": "The translation partially preserves the coalesce semantics. The coalesce pattern using next() with a generator filtering None values is correct. The activity output reference and pipeline parameter reference are correctly mapped. However, the variables('defaultValue') mapping is incorrect. ADF variables are pipeline-level variables set via Set Variable activities, and they should NOT be mapped to dbutils.jobs.taskValues.get() with a synthetic taskKey like 'set_variable_defaultValue'. There is no standard Databricks equivalent that maps cleanly this way, and this mapping is fabricated/incorrect. A more appropriate approach might be to use a Python variable or some other mechanism, but using taskValues with a synthetic key 'set_variable_defaultValue' does not correctly reproduce the ADF variables() behavior. This semantic error in the third coalesce argument is significant enough to lower the score substantially."
+    },
+    {
+      "adf_expression": "@concat('abfss://', pipeline().parameters.container, '@', toLower(pipeline().parameters.storageAccount), '.dfs.core.windows.net/', replace(trim(activity('Lookup').output.firstRow.relative_path), '\\\\', '/'))",
+      "python_code": "str('abfss://') + str(dbutils.widgets.get('container')) + str('@') + str(str(dbutils.widgets.get('storageAccount')).lower()) + str('.dfs.core.windows.net/') + str(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['relative_path']).strip()).replace('\\\\\\\\', '/'))",
+      "category": "nested",
+      "score": 0.6,
+      "reasoning": "The translation is mostly correct \u2014 concat with str() coercion, parameter references, toLower\u2192.lower(), trim\u2192.strip(), and activity output reference are all properly mapped. However, there is a semantic error in the replace() call: the ADF expression uses '\\\\' (a single backslash in ADF syntax) as the search string, but the Python translation uses '\\\\\\\\' (four backslashes in source = two-backslash string at runtime), meaning it would only replace double-backslashes instead of single backslashes. The correct Python should use '\\\\' (two backslashes in source = one backslash at runtime). This is a meaningful runtime behavior difference that would cause incorrect path construction when the relative_path contains single backslashes."
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.records), 10), mod(int(pipeline().parameters.records), 3)), 2)",
+      "python_code": "(((int(dbutils.widgets.get('records')) * 10) - (int(dbutils.widgets.get('records')) % 3)) // 2)",
+      "category": "math",
+      "score": 0.65,
+      "reasoning": "The translation correctly maps most operations: mul\u2192*, sub\u2192-, mod\u2192%, parameter references, and int() coercions. However, there are two semantic issues for negative numbers: (1) ADF's @div performs truncating division (toward zero), while Python's // is floor division (toward negative infinity) \u2014 these differ for negative values; (2) ADF's mod returns a result with the same sign as the dividend, while Python's % returns a result with the same sign as the divisor. For positive 'records' values (the common case for a record count), the translation is correct. But the semantic equivalence is not exact across all possible inputs, making this a partial equivalence."
+    },
+    {
+      "adf_expression": "@length(createArray(pipeline().parameters.env, variables('runMode'), activity('Lookup').output.firstRow.config_value))",
+      "python_code": "len([dbutils.widgets.get('env'), dbutils.jobs.taskValues.get(taskKey='set_variable_runMode', key='runMode'), dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['config_value']])",
+      "category": "collection",
+      "score": 0.65,
+      "reasoning": "The overall structure (len of a 3-element list) is correctly preserved. The pipeline parameter mapping (dbutils.widgets.get('env')) and activity output mapping are correct. However, 'variables('runMode')' in ADF refers to a pipeline variable, and the translation maps it to dbutils.jobs.taskValues.get(taskKey='set_variable_runMode', key='runMode'). The taskKey='set_variable_runMode' is an assumed/inferred activity name that may not match the actual pipeline structure. This represents a semantic risk \u2014 if the Set Variable activity has a different name, the translation would fail at runtime. The key='runMode' is also non-standard (the criteria says activity output maps to key='result'). This is a partial equivalence with a meaningful semantic difference in the variable retrieval."
+    }
+  ]
+}
