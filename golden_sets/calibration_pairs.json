@@ -1,7 +1,7 @@
 {
   "description": "Human-labelled ADF expression / Python translation pairs for judge calibration. Scores range from 0.0 (completely wrong) to 1.0 (perfect semantic equivalence).",
   "version": "1.0",
-  "count": 26,
+  "count": 30,
   "calibration_pairs": [
     {
       "adf_expression": "@concat('hello', 'world')",
@@ -184,6 +184,34 @@
       "human_score": 0.95,
       "category": "math",
       "notes": "Correct nested arithmetic with integer division (//). The operator precedence and parenthesisation preserve ADF semantics exactly. div\u2192// is the correct Python mapping for ADF integer division."
+    },
+    {
+      "adf_expression": "@variables('processingFlag')",
+      "python_code": "str(bool(0))",
+      "human_score": 0.7,
+      "category": "string",
+      "notes": "When wkmigrate inlines a SetVariable's computed value for @variables(), the result may be the evaluated expression rather than taskValues.get(). This is a valid translation approach \u2014 the computed value IS the variable's content. Score 0.7 for correct semantics with different reference style."
+    },
+    {
+      "adf_expression": "@variables('outputPath')",
+      "python_code": "str(dbutils.widgets.get('basePath')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd'))",
+      "human_score": 0.75,
+      "category": "string",
+      "notes": "Inlined variable resolution: wkmigrate substitutes the SetVariable expression inline. The Python computes the same value that would be stored in the variable. This is semantically equivalent \u2014 do NOT heavily penalise inlined variable resolution."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(), 'yyyy-MM-dd'), '/', pipeline().parameters.env, '/', pipeline().parameters.region)",
+      "python_code": "str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) + str('/') + str(dbutils.widgets.get('region'))",
+      "human_score": 0.95,
+      "category": "string",
+      "notes": "Multi-arg concat with datetime and parameters. The str() wrapping + concatenation correctly reproduces @concat's auto-coercion behavior. _wkmigrate helpers are the correct datetime mapping."
+    },
+    {
+      "adf_expression": "@if(startsWith(pipeline().parameters.env, 'prod'), 'production', 'development')",
+      "python_code": "('production' if str(dbutils.widgets.get('env')).startswith('prod') else 'development')",
+      "human_score": 0.95,
+      "category": "logical",
+      "notes": "Correct mapping: @startsWith \u2192 .startswith() (Python), @if \u2192 ternary. The Python correctly evaluates the condition and returns the appropriate branch."
     }
   ]
 }
