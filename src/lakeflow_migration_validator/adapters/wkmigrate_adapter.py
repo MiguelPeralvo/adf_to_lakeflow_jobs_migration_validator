@@ -26,6 +26,15 @@ if TYPE_CHECKING:
 
 _PLACEHOLDER_PATH = "/UNSUPPORTED_ADF_ACTIVITY"
 
+_IR_OP_TO_PYTHON: dict[str, str] = {
+    "EQUAL_TO": "==",
+    "NOT_EQUAL_TO": "!=",
+    "GREATER_THAN": ">",
+    "GREATER_THAN_OR_EQUAL": ">=",
+    "LESS_THAN": "<",
+    "LESS_THAN_OR_EQUAL": "<=",
+}
+
 
 def _coerce_resolved_value(value: Any) -> str | None:
     """Coerce a wkmigrate IR value into a plain Python source string.
@@ -374,7 +383,8 @@ def _extract_resolved_expression_pairs(
             left = getattr(task, "left", None)
             right = getattr(task, "right", None)
             if isinstance(op, str) and op and isinstance(left, str) and left and isinstance(right, str) and right:
-                python_code = f"({left} {op} {right})"
+                python_op = _IR_OP_TO_PYTHON.get(op, op)
+                python_code = f"({left} {python_op} {right})"
                 adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code))
             continue

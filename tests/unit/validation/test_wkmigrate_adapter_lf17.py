@@ -240,7 +240,7 @@ def test_adapter_extracts_if_condition_decomposed_predicate():
     task = IfConditionActivity(
         name="ifc",
         task_key="ifc",
-        op="==",
+        op="EQUAL_TO",
         left="dbutils.widgets.get('x')",
         right="1",
     )
@@ -250,8 +250,23 @@ def test_adapter_extracts_if_condition_decomposed_predicate():
 
     pairs = {p.adf_expression: p.python_code for p in snap.resolved_expressions}
     assert "@equals(pipeline().parameters.x, 1)" in pairs
-    # Synthesized from (left, op, right) — exact format is the (left op right) string
+    # L-F17 walker maps IR enum EQUAL_TO → Python ==
     assert pairs["@equals(pipeline().parameters.x, 1)"] == "(dbutils.widgets.get('x') == 1)"
+
+
+def test_adapter_maps_ir_op_enum_to_python_operators():
+    """All IR condition ops (EQUAL_TO, GREATER_THAN, etc.) are mapped to Python operators."""
+    from lakeflow_migration_validator.adapters.wkmigrate_adapter import _IR_OP_TO_PYTHON
+
+    source = {"activities": []}
+    for ir_op, py_op in _IR_OP_TO_PYTHON.items():
+        task = IfConditionActivity(name="ifc", task_key="ifc", op=ir_op, left="a", right="b")
+        prepared = _build_minimal_prepared_for_task(task)
+        snap = from_wkmigrate(source, prepared)
+        assert len(snap.resolved_expressions) == 1
+        assert f"(a {py_op} b)" == snap.resolved_expressions[0].python_code, (
+            f"IR op {ir_op!r} should map to Python {py_op!r}"
+        )
 
 
 def test_adapter_uses_synthetic_label_when_source_expression_missing():
@@ -596,7 +611,7 @@ def test_adapter_skips_if_condition_with_missing_operands():
     task = IfConditionActivity(
         name="bad_if",
         task_key="bad_if",
-        op="==",
+        op="EQUAL_TO",
         left="",  # ← invalid: empty operand
         right="1",
     )
