@@ -56,7 +56,7 @@ def configure_cli(
 
 def _auto_configure() -> None:
     """Auto-configure from environment if not already set."""
-    global _CONVERT_FN, _JUDGE_PROVIDER
+    global _CONVERT_FN, _JUDGE_PROVIDER, _HARNESS_RUNNER, _PARALLEL_RUNNER
     if _CONVERT_FN is not snapshot_from_adf_payload:
         return  # already configured
     # Try to build wkmigrate converter. The adapter module is importable
@@ -89,6 +89,33 @@ def _auto_configure() -> None:
                 endpoint=f"{host.rstrip('/')}/serving-endpoints",
                 token=token,
                 timeout_seconds=60,
+            )
+        except Exception:
+            pass
+    # Try to build harness runner from Azure credentials
+    azure_tenant = os.environ.get("AZURE_TENANT_ID")
+    azure_client = os.environ.get("AZURE_CLIENT_ID")
+    azure_secret = os.environ.get("AZURE_CLIENT_SECRET")
+    azure_sub = os.environ.get("AZURE_SUBSCRIPTION_ID")
+    azure_rg = os.environ.get("AZURE_RESOURCE_GROUP")
+    azure_factory = os.environ.get("AZURE_FACTORY_NAME")
+    if all([azure_tenant, azure_client, azure_secret, azure_sub, azure_rg, azure_factory]) and _HARNESS_RUNNER is None:
+        try:
+            from lakeflow_migration_validator.harness.adf_connector import ADFConnector
+            from lakeflow_migration_validator.harness.harness_runner import HarnessRunner
+
+            connector = ADFConnector.from_credentials(
+                tenant_id=azure_tenant,
+                client_id=azure_client,
+                client_secret=azure_secret,
+                subscription_id=azure_sub,
+                resource_group=azure_rg,
+                factory_name=azure_factory,
+            )
+            _HARNESS_RUNNER = HarnessRunner(
+                adf_connector=connector,
+                wkmigrate_adapter=lambda src, prep: _CONVERT_FN(src),
+                judge_provider=_JUDGE_PROVIDER,
             )
         except Exception:
             pass
