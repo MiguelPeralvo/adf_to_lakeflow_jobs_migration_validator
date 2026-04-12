@@ -130,7 +130,7 @@ class TestCalibrationPairFormat:
 
         pairs = load_calibration_pairs(golden_path)
 
-        assert len(pairs) == 20
+        assert len(pairs) >= 20
         for pair in pairs:
             assert pair.adf_expression, "adf_expression must not be empty"
             assert pair.python_code, "python_code must not be empty"

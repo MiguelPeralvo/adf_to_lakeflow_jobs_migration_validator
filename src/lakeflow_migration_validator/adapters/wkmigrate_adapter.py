@@ -288,6 +288,7 @@ def _extract_resolved_expression_pairs(
                             _source_expression_at(source_activity, "value") or f"@variables('{variable_name}')"
                         ),
                         python_code=variable_value,
+                        context="set_variable",
                     )
                 )
             continue
@@ -302,7 +303,7 @@ def _extract_resolved_expression_pairs(
                         _source_expression_at(source_activity, "base_parameters", param_name)
                         or f"@notebook('{task_name}').base_parameters.{param_name}"
                     )
-                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code, context="notebook_base_param"))
             continue
 
         if isinstance(task, WebActivity):
@@ -313,14 +314,14 @@ def _extract_resolved_expression_pairs(
                 adf = _source_expression_at(source_activity, prop_name)
                 if adf is None:
                     continue
-                pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=code, context="web_body"))
             # headers can be: dict[str, Any | ResolvedExpression], a single
             # ResolvedExpression covering the whole dict, or None.
             headers_code = _coerce_resolved_value(task.headers)
             if headers_code is not None:
                 headers_adf = _source_expression_at(source_activity, "headers")
                 if headers_adf is not None:
-                    pairs.append(ExpressionPair(adf_expression=headers_adf, python_code=headers_code))
+                    pairs.append(ExpressionPair(adf_expression=headers_adf, python_code=headers_code, context="web_headers"))
             elif isinstance(task.headers, dict):
                 for header_name, header_value in task.headers.items():
                     code = _coerce_resolved_value(header_value)
@@ -330,7 +331,7 @@ def _extract_resolved_expression_pairs(
                         _source_expression_at(source_activity, "headers", header_name)
                         or f"@web('{task_name}').headers.{header_name}"
                     )
-                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code, context="web_headers"))
             continue
 
         if isinstance(task, LookupActivity):
@@ -340,7 +341,7 @@ def _extract_resolved_expression_pairs(
                     _source_expression_at(source_activity, "source", "sql_reader_query")
                     or f"@lookup('{task_name}').source.sql_reader_query"
                 )
-                pairs.append(ExpressionPair(adf_expression=adf, python_code=source_query_code))
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=source_query_code, context="lookup_query"))
             continue
 
         if isinstance(task, CopyActivity):
@@ -353,14 +354,14 @@ def _extract_resolved_expression_pairs(
                         _source_expression_at(source_activity, "source", "sql_reader_query")
                         or f"@copy('{task_name}').source.sql_reader_query"
                     )
-                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=code, context="copy_query"))
             continue
 
         if isinstance(task, ForEachActivity):
             items_code = _coerce_resolved_value(task.items_string)
             if items_code is not None:
                 adf = _source_expression_at(source_activity, "items") or f"@for_each('{task_name}').items"
-                pairs.append(ExpressionPair(adf_expression=adf, python_code=items_code))
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=items_code, context="for_each"))
             continue
 
         if isinstance(task, IfConditionActivity):
@@ -383,7 +384,7 @@ def _extract_resolved_expression_pairs(
                 python_op = _IR_OP_TO_PYTHON.get(op, op)
                 python_code = f"({left} {python_op} {right})"
                 adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
-                pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code))
+                pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code, context="if_condition"))
             continue
 
     return pairs

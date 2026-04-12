@@ -50,15 +50,15 @@ __all__ = [
 ]
 
 _DEFAULT_WEIGHTS = {
-    "activity_coverage": 0.25,
-    "expression_coverage": 0.20,
+    "activity_coverage": 0.15,
+    "expression_coverage": 0.15,
     "dependency_preservation": 0.15,
     "notebook_validity": 0.15,
     "parameter_completeness": 0.10,
-    "secret_completeness": 0.10,
+    "secret_completeness": 0.05,
     "not_translatable_ratio": 0.05,
-    "control_flow_fidelity": 0.0,
-    "semantic_equivalence": 0.0,
+    "control_flow_fidelity": 0.05,
+    "semantic_equivalence": 0.15,
     "runtime_success": 0.0,
     "parallel_equivalence": 0.0,
 }
@@ -199,6 +199,16 @@ def _evaluate_semantic_equivalence(snapshot: ConversionSnapshot, judge) -> Dimen
 
     per_pair = [judge.evaluate(pair.adf_expression, pair.python_code) for pair in pairs]
     mean_score = sum(result.score for result in per_pair) / len(per_pair)
+
+    by_context: dict[str, list[float]] = {}
+    for pair, result in zip(pairs, per_pair):
+        ctx = getattr(pair, "context", "unknown")
+        by_context.setdefault(ctx, []).append(result.score)
+    context_breakdown = {
+        ctx: {"mean": round(sum(scores) / len(scores), 3), "count": len(scores)}
+        for ctx, scores in sorted(by_context.items())
+    }
+
     return DimensionResult(
         name="semantic_equivalence",
         score=mean_score,
@@ -207,5 +217,6 @@ def _evaluate_semantic_equivalence(snapshot: ConversionSnapshot, judge) -> Dimen
             "evaluated": len(per_pair),
             "reasoning": [result.details.get("reasoning", "") for result in per_pair],
             "model": judge.model,
+            "by_context": context_breakdown,
         },
     )

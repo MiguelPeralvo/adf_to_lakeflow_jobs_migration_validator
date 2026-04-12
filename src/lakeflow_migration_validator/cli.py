@@ -37,6 +37,7 @@ _CONVERT_FN: Callable[[dict], ConversionSnapshot] = snapshot_from_adf_payload
 _JUDGE_PROVIDER: Any = None
 _HARNESS_RUNNER: Any = None
 _PARALLEL_RUNNER: Any = None
+_CONFIGURED: bool = False
 
 
 def configure_cli(
@@ -47,16 +48,19 @@ def configure_cli(
     parallel_runner: Any = None,
 ) -> None:
     """Inject runtime dependencies for commands (primarily in tests)."""
-    global _CONVERT_FN, _JUDGE_PROVIDER, _HARNESS_RUNNER, _PARALLEL_RUNNER
+    global _CONVERT_FN, _JUDGE_PROVIDER, _HARNESS_RUNNER, _PARALLEL_RUNNER, _CONFIGURED
     _CONVERT_FN = convert_fn or snapshot_from_adf_payload
     _JUDGE_PROVIDER = judge_provider
     _HARNESS_RUNNER = harness_runner
     _PARALLEL_RUNNER = parallel_runner
+    _CONFIGURED = True
 
 
 def _auto_configure() -> None:
     """Auto-configure from environment if not already set."""
     global _CONVERT_FN, _JUDGE_PROVIDER, _HARNESS_RUNNER, _PARALLEL_RUNNER
+    if _CONFIGURED:
+        return  # explicitly configured via configure_cli()
     if _CONVERT_FN is not snapshot_from_adf_payload:
         return  # already configured
     # Try to build wkmigrate converter. The adapter module is importable

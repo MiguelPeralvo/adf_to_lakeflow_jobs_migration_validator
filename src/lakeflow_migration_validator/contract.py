@@ -48,6 +48,7 @@ class ExpressionPair:
 
     adf_expression: str
     python_code: str
+    context: str = "unknown"
 
 
 @dataclass(frozen=True, slots=True)
