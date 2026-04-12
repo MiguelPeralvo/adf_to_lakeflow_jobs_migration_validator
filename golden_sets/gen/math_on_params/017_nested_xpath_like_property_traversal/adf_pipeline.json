@@ -1,0 +1,289 @@
+{
+  "name": "nested_xpath_like_property_traversal",
+  "properties": {
+    "parameters": {
+      "config_table": {
+        "type": "String",
+        "defaultValue": "dbo.pipeline_config"
+      },
+      "config_key": {
+        "type": "String",
+        "defaultValue": "source_query"
+      },
+      "default_value": {
+        "type": "String",
+        "defaultValue": "SELECT 1 AS fallback"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "resolved_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "nested_path_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupPrimaryConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_value, nested_json FROM ', pipeline().parameters.config_table, ' WHERE config_key = ''', pipeline().parameters.config_key, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "LookupFallbackConfig",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "LookupPrimaryConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_value, nested_json, override_json FROM ', pipeline().parameters.config_table, ' WHERE config_key = ''', pipeline().parameters.config_key, '_fallback'' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetResolvedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupFallbackConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_value",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupPrimaryConfig').output?.value[0]?.nested_json?.settings?.query?.sql_text, activity('LookupPrimaryConfig').output?.value[0]?.config_value, activity('LookupFallbackConfig').output?.value[0]?.nested_json?.settings?.query?.sql_text, activity('LookupFallbackConfig').output?.value[0]?.override_json?.deep?.path?.value, activity('LookupFallbackConfig').output?.value[0]?.config_value, pipeline().parameters.default_value)"
+          }
+        }
+      },
+      {
+        "name": "SetNestedPathResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "nested_path_result",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupPrimaryConfig').output?.value[0]?.nested_json?.metadata?.source?.connection?.database_name, activity('LookupFallbackConfig').output?.value[0]?.nested_json?.metadata?.source?.connection?.database_name, activity('LookupFallbackConfig').output?.value[0]?.override_json?.metadata?.source?.connection?.database_name, concat(pipeline().parameters.env, '_default_db'))"
+          }
+        }
+      },
+      {
+        "name": "CheckResolvedValueNotDefault",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetNestedPathResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('resolved_value'), pipeline().parameters.default_value))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogResolvedConfig",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@variables('resolved_value')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogFallbackUsed",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/* fallback for ', pipeline().parameters.config_key, ' in ', pipeline().parameters.env, ' */ ', pipeline().parameters.default_value)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckResolvedValueNotDefault",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "final_query",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(variables('final_query'), coalesce(activity('LookupPrimaryConfig').output?.value[0]?.nested_json?.settings?.query?.sql_text, activity('LookupFallbackConfig').output?.value[0]?.override_json?.deep?.path?.value, pipeline().parameters.default_value))"
+          }
+        }
+      },
+      {
+        "name": "CopyResolvedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@variables('final_query')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "config_key"
+                },
+                "sink": {
+                  "name": "config_key",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "env",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

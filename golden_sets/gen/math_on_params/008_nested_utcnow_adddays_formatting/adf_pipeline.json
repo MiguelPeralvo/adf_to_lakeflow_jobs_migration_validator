@@ -1,0 +1,196 @@
+{
+  "name": "nested_utcnow_adddays_formatting",
+  "properties": {
+    "parameters": {
+      "days_offset": {
+        "type": "Int",
+        "defaultValue": -7
+      },
+      "date_format": {
+        "type": "String",
+        "defaultValue": "yyyy-MM-dd"
+      },
+      "target_folder": {
+        "type": "String",
+        "defaultValue": "output/processed"
+      }
+    },
+    "variables": {
+      "computed_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "formatted_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "query_filter": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeOffsetDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "BuildTargetPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeOffsetDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "formatted_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.target_folder, '/', formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), 'yyyy'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), 'MM'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), pipeline().parameters.date_format), '.parquet')"
+          }
+        }
+      },
+      {
+        "name": "BuildQueryFilter",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildTargetPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "query_filter",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM sales_data WHERE transaction_date >= ''', formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), 'yyyy-MM-dd'), ''' AND transaction_date < ''', formatDateTime(adddays(utcnow(), 0), 'yyyy-MM-dd'), ''' ORDER BY transaction_date')"
+          }
+        }
+      },
+      {
+        "name": "CopySalesDataToLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "BuildQueryFilter",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT id, customer_id, amount, transaction_date, region FROM sales_data WHERE transaction_date >= ''', formatDateTime(adddays(utcnow(), pipeline().parameters.days_offset), 'yyyy-MM-dd'), ''' AND transaction_date < ''', formatDateTime(adddays(utcnow(), 0), 'yyyy-MM-dd'), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "customer_id"
+                },
+                "sink": {
+                  "name": "customer_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "amount"
+                },
+                "sink": {
+                  "name": "transaction_amount",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "transaction_date"
+                },
+                "sink": {
+                  "name": "txn_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "region"
+                },
+                "sink": {
+                  "name": "sales_region",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_azure_sql_sales",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_lake_sales",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

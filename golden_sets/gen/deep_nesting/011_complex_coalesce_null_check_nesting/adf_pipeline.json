@@ -1,0 +1,234 @@
+{
+  "name": "complex_coalesce_null_check_nesting",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "fallback_value": {
+        "type": "String",
+        "defaultValue": "default_fallback"
+      },
+      "nullable_param": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "default_schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      }
+    },
+    "variables": {
+      "resolved_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "schema_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigValues",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_value, schema_name FROM ', coalesce(pipeline().parameters.default_schema, 'dbo'), '.pipeline_config WHERE environment = ''', coalesce(pipeline().parameters.env, 'dev'), ''' AND is_active = 1')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetResolvedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigValues",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_value",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(if(equals(pipeline().parameters.nullable_param, ''), null, pipeline().parameters.nullable_param), if(greater(activity('LookupConfigValues').output.count, 0), activity('LookupConfigValues').output.value[0].config_value, null), pipeline().parameters.fallback_value, 'ultimate_default')"
+          }
+        }
+      },
+      {
+        "name": "SetSchemaName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "schema_name",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(if(equals(pipeline().parameters.default_schema, ''), null, pipeline().parameters.default_schema), if(and(greater(activity('LookupConfigValues').output.count, 0), not(equals(activity('LookupConfigValues').output.value[0].schema_name, null))), activity('LookupConfigValues').output.value[0].schema_name, null), 'dbo')"
+          }
+        }
+      },
+      {
+        "name": "OuterNullCheck",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetSchemaName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(coalesce(variables('resolved_value'), ''), '')), not(equals(coalesce(variables('schema_name'), ''), '')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerNestedNullCheck",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(and(not(equals(coalesce(pipeline().parameters.nullable_param, pipeline().parameters.fallback_value, 'none'), 'none')), equals(pipeline().parameters.env, 'prod')), and(not(equals(coalesce(if(equals(variables('resolved_value'), 'ultimate_default'), null, variables('resolved_value')), pipeline().parameters.fallback_value), pipeline().parameters.fallback_value)), greater(activity('LookupConfigValues').output.count, 0)))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunDatabricksNotebook",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 1,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat('/pipelines/', coalesce(pipeline().parameters.env, 'dev'), '/process_', coalesce(variables('schema_name'), 'dbo'), '_data')"
+                      },
+                      "baseParameters": {
+                        "env": {
+                          "type": "Expression",
+                          "value": "@coalesce(pipeline().parameters.env, 'dev')"
+                        },
+                        "schema": {
+                          "type": "Expression",
+                          "value": "@coalesce(variables('schema_name'), pipeline().parameters.default_schema, 'dbo')"
+                        },
+                        "resolved_param": {
+                          "type": "Expression",
+                          "value": "@coalesce(if(equals(pipeline().parameters.nullable_param, ''), null, pipeline().parameters.nullable_param), variables('resolved_value'), pipeline().parameters.fallback_value)"
+                        },
+                        "config_count": {
+                          "type": "Expression",
+                          "value": "@string(activity('LookupConfigValues').output.count)"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "NotifySkippedProcessing",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:05:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.monitoring.internal/', coalesce(pipeline().parameters.env, 'dev'), '/notifications')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"complex_coalesce_null_check_nesting\",\"status\":\"skipped\",\"env\":\"', coalesce(pipeline().parameters.env, 'dev'), '\",\"reason\":\"null_check_failed\",\"resolved_value\":\"', coalesce(variables('resolved_value'), 'NULL'), '\",\"nullable_param\":\"', coalesce(pipeline().parameters.nullable_param, 'NULL'), '\",\"fallback_used\":\"', coalesce(if(equals(variables('resolved_value'), pipeline().parameters.fallback_value), 'true', 'false'), 'unknown'), '\",\"schema\":\"', coalesce(variables('schema_name'), 'NULL'), '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NotifyCriticalNullFailure",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.monitoring.internal/', coalesce(pipeline().parameters.env, 'dev'), '/alerts')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"complex_coalesce_null_check_nesting\",\"severity\":\"critical\",\"env\":\"', coalesce(pipeline().parameters.env, 'dev'), '\",\"message\":\"Core variables resolved to null or empty\",\"resolved_value\":\"', coalesce(variables('resolved_value'), 'NULL'), '\",\"schema_name\":\"', coalesce(variables('schema_name'), 'NULL'), '\",\"nullable_param_raw\":\"', coalesce(pipeline().parameters.nullable_param, 'NULL'), '\",\"fallback_value\":\"', coalesce(pipeline().parameters.fallback_value, 'NULL'), '\",\"lookup_count\":', string(activity('LookupConfigValues').output.count), '}'))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

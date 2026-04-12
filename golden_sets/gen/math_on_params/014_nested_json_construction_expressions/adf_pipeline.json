@@ -1,0 +1,151 @@
+{
+  "name": "nested_json_construction_expressions",
+  "properties": {
+    "parameters": {
+      "entity_name": {
+        "type": "String",
+        "defaultValue": "customers"
+      },
+      "record_count": {
+        "type": "String",
+        "defaultValue": "100"
+      },
+      "callback_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/callback"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "json_header": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "json_body": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "json_metadata": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "api_response": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Build_JSON_Header",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "json_header",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"api_version\":\"2.0\",\"environment\":\"',pipeline().parameters.env,'\",\"request_id\":\"',guid(),'\",\"timestamp\":\"',utcNow(),'\",\"source\":{\"system\":\"ADF\",\"pipeline\":\"',pipeline().Pipeline,'\",\"run_id\":\"',pipeline().RunId,'\"}}')"
+          }
+        }
+      },
+      {
+        "name": "Build_JSON_Body",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Build_JSON_Header",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "json_body",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"entity\":{\"name\":\"',pipeline().parameters.entity_name,'\",\"record_count\":',pipeline().parameters.record_count,',\"config\":{\"batch_size\":',string(div(int(pipeline().parameters.record_count),if(equals(pipeline().parameters.env,'prod'),5,2))),',\"retry_enabled\":',if(equals(pipeline().parameters.env,'prod'),'true','false'),',\"environment_tier\":\"',if(equals(pipeline().parameters.env,'prod'),'production',if(equals(pipeline().parameters.env,'uat'),'staging','development')),'\"}},\"filters\":{\"active_only\":true,\"modified_after\":\"',formatDateTime(adddays(utcNow(),-7),'yyyy-MM-ddTHH:mm:ssZ'),'\"}}')"
+          }
+        }
+      },
+      {
+        "name": "Build_JSON_Metadata",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Build_JSON_Body",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "json_metadata",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"header\":',variables('json_header'),',\"payload\":',variables('json_body'),',\"callback\":{\"url\":\"',pipeline().parameters.callback_url,'\",\"method\":\"POST\",\"headers\":{\"Content-Type\":\"application/json\",\"X-Correlation-Id\":\"',guid(),'\",\"X-Environment\":\"',pipeline().parameters.env,'\",\"X-Entity\":\"',pipeline().parameters.entity_name,'\",\"X-Record-Count\":\"',pipeline().parameters.record_count,'\"}},\"processing\":{\"priority\":',if(greater(int(pipeline().parameters.record_count),1000),'1','5'),',\"async\":',if(greater(int(pipeline().parameters.record_count),500),'true','false'),',\"compression\":\"gzip\",\"format\":\"json\"}}')"
+          }
+        }
+      },
+      {
+        "name": "Post_JSON_Payload",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Build_JSON_Metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.callback_url,'/',pipeline().parameters.env,'/entities/',pipeline().parameters.entity_name,'/ingest')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            },
+            "X-Constructed-At": {
+              "type": "Expression",
+              "value": "@utcNow()"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(variables('json_metadata'))"
+          }
+        }
+      },
+      {
+        "name": "Store_API_Response",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Post_JSON_Payload",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "api_response",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"status\":\"completed\",\"response_code\":\"',string(activity('Post_JSON_Payload').output.statusCode),'\",\"entity\":\"',pipeline().parameters.entity_name,'\",\"records_requested\":',pipeline().parameters.record_count,',\"environment\":\"',pipeline().parameters.env,'\",\"original_payload_hash\":\"',base64(variables('json_metadata')),'\",\"completed_at\":\"',utcNow(),'\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

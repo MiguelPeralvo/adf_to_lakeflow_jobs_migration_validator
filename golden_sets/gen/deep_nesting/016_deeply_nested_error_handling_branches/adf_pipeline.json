@@ -1,0 +1,410 @@
+{
+  "name": "deeply_nested_error_handling_branches",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "alert_endpoint": {
+        "type": "String",
+        "defaultValue": "https://alerts.example.com/webhook"
+      },
+      "error_threshold": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch-001"
+      },
+      "retry_policy": {
+        "type": "String",
+        "defaultValue": "exponential"
+      }
+    },
+    "variables": {
+      "error_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "last_error_code": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "unknown"
+      }
+    },
+    "activities": [
+      {
+        "name": "InitiateBatchProcessing",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.',pipeline().parameters.env,'.example.com/batch/',pipeline().parameters.batch_id,'/start')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"retry_policy\":\"',pipeline().parameters.retry_policy,'\"}'))"
+          }
+        }
+      },
+      {
+        "name": "CheckInitiationStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "InitiateBatchProcessing",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('InitiateBatchProcessing').output.statusCode, 200)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetStatusSuccess",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "processing_status",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('initiated')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetErrorCodeFromInit",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "last_error_code",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('InitiateBatchProcessing').output.statusCode)"
+                }
+              }
+            },
+            {
+              "name": "AlertOnInitFailure",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "SetErrorCodeFromInit",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.alert_endpoint"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"severity\":\"critical\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"error_code\":\"',variables('last_error_code'),'\",\"stage\":\"initiation\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetErrorCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckInitiationStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "error_count",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('processing_status'),'initiated'),'0','1')"
+          }
+        }
+      },
+      {
+        "name": "CheckErrorThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetErrorCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@less(int(variables('error_count')), pipeline().parameters.error_threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyBatchData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "7.00:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM dbo.batch_data WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "batch_id"
+                      },
+                      "sink": {
+                        "name": "batch_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "record_ts"
+                      },
+                      "sink": {
+                        "name": "record_timestamp",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "RunTransformNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "CopyBatchData",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/',pipeline().parameters.env,'/transform_batch')"
+                },
+                "baseParameters": {
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "error_threshold": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.error_threshold)"
+                  }
+                }
+              }
+            },
+            {
+              "name": "CheckTransformResult",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "RunTransformNotebook",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('RunTransformNotebook').output.runOutput.status, 'success')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "NotifySuccess",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@pipeline().parameters.alert_endpoint"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"severity\":\"info\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"message\":\"Batch processing completed successfully\",\"env\":\"',pipeline().parameters.env,'\",\"rows_processed\":\"',activity('RunTransformNotebook').output.runOutput.rows_processed,'\"}'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetTransformErrorCode",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "last_error_code",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(contains(activity('RunTransformNotebook').output.runOutput,'error_code'),activity('RunTransformNotebook').output.runOutput.error_code,'UNKNOWN_TRANSFORM_ERROR')"
+                      }
+                    }
+                  },
+                  {
+                    "name": "AlertTransformFailure",
+                    "type": "WebActivity",
+                    "dependsOn": [
+                      {
+                        "activity": "SetTransformErrorCode",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@pipeline().parameters.alert_endpoint"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"severity\":\"high\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"error_code\":\"',variables('last_error_code'),'\",\"stage\":\"transformation\",\"env\":\"',pipeline().parameters.env,'\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "AlertThresholdExceeded",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.alert_endpoint"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"severity\":\"critical\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"message\":\"Error threshold exceeded. Error count: ',variables('error_count'),', threshold: ',string(pipeline().parameters.error_threshold),'\",\"env\":\"',pipeline().parameters.env,'\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalStatusNotification",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckErrorThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.alert_endpoint,'/final')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"final_error_count\":\"',variables('error_count'),'\",\"last_error_code\":\"',variables('last_error_code'),'\",\"processing_status\":\"',variables('processing_status'),'\",\"env\":\"',pipeline().parameters.env,'\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

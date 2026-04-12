@@ -1,0 +1,266 @@
+{
+  "name": "web_activity_output_into_nested_conditions",
+  "properties": {
+    "parameters": {
+      "api_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/data"
+      },
+      "auth_token": {
+        "type": "String",
+        "defaultValue": "Bearer xxx"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "response_status": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "record_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "CallApiEndpoint",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_url, '/', pipeline().parameters.env, '/records')"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      {
+        "name": "SetResponseStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CallApiEndpoint",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "response_status",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('CallApiEndpoint').output.status)"
+          }
+        }
+      },
+      {
+        "name": "CheckResponseStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetResponseStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('response_status'), 'success')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CheckNestedDataExists",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greater(int(string(activity('CallApiEndpoint').output.data.totalRecords)), 0)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CopyApiDataToDelta",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 1,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM staging.api_records WHERE batch_id = ''', string(activity('CallApiEndpoint').output.data.batchId), ''' AND env = ''', pipeline().parameters.env, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink"
+                      },
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "batch_id"
+                            },
+                            "sink": {
+                              "name": "batch_id",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "record_payload"
+                            },
+                            "sink": {
+                              "name": "record_payload",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "input_dataset_definitions": [
+                      {
+                        "type": "AzureSqlSource",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_sql",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ],
+                    "output_dataset_definitions": [
+                      {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_delta",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "RunTransformNotebook",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [
+                      {
+                        "activity": "CopyApiDataToDelta",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "timeout": "0.02:00:00",
+                      "retry": 1,
+                      "retryIntervalInSeconds": 120
+                    },
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat('/Workspace/pipelines/', pipeline().parameters.env, '/transform_api_records')"
+                      },
+                      "baseParameters": {
+                        "batch_id": {
+                          "type": "Expression",
+                          "value": "@string(activity('CallApiEndpoint').output.data.batchId)"
+                        },
+                        "total_records": {
+                          "type": "Expression",
+                          "value": "@string(activity('CallApiEndpoint').output.data.totalRecords)"
+                        },
+                        "environment": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetZeroRecordCount",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "record_count",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(activity('CallApiEndpoint').output.data.totalRecords)"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NotifyFailureWebhook",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_url, '/webhook/failure')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  },
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"web_activity_output_into_nested_conditions\",\"env\":\"', pipeline().parameters.env, '\",\"status\":\"', variables('response_status'), '\",\"errorMessage\":\"', string(activity('CallApiEndpoint').output), '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

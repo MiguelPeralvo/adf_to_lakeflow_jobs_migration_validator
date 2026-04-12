@@ -1,0 +1,193 @@
+{
+  "name": "deeply_nested_power_approximation",
+  "properties": {
+    "parameters": {
+      "base": {
+        "type": "Float",
+        "defaultValue": 2.0
+      },
+      "exponent_level": {
+        "type": "Int",
+        "defaultValue": 4
+      },
+      "max_result": {
+        "type": "Float",
+        "defaultValue": 10000.0
+      }
+    },
+    "variables": {
+      "power_level_1": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "power_level_2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "power_level_3": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "power_level_4": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputePowerLevel1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "power_level_1",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(pipeline().parameters.base, pipeline().parameters.base))"
+          }
+        }
+      },
+      {
+        "name": "ComputePowerLevel2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePowerLevel1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "power_level_2",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(mul(pipeline().parameters.base, pipeline().parameters.base), mul(pipeline().parameters.base, pipeline().parameters.base)))"
+          }
+        }
+      },
+      {
+        "name": "ComputePowerLevel3",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePowerLevel2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "power_level_3",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(mul(mul(pipeline().parameters.base, pipeline().parameters.base), mul(pipeline().parameters.base, pipeline().parameters.base)), mul(pipeline().parameters.base, pipeline().parameters.base)))"
+          }
+        }
+      },
+      {
+        "name": "ComputePowerLevel4",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePowerLevel3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "power_level_4",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(mul(mul(pipeline().parameters.base, pipeline().parameters.base), mul(pipeline().parameters.base, pipeline().parameters.base)), mul(mul(pipeline().parameters.base, pipeline().parameters.base), mul(pipeline().parameters.base, pipeline().parameters.base))))"
+          }
+        }
+      },
+      {
+        "name": "CheckExceedsMaxResult",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputePowerLevel4",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(float(variables('power_level_4')), pipeline().parameters.max_result)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogExceedanceWarning",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.example.com/adf/power-exceeded",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"deeply_nested_power_approximation\",\"base\":', string(pipeline().parameters.base), ',\"exponent_level\":', string(pipeline().parameters.exponent_level), ',\"computed_power_level_4\":', variables('power_level_4'), ',\"max_result\":', string(pipeline().parameters.max_result), ',\"exceeded\":true}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogWithinBounds",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.example.com/adf/power-ok",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"deeply_nested_power_approximation\",\"base\":', string(pipeline().parameters.base), ',\"exponent_level\":', string(pipeline().parameters.exponent_level), ',\"computed_power_level_4\":', variables('power_level_4'), ',\"max_result\":', string(pipeline().parameters.max_result), ',\"exceeded\":false}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ReportFinalResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckExceedsMaxResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example.com/adf/power-result",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"deeply_nested_power_approximation\",\"base\":', string(pipeline().parameters.base), ',\"exponent_level\":', string(pipeline().parameters.exponent_level), ',\"level1_base_sq\":', variables('power_level_1'), ',\"level2_base_4\":', variables('power_level_2'), ',\"level3_base_6\":', variables('power_level_3'), ',\"level4_base_8\":', variables('power_level_4'), ',\"max_result\":', string(pipeline().parameters.max_result), ',\"nested_multiply_expr\":\"mul(mul(mul(base,base),mul(base,base)),mul(mul(base,base),mul(base,base)))\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

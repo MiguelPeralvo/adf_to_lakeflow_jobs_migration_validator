@@ -1,0 +1,305 @@
+{
+  "name": "four_level_nested_if_conditions",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "feature_flag_a": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "feature_flag_b": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "feature_flag_c": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      }
+    },
+    "variables": {
+      "processing_mode": {
+        "type": "String",
+        "defaultValue": "default"
+      },
+      "status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupBatchConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_status, record_count, is_active FROM batch_config WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "IfCondition_Level1_EnvCheck",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env, 'prod'), equals(activity('LookupBatchConfig').output.firstRow.is_active, 1))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "IfCondition_Level2_FeatureFlagA",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(equals(pipeline().parameters.feature_flag_a, 'true'), greater(activity('LookupBatchConfig').output.firstRow.record_count, 0))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "IfCondition_Level3_FeatureFlagB",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@or(equals(pipeline().parameters.feature_flag_b, 'true'), equals(activity('LookupBatchConfig').output.firstRow.batch_status, 'ready'))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "IfCondition_Level4_FeatureFlagC",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@and(equals(pipeline().parameters.feature_flag_c, 'true'), greater(activity('LookupBatchConfig').output.firstRow.record_count, 1000))"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "CopyLargeDataset",
+                                "type": "Copy",
+                                "dependsOn": [],
+                                "policy": {
+                                  "timeout": "0.01:00:00",
+                                  "retry": 3,
+                                  "retryIntervalInSeconds": 60
+                                },
+                                "typeProperties": {
+                                  "source": {
+                                    "type": "AzureSqlSource",
+                                    "sql_reader_query": {
+                                      "type": "Expression",
+                                      "value": "@concat('SELECT * FROM transactions WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, ''' AND record_count > 1000')"
+                                    }
+                                  },
+                                  "sink": {
+                                    "type": "AzureDatabricksDeltaLakeSink"
+                                  },
+                                  "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                      {
+                                        "source": {
+                                          "name": "src_col"
+                                        },
+                                        "sink": {
+                                          "name": "tgt_col",
+                                          "type": "String"
+                                        }
+                                      },
+                                      {
+                                        "source": {
+                                          "name": "batch_id"
+                                        },
+                                        "sink": {
+                                          "name": "batch_id",
+                                          "type": "String"
+                                        }
+                                      },
+                                      {
+                                        "source": {
+                                          "name": "amount"
+                                        },
+                                        "sink": {
+                                          "name": "amount",
+                                          "type": "String"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "enableStaging": false
+                                },
+                                "input_dataset_definitions": [
+                                  {
+                                    "type": "AzureSqlSource",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_sql",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ],
+                                "output_dataset_definitions": [
+                                  {
+                                    "type": "AzureDatabricksDeltaLakeSink",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_delta",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ]
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "RunDatabricksNotebook",
+                                "type": "DatabricksNotebook",
+                                "dependsOn": [],
+                                "policy": {
+                                  "timeout": "0.02:00:00",
+                                  "retry": 1,
+                                  "retryIntervalInSeconds": 30
+                                },
+                                "typeProperties": {
+                                  "notebookPath": {
+                                    "type": "Expression",
+                                    "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_batch_', pipeline().parameters.batch_id)"
+                                  },
+                                  "baseParameters": {
+                                    "env": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.env"
+                                    },
+                                    "batch_id": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.batch_id"
+                                    },
+                                    "feature_flag_a": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.feature_flag_a"
+                                    },
+                                    "feature_flag_b": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.feature_flag_b"
+                                    },
+                                    "feature_flag_c": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.feature_flag_c"
+                                    },
+                                    "record_count": {
+                                      "type": "Expression",
+                                      "value": "@string(activity('LookupBatchConfig').output.firstRow.record_count)"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "SetVariableProcessingMode",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "variableName": "processing_mode",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@if(equals(pipeline().parameters.feature_flag_b, 'true'), 'partial', 'skipped')"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "WebActivityNotifySkipped",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:05:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 15
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://api.monitoring.internal/', pipeline().parameters.env, '/notifications')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json",
+                        "X-Batch-Id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        }
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"four_level_nested_if_conditions\",\"env\":\"', pipeline().parameters.env, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"status\":\"skipped_feature_flag_a_disabled\",\"record_count\":', string(activity('LookupBatchConfig').output.firstRow.record_count), ',\"timestamp\":\"', utcNow(), '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetVariableStatus",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "status",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.env, 'dev'), 'non_prod_skipped', 'inactive_batch_skipped')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

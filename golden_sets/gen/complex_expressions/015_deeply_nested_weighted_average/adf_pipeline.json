@@ -1,0 +1,232 @@
+{
+  "name": "deeply_nested_weighted_average",
+  "properties": {
+    "parameters": {
+      "weight_a": {
+        "type": "Float",
+        "defaultValue": 0.6
+      },
+      "value_a": {
+        "type": "Float",
+        "defaultValue": 100
+      },
+      "weight_b": {
+        "type": "Float",
+        "defaultValue": 0.4
+      },
+      "value_b": {
+        "type": "Float",
+        "defaultValue": 200
+      },
+      "total_weight": {
+        "type": "Float",
+        "defaultValue": 1.0
+      }
+    },
+    "variables": {
+      "weighted_component_a": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "weighted_component_b": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "sum_of_weighted": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "weighted_average_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_valid": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeWeightedComponentA",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "weighted_component_a",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(mul(mul(pipeline().parameters.weight_a, pipeline().parameters.value_a), div(add(pipeline().parameters.weight_a, pipeline().parameters.weight_b), pipeline().parameters.total_weight)), div(add(mul(pipeline().parameters.weight_a, 1.0), mul(pipeline().parameters.weight_b, 1.0)), pipeline().parameters.total_weight)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeWeightedComponentB",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeWeightedComponentA",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "weighted_component_b",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(mul(mul(pipeline().parameters.weight_b, pipeline().parameters.value_b), div(add(pipeline().parameters.weight_a, pipeline().parameters.weight_b), pipeline().parameters.total_weight)), div(add(mul(pipeline().parameters.weight_a, 1.0), mul(pipeline().parameters.weight_b, 1.0)), pipeline().parameters.total_weight)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeSumOfWeighted",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeWeightedComponentB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sum_of_weighted",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(mul(pipeline().parameters.weight_a, pipeline().parameters.value_a), pipeline().parameters.total_weight), div(mul(pipeline().parameters.weight_b, pipeline().parameters.value_b), pipeline().parameters.total_weight)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeWeightedAverage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeSumOfWeighted",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "weighted_average_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(add(mul(pipeline().parameters.weight_a, pipeline().parameters.value_a), mul(pipeline().parameters.weight_b, pipeline().parameters.value_b)), add(div(mul(pipeline().parameters.weight_a, pipeline().parameters.total_weight), pipeline().parameters.total_weight), div(mul(pipeline().parameters.weight_b, pipeline().parameters.total_weight), pipeline().parameters.total_weight))))"
+          }
+        }
+      },
+      {
+        "name": "ValidateTotalWeight",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeWeightedAverage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_valid",
+          "value": {
+            "type": "Expression",
+            "value": "@string(greater(div(add(mul(pipeline().parameters.weight_a, pipeline().parameters.total_weight), mul(pipeline().parameters.weight_b, pipeline().parameters.total_weight)), mul(pipeline().parameters.total_weight, pipeline().parameters.total_weight)), 0))"
+          }
+        }
+      },
+      {
+        "name": "CheckWeightValidity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ValidateTotalWeight",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(div(add(pipeline().parameters.weight_a, pipeline().parameters.weight_b), pipeline().parameters.total_weight), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogValidResult",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "weighted_average_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@variables('weighted_average_result')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogInvalidResult",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "weighted_average_result",
+                "value": "0"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "PublishWeightedAverage",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckWeightValidity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/weighted_average/publish_result",
+          "baseParameters": {
+            "weighted_avg": {
+              "type": "Expression",
+              "value": "@variables('weighted_average_result')"
+            },
+            "component_a": {
+              "type": "Expression",
+              "value": "@variables('weighted_component_a')"
+            },
+            "component_b": {
+              "type": "Expression",
+              "value": "@variables('weighted_component_b')"
+            },
+            "sum_weighted": {
+              "type": "Expression",
+              "value": "@variables('sum_of_weighted')"
+            },
+            "formula_detail": {
+              "type": "Expression",
+              "value": "@concat('wa=div(add(mul(',string(pipeline().parameters.weight_a),',',string(pipeline().parameters.value_a),'),mul(',string(pipeline().parameters.weight_b),',',string(pipeline().parameters.value_b),')),',string(pipeline().parameters.total_weight),')')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

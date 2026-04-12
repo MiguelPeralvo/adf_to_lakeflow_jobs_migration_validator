@@ -1,0 +1,295 @@
+{
+  "name": "complex_array_expression_foreach_nesting",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "include_tables": {
+        "type": "Array",
+        "defaultValue": [
+          "orders",
+          "customers",
+          "products"
+        ]
+      },
+      "exclude_tables": {
+        "type": "Array",
+        "defaultValue": [
+          "temp_logs"
+        ]
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      }
+    },
+    "variables": {
+      "effective_tables": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_table": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildEffectiveTableList",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_tables",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(union(pipeline().parameters.include_tables, createArray('audit_log')), createArray('orders','customers','products','audit_log','inventory'))"
+          }
+        }
+      },
+      {
+        "name": "SetProcessingStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildEffectiveTableList",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(variables('effective_tables')), 0), 'ready', 'empty')"
+          }
+        }
+      },
+      {
+        "name": "LookupBatchMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_id, status, table_name, row_count FROM batch_metadata WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND environment = ''', pipeline().parameters.env, ''' ORDER BY table_name')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_metadata",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CheckBatchNotEmpty",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(length(variables('effective_tables')), 0), greater(activity('LookupBatchMetadata').output.count, 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "NotifyBatchReady",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/batch-notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Batch-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"table_count\":', string(length(variables('effective_tables'))), ',\"status\":\"ready\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "ForEachEffectiveTable",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "CheckBatchNotEmpty",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "items": {
+            "type": "Expression",
+            "value": "@intersection(variables('effective_tables'), createArray('orders','customers','products','audit_log','inventory'))"
+          },
+          "isSequential": false,
+          "batchCount": 4,
+          "activities": [
+            {
+              "name": "CheckTableNotExcluded",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(contains(pipeline().parameters.exclude_tables, item()))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CopyTableData",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM ', pipeline().parameters.env, '.dbo.', item(), ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND modified_date >= DATEADD(day, -7, GETDATE())')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink"
+                      },
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      },
+                      "enableStaging": false
+                    },
+                    "inputs": [
+                      {
+                        "referenceName": "ds_sql_source",
+                        "type": "DatasetReference"
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "referenceName": "ds_delta_sink",
+                        "type": "DatasetReference"
+                      }
+                    ],
+                    "input_dataset_definitions": [
+                      {
+                        "type": "AzureSqlSource",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_sql",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ],
+                    "output_dataset_definitions": [
+                      {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_delta",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "PostProcessingWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ForEachEffectiveTable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.example.com/', pipeline().parameters.env, '/pipelines/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": {
+              "type": "Expression",
+              "value": "@concat('Bearer ', pipeline().parameters.batch_id)"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"complex_array_expression_foreach_nesting\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"tables_processed\":', string(length(intersection(variables('effective_tables'), createArray('orders','customers','products','audit_log','inventory')))), ',\"included_tables\":\"', join(variables('effective_tables'), ','), '\",\"excluded_tables\":\"', join(pipeline().parameters.exclude_tables, ','), '\",\"status\":\"completed\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

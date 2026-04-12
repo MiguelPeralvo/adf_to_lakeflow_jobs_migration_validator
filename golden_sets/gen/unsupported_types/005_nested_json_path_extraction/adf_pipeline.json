@@ -1,0 +1,256 @@
+{
+  "name": "nested_json_path_extraction",
+  "properties": {
+    "parameters": {
+      "config_table": {
+        "type": "String",
+        "defaultValue": "dbo.pipeline_config"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "schema_version": {
+        "type": "String",
+        "defaultValue": "v2"
+      }
+    },
+    "variables": {
+      "extractedConfig": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "nestedFieldValue": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "targetTableName": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigJson",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_json, table_mapping, metadata FROM ', pipeline().parameters.config_table, ' WHERE environment = ''', pipeline().parameters.env, ''' AND schema_version = ''', pipeline().parameters.schema_version, ''' ORDER BY priority DESC')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetExtractedConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigJson",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "extractedConfig",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(activity('LookupConfigJson').output.firstRow.config_json).environments[pipeline().parameters.env].settings)"
+          }
+        }
+      },
+      {
+        "name": "SetNestedFieldValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetExtractedConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "nestedFieldValue",
+          "value": {
+            "type": "Expression",
+            "value": "@json(json(activity('LookupConfigJson').output.firstRow.config_json).environments[pipeline().parameters.env].settings.extraction).source.connection.database"
+          }
+        }
+      },
+      {
+        "name": "SetTargetTableName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNestedFieldValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "targetTableName",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(json(json(variables('extractedConfig')).target.schema).prefix, '_', json(activity('LookupConfigJson').output.firstRow.table_mapping).tables[0].destination_name, '_', pipeline().parameters.schema_version)"
+          }
+        }
+      },
+      {
+        "name": "CheckNestedConfigValid",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetTargetTableName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(variables('nestedFieldValue'), '')), not(equals(json(activity('LookupConfigJson').output.firstRow.metadata).status, 'disabled')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogValidConfig",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "nestedFieldValue",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('nestedFieldValue'), '_validated')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogInvalidConfig",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "nestedFieldValue",
+                "value": {
+                  "type": "Expression",
+                  "value": "INVALID_CONFIG"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyExtractedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckNestedConfigValid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', json(json(activity('LookupConfigJson').output.firstRow.config_json).environments[pipeline().parameters.env].settings.extraction).source.tableName, ' WHERE schema_ver = ''', pipeline().parameters.schema_version, ''' AND database_name = ''', variables('nestedFieldValue'), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "payload_json",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "ingestion_ts",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "source_db"
+                },
+                "sink": {
+                  "name": "source_database",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

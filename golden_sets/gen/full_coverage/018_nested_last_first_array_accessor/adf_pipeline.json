@@ -1,0 +1,187 @@
+{
+  "name": "nested_last_first_array_accessor",
+  "properties": {
+    "parameters": {
+      "lookup_table": {
+        "type": "String",
+        "defaultValue": "dbo.source_data"
+      },
+      "sort_order": {
+        "type": "String",
+        "defaultValue": "ASC"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "first_record_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "last_record_value": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceRecords",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', pipeline().parameters.lookup_table, ' ORDER BY id ', pipeline().parameters.sort_order)"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_lookup",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetFirstRecordValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceRecords",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "first_record_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(length(activity('LookupSourceRecords').output.value), 0), first(activity('LookupSourceRecords').output.value).id, 'NO_RECORDS'))"
+          }
+        }
+      },
+      {
+        "name": "SetLastRecordValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFirstRecordValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "last_record_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(length(activity('LookupSourceRecords').output.value), 0), last(activity('LookupSourceRecords').output.value).id, 'NO_RECORDS'))"
+          }
+        }
+      },
+      {
+        "name": "CheckFirstLastEquality",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetLastRecordValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(variables('first_record_value'), 'NO_RECORDS')), equals(if(equals(pipeline().parameters.env, 'prod'), string(first(activity('LookupSourceRecords').output.value).id), string(last(activity('LookupSourceRecords').output.value).id)), if(greater(length(activity('LookupSourceRecords').output.value), 1), string(last(activity('LookupSourceRecords').output.value).id), string(first(activity('LookupSourceRecords').output.value).id))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebNotifySingleRecord",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.api.', pipeline().parameters.env, '.example.com/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"message\":\"Single record or matching boundaries\",\"first\":\"', variables('first_record_value'), '\",\"last\":\"', variables('last_record_value'), '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebNotifyMultipleRecords",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.api.', pipeline().parameters.env, '.example.com/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"message\":\"Multiple distinct records found\",\"first\":\"', string(if(equals(pipeline().parameters.env, 'prod'), first(activity('LookupSourceRecords').output.value).id, first(activity('LookupSourceRecords').output.value).name)), '\",\"last\":\"', string(if(equals(pipeline().parameters.env, 'prod'), last(activity('LookupSourceRecords').output.value).id, last(activity('LookupSourceRecords').output.value).name)), '\",\"count\":', string(length(activity('LookupSourceRecords').output.value)), ',\"table\":\"', pipeline().parameters.lookup_table, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivityLogCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckFirstLastEquality",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://logging.', pipeline().parameters.env, '.example.com/api/pipelines/log')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_last_first_array_accessor\",\"env\":\"', pipeline().parameters.env, '\",\"first_value\":\"', variables('first_record_value'), '\",\"last_value\":\"', variables('last_record_value'), '\",\"record_count\":', string(length(activity('LookupSourceRecords').output.value)), ',\"boundaries_match\":', string(equals(string(if(greater(length(activity('LookupSourceRecords').output.value), 0), first(activity('LookupSourceRecords').output.value).id, '')), string(if(greater(length(activity('LookupSourceRecords').output.value), 0), last(activity('LookupSourceRecords').output.value).id, '')))), ',\"sort_order\":\"', pipeline().parameters.sort_order, '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

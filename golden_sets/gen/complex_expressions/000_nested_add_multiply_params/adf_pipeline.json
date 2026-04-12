@@ -1,0 +1,175 @@
+{
+  "name": "nested_add_multiply_params",
+  "properties": {
+    "parameters": {
+      "base_value": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "multiplier": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "offset": {
+        "type": "Int",
+        "defaultValue": 5
+      }
+    },
+    "variables": {
+      "computed_step1": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "computed_step2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetComputedStep1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_step1",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(pipeline().parameters.base_value, pipeline().parameters.multiplier), pipeline().parameters.offset))"
+          }
+        }
+      },
+      {
+        "name": "SetComputedStep2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedStep1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_step2",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(add(pipeline().parameters.base_value, pipeline().parameters.offset), add(pipeline().parameters.multiplier, pipeline().parameters.offset)))"
+          }
+        }
+      },
+      {
+        "name": "CheckThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetComputedStep2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('computed_step2')), mul(pipeline().parameters.base_value, add(pipeline().parameters.multiplier, mul(pipeline().parameters.offset, 2))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFinalResultTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(mul(int(variables('computed_step1')), int(variables('computed_step2'))), mul(pipeline().parameters.offset, pipeline().parameters.multiplier)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFinalResultFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(int(variables('computed_step1')), mul(int(variables('computed_step2')), add(pipeline().parameters.base_value, pipeline().parameters.offset))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetAdjustedResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(int(variables('final_result')), pipeline().parameters.multiplier), add(mul(pipeline().parameters.base_value, pipeline().parameters.offset), mul(pipeline().parameters.multiplier, add(pipeline().parameters.offset, pipeline().parameters.base_value)))))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetAdjustedResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/nested_add_multiply_params/process_results",
+          "baseParameters": {
+            "computed_step1": {
+              "type": "Expression",
+              "value": "@variables('computed_step1')"
+            },
+            "computed_step2": {
+              "type": "Expression",
+              "value": "@variables('computed_step2')"
+            },
+            "final_result": {
+              "type": "Expression",
+              "value": "@variables('final_result')"
+            },
+            "nested_expression": {
+              "type": "Expression",
+              "value": "@string(add(mul(add(pipeline().parameters.base_value, pipeline().parameters.offset), pipeline().parameters.multiplier), mul(pipeline().parameters.base_value, add(pipeline().parameters.multiplier, pipeline().parameters.offset))))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

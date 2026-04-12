@@ -1,0 +1,228 @@
+{
+  "name": "deep_nested_if_with_databricks_output",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": "/Workspace/ETL/main_notebook"
+      },
+      "cluster_id": {
+        "type": "String",
+        "defaultValue": "0101-abcdef-ghijk"
+      }
+    },
+    "variables": {
+      "runStatus": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "recordCount": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@pipeline().parameters.notebook_path"
+          },
+          "baseParameters": {
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "cluster_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.cluster_id"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "SetRunStatusVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RunDatabricksNotebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "runStatus",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('RunDatabricksNotebook').output.runOutput.status)"
+          }
+        }
+      },
+      {
+        "name": "Level1_CheckStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRunStatusVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('RunDatabricksNotebook').output.runOutput.status, 'SUCCESS')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Level2_CheckRecordCount",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greater(int(activity('RunDatabricksNotebook').output.runOutput.recordCount), 0)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "Level3_CheckEnvForCopy",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@or(equals(pipeline().parameters.env, 'prod'), greater(int(activity('RunDatabricksNotebook').output.runOutput.recordCount), 100))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "CopyProcessedData",
+                          "type": "Copy",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "00:30:00",
+                            "retry": 1,
+                            "retryIntervalInSeconds": 30
+                          },
+                          "typeProperties": {
+                            "source": {
+                              "type": "AzureSqlSource",
+                              "sql_reader_query": {
+                                "type": "Expression",
+                                "value": "@concat('SELECT * FROM staging.processed_data WHERE env = ''', pipeline().parameters.env, ''' AND batch_id = ''', activity('RunDatabricksNotebook').output.runOutput.batchId, '''')"
+                              }
+                            },
+                            "sink": {
+                              "type": "AzureDatabricksDeltaLakeSink"
+                            },
+                            "translator": {
+                              "type": "TabularTranslator",
+                              "mappings": [
+                                {
+                                  "source": {
+                                    "name": "src_col"
+                                  },
+                                  "sink": {
+                                    "name": "tgt_col",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "batch_id"
+                                  },
+                                  "sink": {
+                                    "name": "batch_id",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "record_value"
+                                  },
+                                  "sink": {
+                                    "name": "record_value",
+                                    "type": "String"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "input_dataset_definitions": [
+                            {
+                              "type": "AzureSqlSource",
+                              "schema": [],
+                              "linkedServiceName": {
+                                "referenceName": "ls_sql",
+                                "type": "LinkedServiceReference"
+                              }
+                            }
+                          ],
+                          "output_dataset_definitions": [
+                            {
+                              "type": "AzureDatabricksDeltaLakeSink",
+                              "schema": [],
+                              "linkedServiceName": {
+                                "referenceName": "ls_delta",
+                                "type": "LinkedServiceReference"
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "NotifySkippedCopy",
+                          "type": "WebActivity",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "00:05:00",
+                            "retry": 1,
+                            "retryIntervalInSeconds": 10
+                          },
+                          "typeProperties": {
+                            "url": {
+                              "type": "Expression",
+                              "value": "@concat('https://hooks.slack.com/services/notify/', pipeline().parameters.env)"
+                            },
+                            "method": "POST",
+                            "headers": {
+                              "Content-Type": "application/json"
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"text\": \"Pipeline deep_nested_if_with_databricks_output: Copy skipped for env=', pipeline().parameters.env, ', recordCount=', activity('RunDatabricksNotebook').output.runOutput.recordCount, '\"}'))"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ]
+  }
+}

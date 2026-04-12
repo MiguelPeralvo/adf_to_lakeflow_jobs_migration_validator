@@ -1,0 +1,209 @@
+{
+  "name": "batch_window_calculation",
+  "properties": {
+    "parameters": {
+      "total_hours": {
+        "type": "Int",
+        "defaultValue": 24
+      },
+      "window_size": {
+        "type": "Int",
+        "defaultValue": 4
+      },
+      "overlap_minutes": {
+        "type": "Int",
+        "defaultValue": 30
+      }
+    },
+    "variables": {
+      "batch_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "batch_start_offsets": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_window_minutes": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcEffectiveWindowMinutes",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_window_minutes",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(mul(pipeline().parameters.window_size, 60), pipeline().parameters.overlap_minutes))"
+          }
+        }
+      },
+      {
+        "name": "CalcBatchCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcEffectiveWindowMinutes",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "batch_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(sub(mul(pipeline().parameters.total_hours, 60), pipeline().parameters.overlap_minutes), sub(mul(pipeline().parameters.window_size, 60), pipeline().parameters.overlap_minutes)), if(greater(mod(sub(mul(pipeline().parameters.total_hours, 60), pipeline().parameters.overlap_minutes), sub(mul(pipeline().parameters.window_size, 60), pipeline().parameters.overlap_minutes)), 0), 1, 0)))"
+          }
+        }
+      },
+      {
+        "name": "BuildBatchOffsetArray",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcBatchCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "batch_start_offsets",
+          "value": {
+            "type": "Expression",
+            "value": "@string(range(0, int(variables('batch_count'))))"
+          }
+        }
+      },
+      {
+        "name": "IterateBatchWindows",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "BuildBatchOffsetArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@range(0, int(variables('batch_count')))"
+          },
+          "activities": [
+            {
+              "name": "RunBatchNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/batch_window_processing",
+                "baseParameters": {
+                  "batch_index": {
+                    "type": "Expression",
+                    "value": "@string(item())"
+                  },
+                  "batch_start_minutes": {
+                    "type": "Expression",
+                    "value": "@string(mul(item(), int(variables('effective_window_minutes'))))"
+                  },
+                  "batch_end_minutes": {
+                    "type": "Expression",
+                    "value": "@string(min(add(mul(item(), int(variables('effective_window_minutes'))), mul(pipeline().parameters.window_size, 60)), mul(pipeline().parameters.total_hours, 60)))"
+                  },
+                  "batch_start_with_overlap_minutes": {
+                    "type": "Expression",
+                    "value": "@string(max(sub(mul(item(), int(variables('effective_window_minutes'))), pipeline().parameters.overlap_minutes), 0))"
+                  },
+                  "batch_end_with_overlap_minutes": {
+                    "type": "Expression",
+                    "value": "@string(min(add(mul(item(), int(variables('effective_window_minutes'))), add(mul(pipeline().parameters.window_size, 60), pipeline().parameters.overlap_minutes)), mul(pipeline().parameters.total_hours, 60)))"
+                  },
+                  "window_size_hours": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.window_size)"
+                  },
+                  "overlap_minutes": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.overlap_minutes)"
+                  },
+                  "total_hours": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.total_hours)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalAggregationNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "IterateBatchWindows",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "policy": {
+          "timeout": "02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120
+        },
+        "typeProperties": {
+          "notebookPath": "/pipelines/batch_window_aggregation",
+          "baseParameters": {
+            "total_batches": {
+              "type": "Expression",
+              "value": "@variables('batch_count')"
+            },
+            "total_hours": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.total_hours)"
+            },
+            "effective_window_minutes": {
+              "type": "Expression",
+              "value": "@variables('effective_window_minutes')"
+            },
+            "total_span_minutes": {
+              "type": "Expression",
+              "value": "@string(mul(pipeline().parameters.total_hours, 60))"
+            },
+            "overlap_ratio": {
+              "type": "Expression",
+              "value": "@string(div(float(pipeline().parameters.overlap_minutes), float(mul(pipeline().parameters.window_size, 60))))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

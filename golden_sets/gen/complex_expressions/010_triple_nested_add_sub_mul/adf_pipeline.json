@@ -1,0 +1,279 @@
+{
+  "name": "triple_nested_add_sub_mul",
+  "properties": {
+    "parameters": {
+      "a": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "b": {
+        "type": "Int",
+        "defaultValue": 5
+      },
+      "c": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "d": {
+        "type": "Int",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "level1_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "level2_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "level3_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "mul_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "branch_result": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetLevel1_AddSubNested",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "level1_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(sub(pipeline().parameters.a, pipeline().parameters.b), mul(pipeline().parameters.c, pipeline().parameters.d)))"
+          }
+        }
+      },
+      {
+        "name": "SetLevel2_NestedMulAddSub",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetLevel1_AddSubNested",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "level2_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(add(pipeline().parameters.a, sub(pipeline().parameters.b, pipeline().parameters.c)), add(pipeline().parameters.d, sub(pipeline().parameters.a, mul(pipeline().parameters.b, pipeline().parameters.c)))))"
+          }
+        }
+      },
+      {
+        "name": "SetLevel3_DeepNested",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetLevel2_NestedMulAddSub",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "level3_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(sub(pipeline().parameters.a, add(pipeline().parameters.b, pipeline().parameters.c)), mul(pipeline().parameters.d, sub(pipeline().parameters.a, pipeline().parameters.b))), sub(add(mul(pipeline().parameters.c, pipeline().parameters.d), pipeline().parameters.a), mul(sub(pipeline().parameters.b, pipeline().parameters.d), add(pipeline().parameters.a, pipeline().parameters.c)))))"
+          }
+        }
+      },
+      {
+        "name": "SetMulComplex",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetLevel3_DeepNested",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "mul_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(sub(add(pipeline().parameters.a, mul(pipeline().parameters.b, pipeline().parameters.c)), pipeline().parameters.d), add(sub(mul(pipeline().parameters.a, pipeline().parameters.d), pipeline().parameters.b), pipeline().parameters.c)))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalCombined",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetMulComplex",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(int(variables('level1_result')), sub(int(variables('level2_result')), int(variables('level3_result')))), add(int(variables('mul_result')), sub(mul(pipeline().parameters.a, pipeline().parameters.b), add(pipeline().parameters.c, pipeline().parameters.d)))))"
+          }
+        }
+      },
+      {
+        "name": "CheckThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFinalCombined",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('final_result')), mul(add(pipeline().parameters.a, pipeline().parameters.b), sub(pipeline().parameters.c, pipeline().parameters.d)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetBranchTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(mul(sub(int(variables('final_result')), pipeline().parameters.d), pipeline().parameters.c), pipeline().parameters.a))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetBranchFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(mul(add(int(variables('final_result')), pipeline().parameters.a), pipeline().parameters.b), pipeline().parameters.c))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetPostConditionCalc",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(add(int(variables('branch_result')), sub(mul(pipeline().parameters.a, pipeline().parameters.b), add(pipeline().parameters.c, pipeline().parameters.d))), sub(pipeline().parameters.a, mul(sub(pipeline().parameters.b, pipeline().parameters.d), pipeline().parameters.c))))"
+          }
+        }
+      },
+      {
+        "name": "WebPostResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetPostConditionCalc",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.example.com/results/', string(add(mul(int(variables('final_result')), sub(pipeline().parameters.a, pipeline().parameters.d)), add(pipeline().parameters.b, pipeline().parameters.c))))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"level1\":', variables('level1_result'), ',\"level2\":', variables('level2_result'), ',\"level3\":', variables('level3_result'), ',\"mul\":', variables('mul_result'), ',\"final\":', variables('final_result'), ',\"branch\":', variables('branch_result'), ',\"nested_calc\":', string(sub(add(mul(pipeline().parameters.a, pipeline().parameters.b), mul(pipeline().parameters.c, pipeline().parameters.d)), add(sub(pipeline().parameters.a, pipeline().parameters.c), mul(pipeline().parameters.b, pipeline().parameters.d)))), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

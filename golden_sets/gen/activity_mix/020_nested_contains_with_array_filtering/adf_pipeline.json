@@ -1,0 +1,257 @@
+{
+  "name": "nested_contains_with_array_filtering",
+  "properties": {
+    "parameters": {
+      "source_array": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "filter_keyword": {
+        "type": "String",
+        "defaultValue": "active"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      }
+    },
+    "variables": {
+      "filtered_items": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_item": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT item_name, item_status, category FROM dbo.source_items WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariableInitFilteredItems",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "filtered_items",
+          "value": {
+            "type": "Expression",
+            "value": "@createArray()"
+          }
+        }
+      },
+      {
+        "name": "ForEachSourceItem",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetVariableInitFilteredItems",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(activity('LookupSourceMetadata').output.value[0], activity('LookupSourceMetadata').output.value[1], activity('LookupSourceMetadata').output.value[2])"
+          },
+          "activities": [
+            {
+              "name": "CheckContainsFilterKeyword",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(contains(string(item().item_name), pipeline().parameters.filter_keyword), contains(string(item().category), pipeline().parameters.filter_keyword))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetCurrentItemMatched",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "current_item",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat(item().item_name, '|', item().item_status, '|', pipeline().parameters.batch_id)"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetCurrentItemSkipped",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "current_item",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('SKIPPED|', item().item_name)"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVariableProcessingComplete",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachSourceItem",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@if(contains(string(variables('current_item')), pipeline().parameters.filter_keyword), 'true', 'false')"
+          }
+        }
+      },
+      {
+        "name": "CopyFilteredResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetVariableProcessingComplete",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT item_name, item_status, category, created_date FROM dbo.source_items WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND environment = ''', pipeline().parameters.env, ''' AND (item_name LIKE ''%', pipeline().parameters.filter_keyword, '%'' OR category LIKE ''%', pipeline().parameters.filter_keyword, '%'')')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "item_name"
+                },
+                "sink": {
+                  "name": "item_name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "item_status"
+                },
+                "sink": {
+                  "name": "item_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "category"
+                },
+                "sink": {
+                  "name": "category",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_date"
+                },
+                "sink": {
+                  "name": "created_date",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

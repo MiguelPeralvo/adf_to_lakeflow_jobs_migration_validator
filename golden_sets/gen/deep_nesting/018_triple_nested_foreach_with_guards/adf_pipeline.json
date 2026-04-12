@@ -1,0 +1,288 @@
+{
+  "name": "triple_nested_foreach_with_guards",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "schema_list": {
+        "type": "Array",
+        "defaultValue": [
+          "dbo",
+          "staging",
+          "raw"
+        ]
+      },
+      "table_filter": {
+        "type": "String",
+        "defaultValue": "active"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B001"
+      }
+    },
+    "variables": {
+      "current_table": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT schema_name, table_name, row_count, is_active FROM metadata.table_registry WHERE environment = ''', pipeline().parameters.env, ''' AND status = ''', pipeline().parameters.table_filter, ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_metadata",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "ForEachSchema",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupTableMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 5,
+          "items": {
+            "type": "Expression",
+            "value": "@pipeline().parameters.schema_list"
+          },
+          "activities": [
+            {
+              "name": "IfSchemaHasTables",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greater(length(filter(activity('LookupTableMetadata').output.value, item2 -> equals(item2.schema_name, item()))), 0)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ForEachTableInSchema",
+                    "type": "ForEach",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "isSequential": true,
+                      "batchCount": 1,
+                      "items": {
+                        "type": "Expression",
+                        "value": "@filter(activity('LookupTableMetadata').output.value, item2 -> equals(item2.schema_name, item()))"
+                      },
+                      "activities": [
+                        {
+                          "name": "IfTableIsActive",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@equals(item().is_active, true)"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "CopyTableData",
+                                "type": "Copy",
+                                "dependsOn": [],
+                                "policy": {
+                                  "timeout": "0.01:00:00",
+                                  "retry": 3,
+                                  "retryIntervalInSeconds": 60
+                                },
+                                "typeProperties": {
+                                  "source": {
+                                    "type": "AzureSqlSource",
+                                    "sql_reader_query": {
+                                      "type": "Expression",
+                                      "value": "@concat('SELECT * FROM ', item().schema_name, '.', item().table_name, ' WHERE batch_id = ''', pipeline().parameters.batch_id, '''')"
+                                    }
+                                  },
+                                  "sink": {
+                                    "type": "AzureDatabricksDeltaLakeSink"
+                                  },
+                                  "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                      {
+                                        "source": {
+                                          "name": "src_col"
+                                        },
+                                        "sink": {
+                                          "name": "tgt_col",
+                                          "type": "String"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "enableStaging": false
+                                },
+                                "inputs": [
+                                  {
+                                    "referenceName": "ds_sql_source",
+                                    "type": "DatasetReference"
+                                  }
+                                ],
+                                "outputs": [
+                                  {
+                                    "referenceName": "ds_delta_sink",
+                                    "type": "DatasetReference"
+                                  }
+                                ],
+                                "input_dataset_definitions": [
+                                  {
+                                    "type": "AzureSqlSource",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_sql",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ],
+                                "output_dataset_definitions": [
+                                  {
+                                    "type": "AzureDatabricksDeltaLakeSink",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_delta",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "name": "SetProcessingStatus",
+                                "type": "SetVariable",
+                                "dependsOn": [
+                                  {
+                                    "activity": "CopyTableData",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "typeProperties": {
+                                  "variableName": "processing_status",
+                                  "value": {
+                                    "type": "Expression",
+                                    "value": "@concat('completed_', item().schema_name, '_', item().table_name)"
+                                  }
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "IfRowCountAboveThreshold",
+                                "type": "IfCondition",
+                                "dependsOn": [],
+                                "typeProperties": {
+                                  "expression": {
+                                    "type": "Expression",
+                                    "value": "@greater(item().row_count, 0)"
+                                  },
+                                  "ifTrueActivities": [
+                                    {
+                                      "name": "NotifySkippedInactiveTable",
+                                      "type": "WebActivity",
+                                      "dependsOn": [],
+                                      "policy": {
+                                        "timeout": "0.00:05:00",
+                                        "retry": 1,
+                                        "retryIntervalInSeconds": 30
+                                      },
+                                      "typeProperties": {
+                                        "url": {
+                                          "type": "Expression",
+                                          "value": "@concat('https://hooks.monitoring.', pipeline().parameters.env, '.internal/api/pipeline/notify')"
+                                        },
+                                        "method": "POST",
+                                        "headers": {
+                                          "Content-Type": "application/json",
+                                          "X-Batch-Id": {
+                                            "type": "Expression",
+                                            "value": "@pipeline().parameters.batch_id"
+                                          }
+                                        },
+                                        "body": {
+                                          "type": "Expression",
+                                          "value": "@json(concat('{\"pipeline\":\"triple_nested_foreach_with_guards\",\"schema\":\"', item().schema_name, '\",\"table\":\"', item().table_name, '\",\"row_count\":', string(item().row_count), ',\"status\":\"skipped_inactive\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "ifFalseActivities": []
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachSchema",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('batch_', pipeline().parameters.batch_id, '_all_schemas_processed')"
+          }
+        }
+      }
+    ]
+  }
+}

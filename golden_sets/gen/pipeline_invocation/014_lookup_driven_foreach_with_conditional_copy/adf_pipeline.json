@@ -1,0 +1,288 @@
+{
+  "name": "lookup_driven_foreach_with_conditional_copy",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "config_table": {
+        "type": "String",
+        "defaultValue": "dbo.pipeline_config"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      }
+    },
+    "variables": {
+      "lookup_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigEntries",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, schema_name, is_active, incremental_flag, watermark_column FROM ', pipeline().parameters.config_table, ' WHERE environment = ''', pipeline().parameters.env, ''' AND run_date <= ''', pipeline().parameters.run_date, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetLookupCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigEntries",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "lookup_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(activity('LookupConfigEntries').output.value))"
+          }
+        }
+      },
+      {
+        "name": "ForEachConfigEntry",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetLookupCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 5,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(activity('LookupConfigEntries').output.value)"
+          },
+          "activities": [
+            {
+              "name": "CheckIfActive",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(item().is_active, 1)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CopyTableData",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 3,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM ', item().schema_name, '.', item().table_name, ' WHERE modified_date >= ''', pipeline().parameters.run_date, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "importSettings": {
+                          "type": "AzureDatabricksDeltaLakeImportCommand"
+                        }
+                      },
+                      "enableStaging": false,
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "id"
+                            },
+                            "sink": {
+                              "name": "id",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "modified_date"
+                            },
+                            "sink": {
+                              "name": "modified_date",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "inputs": [
+                      {
+                        "referenceName": "ds_azure_sql_source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                          "schema_name": {
+                            "type": "Expression",
+                            "value": "@item().schema_name"
+                          },
+                          "table_name": {
+                            "type": "Expression",
+                            "value": "@item().table_name"
+                          }
+                        }
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "referenceName": "ds_delta_lake_sink",
+                        "type": "DatasetReference",
+                        "parameters": {
+                          "table_name": {
+                            "type": "Expression",
+                            "value": "@item().table_name"
+                          }
+                        }
+                      }
+                    ],
+                    "input_dataset_definitions": [
+                      {
+                        "type": "AzureSqlSource",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_sql",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ],
+                    "output_dataset_definitions": [
+                      {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_delta",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "NotifyCopySuccess",
+                    "type": "WebActivity",
+                    "dependsOn": [
+                      {
+                        "activity": "CopyTableData",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "timeout": "0.00:05:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/pipeline-notify')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline_name\":\"lookup_driven_foreach_with_conditional_copy\",\"table_name\":\"', item().table_name, '\",\"rows_copied\":', string(activity('CopyTableData').output.rowsCopied), ',\"run_date\":\"', pipeline().parameters.run_date, '\",\"status\":\"succeeded\",\"environment\":\"', pipeline().parameters.env, '\"}'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalStatusWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ForEachConfigEntry",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/pipeline-complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"lookup_driven_foreach_with_conditional_copy\",\"total_tables_processed\":', variables('lookup_count'), ',\"run_date\":\"', pipeline().parameters.run_date, '\",\"environment\":\"', pipeline().parameters.env, '\",\"final_status\":\"completed\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

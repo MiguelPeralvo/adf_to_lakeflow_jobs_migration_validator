@@ -1,0 +1,254 @@
+{
+  "name": "nested_length_and_empty_checks",
+  "properties": {
+    "parameters": {
+      "input_array": {
+        "type": "Array"
+      },
+      "min_length": {
+        "type": "Int",
+        "defaultValue": 1
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "is_valid": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "filtered_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupInputMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count FROM staging.input_table WHERE environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVariableIsValid",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupInputMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "is_valid",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(length(pipeline().parameters.input_array), 0), if(not(empty(pipeline().parameters.env)), if(greater(int(activity('LookupInputMetadata').output.firstRow.row_count), pipeline().parameters.min_length), 'true', 'false'), 'false'), 'false'))"
+          }
+        }
+      },
+      {
+        "name": "CheckArrayAndEnvNotEmpty",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariableIsValid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(length(pipeline().parameters.input_array), 0), not(empty(pipeline().parameters.env)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSetFilteredQuery",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "filtered_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT * FROM staging.input_table WHERE environment = ''', pipeline().parameters.env, ''' AND is_active = 1')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerSetDefaultQuery",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "filtered_query",
+                "value": "SELECT * FROM staging.input_table WHERE is_active = 1"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckIsValidForCopy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckArrayAndEnvNotEmpty",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('is_valid'), 'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLogValid",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "is_valid",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerLogInvalid",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "is_valid",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIsValidForCopy",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "filtered_query",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(pipeline().parameters.input_array), 0), if(not(empty(variables('filtered_query'))), variables('filtered_query'), concat('SELECT * FROM staging.input_table WHERE environment = ''', pipeline().parameters.env, '''')), 'SELECT 1 WHERE 1=0')"
+          }
+        }
+      },
+      {
+        "name": "CopyValidatedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@if(greater(length(pipeline().parameters.input_array), 0), if(not(empty(variables('filtered_query'))), variables('filtered_query'), 'SELECT 1 WHERE 1=0'), 'SELECT 1 WHERE 1=0')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "env_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "row_count"
+                },
+                "sink": {
+                  "name": "record_count",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "name": "nested_substring_within_replace_within_concat",
+  "properties": {
+    "parameters": {
+      "raw_path": {
+        "type": "String",
+        "defaultValue": "/data/raw/input_file.csv"
+      },
+      "trim_length": {
+        "type": "Int",
+        "defaultValue": 4
+      },
+      "suffix": {
+        "type": "String",
+        "defaultValue": "_processed"
+      }
+    },
+    "variables": {
+      "extracted_substring": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "replaced_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_concat": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExtractSubstring",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_substring",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length)"
+          }
+        }
+      },
+      {
+        "name": "ReplaceWithSubstring",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractSubstring",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "replaced_value",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(pipeline().parameters.raw_path, substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length), 'trimmed')"
+          }
+        }
+      },
+      {
+        "name": "ConcatReplaceSubstring",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ReplaceWithSubstring",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_concat",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('output/', replace(pipeline().parameters.raw_path, substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length), 'trimmed'), pipeline().parameters.suffix, '/', substring(replace(pipeline().parameters.raw_path, substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length), 'trimmed'), 0, pipeline().parameters.trim_length))"
+          }
+        }
+      },
+      {
+        "name": "CopyWithNestedExpression",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "ConcatReplaceSubstring",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM staging WHERE file_path = ''', concat('output/', replace(pipeline().parameters.raw_path, substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length), 'trimmed'), pipeline().parameters.suffix, '/', substring(replace(pipeline().parameters.raw_path, substring(pipeline().parameters.raw_path, 0, pipeline().parameters.trim_length), 'trimmed'), 0, pipeline().parameters.trim_length)), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

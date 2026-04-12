@@ -1,0 +1,264 @@
+{
+  "name": "nested_formatdatetime_timezone_calc",
+  "properties": {
+    "parameters": {
+      "source_timezone": {
+        "type": "String",
+        "defaultValue": "Eastern Standard Time"
+      },
+      "target_timezone": {
+        "type": "String",
+        "defaultValue": "Pacific Standard Time"
+      },
+      "date_format": {
+        "type": "String",
+        "defaultValue": "yyyy-MM-dd HH:mm:ss"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      }
+    },
+    "variables": {
+      "converted_source_time": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "converted_target_time": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "timezone_offset_label": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetConvertedSourceTime",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "converted_source_time",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "SetConvertedTargetTime",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetConvertedSourceTime",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "converted_target_time",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addHours(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), -3), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "SetTimezoneOffsetLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetConvertedTargetTime",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "timezone_offset_label",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Source[', formatDateTime(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), 'yyyy-MM-ddTHH:mm:ss'), ']_Target[', formatDateTime(convertTimeZone(addHours(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), -3), pipeline().parameters.source_timezone, pipeline().parameters.target_timezone), 'yyyy-MM-ddTHH:mm:ss'), ']_Batch_', pipeline().parameters.batch_id)"
+          }
+        }
+      },
+      {
+        "name": "CheckTimezoneAlignment",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetTimezoneOffsetLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(formatDateTime(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), 'yyyy-MM-dd'), formatDateTime(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.target_timezone), 'yyyy-MM-dd'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunNotebookSameDay",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "7.00:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/timezone_processing/same_day_batch",
+                "baseParameters": {
+                  "source_time": {
+                    "type": "Expression",
+                    "value": "@variables('converted_source_time')"
+                  },
+                  "target_time": {
+                    "type": "Expression",
+                    "value": "@variables('converted_target_time')"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "offset_label": {
+                    "type": "Expression",
+                    "value": "@variables('timezone_offset_label')"
+                  },
+                  "run_date": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(convertTimeZone(addHours(utcNow(), 0), 'UTC', pipeline().parameters.target_timezone), pipeline().parameters.date_format)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunNotebookCrossDay",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "7.00:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/timezone_processing/cross_day_batch",
+                "baseParameters": {
+                  "source_time": {
+                    "type": "Expression",
+                    "value": "@variables('converted_source_time')"
+                  },
+                  "target_time": {
+                    "type": "Expression",
+                    "value": "@variables('converted_target_time')"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "offset_label": {
+                    "type": "Expression",
+                    "value": "@variables('timezone_offset_label')"
+                  },
+                  "adjusted_target_time": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(addHours(convertTimeZone(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), pipeline().parameters.source_timezone, pipeline().parameters.target_timezone), -24), pipeline().parameters.date_format)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunFinalNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckTimezoneAlignment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/timezone_processing/finalize_batch",
+          "baseParameters": {
+            "batch_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "source_tz": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.source_timezone"
+            },
+            "target_tz": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.target_timezone"
+            },
+            "final_source_timestamp": {
+              "type": "Expression",
+              "value": "@formatDateTime(addHours(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), 1), pipeline().parameters.date_format)"
+            },
+            "final_target_timestamp": {
+              "type": "Expression",
+              "value": "@formatDateTime(addHours(convertTimeZone(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), pipeline().parameters.source_timezone, pipeline().parameters.target_timezone), 1), pipeline().parameters.date_format)"
+            },
+            "processing_window": {
+              "type": "Expression",
+              "value": "@concat(formatDateTime(addHours(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.source_timezone), -6), 'yyyy-MM-dd HH:mm'), ' to ', formatDateTime(convertTimeZone(utcNow(), 'UTC', pipeline().parameters.target_timezone), 'yyyy-MM-dd HH:mm'))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

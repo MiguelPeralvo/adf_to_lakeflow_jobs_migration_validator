@@ -1,0 +1,288 @@
+{
+  "name": "nested_pipeline_param_interpolation",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "project": {
+        "type": "String",
+        "defaultValue": "analytics"
+      },
+      "module": {
+        "type": "String",
+        "defaultValue": "ingestion"
+      },
+      "version": {
+        "type": "String",
+        "defaultValue": "v1"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      }
+    },
+    "variables": {
+      "resolvedPath": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "datasetRef": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "notebookPath": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "runFlag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolvedPath",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/mnt/', concat(pipeline().parameters.env, '/', concat(pipeline().parameters.project, '/', concat(pipeline().parameters.module, '/', pipeline().parameters.version))))"
+          }
+        }
+      },
+      {
+        "name": "SetDatasetRef",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "datasetRef",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('ds_', concat(pipeline().parameters.env, '_', concat(pipeline().parameters.project, '_', pipeline().parameters.module)))"
+          }
+        }
+      },
+      {
+        "name": "SetNotebookPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetDatasetRef",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "notebookPath",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', concat(pipeline().parameters.env, '/', concat(pipeline().parameters.project, '/notebooks/', concat(pipeline().parameters.module, '/', concat('process_', pipeline().parameters.version)))))"
+          }
+        }
+      },
+      {
+        "name": "LookupBatchConfig",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetNotebookPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_status, record_count FROM dbo.batch_config WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, ''' AND project = ''', concat(pipeline().parameters.project, '_', pipeline().parameters.module), ''' AND version = ''', pipeline().parameters.version, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetRunFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "runFlag",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(activity('LookupBatchConfig').output.firstRow.batch_status, 'READY'), 'true', 'false')"
+          }
+        }
+      },
+      {
+        "name": "CheckBatchReady",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRunFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('runFlag'), 'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunProcessingNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@variables('notebookPath')"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "project": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.project"
+                  },
+                  "module": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.module"
+                  },
+                  "version": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.version"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "input_path": {
+                    "type": "Expression",
+                    "value": "@variables('resolvedPath')"
+                  },
+                  "dataset_reference": {
+                    "type": "Expression",
+                    "value": "@variables('datasetRef')"
+                  },
+                  "full_qualified_name": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.env, '.', concat(pipeline().parameters.project, '.', concat(pipeline().parameters.module, '.', concat('batch_', pipeline().parameters.batch_id))))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogSkipped",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "runFlag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SKIPPED_', concat(pipeline().parameters.batch_id, '_', concat(pipeline().parameters.env, '_', pipeline().parameters.version)))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckBatchReady",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', concat(pipeline().parameters.env, '/', concat(pipeline().parameters.project, '/notebooks/finalize_', concat(pipeline().parameters.module, '_', pipeline().parameters.version))))"
+          },
+          "baseParameters": {
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "batch_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "resolved_path": {
+              "type": "Expression",
+              "value": "@variables('resolvedPath')"
+            },
+            "dataset_ref": {
+              "type": "Expression",
+              "value": "@concat('ds_', concat(pipeline().parameters.env, '_', concat(pipeline().parameters.project, '_', concat(pipeline().parameters.module, '_final'))))"
+            },
+            "output_table": {
+              "type": "Expression",
+              "value": "@concat(pipeline().parameters.project, '_', concat(pipeline().parameters.module, '_', concat(pipeline().parameters.version, '_output')))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

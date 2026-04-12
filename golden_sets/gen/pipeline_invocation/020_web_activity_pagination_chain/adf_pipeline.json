@@ -1,0 +1,344 @@
+{
+  "name": "web_activity_pagination_chain",
+  "properties": {
+    "parameters": {
+      "api_base_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/v1/data"
+      },
+      "page_size": {
+        "type": "String",
+        "defaultValue": "100"
+      },
+      "auth_token": {
+        "type": "String",
+        "defaultValue": "Bearer xxx"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "nextLink_page1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "nextLink_page2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "hasMorePages": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "WebActivity_FetchPage1",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_base_url, '?pageSize=', pipeline().parameters.page_size, '&env=', pipeline().parameters.env)"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": ""
+        }
+      },
+      {
+        "name": "SetVariable_NextLink1",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_FetchPage1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "nextLink_page1",
+          "value": {
+            "type": "Expression",
+            "value": "@if(contains(activity('WebActivity_FetchPage1').output, 'nextLink'), activity('WebActivity_FetchPage1').output.nextLink, '')"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_HasPage2",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_NextLink1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('nextLink_page1'), ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLog_Page2Exists",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_base_url, '/health')"
+                },
+                "method": "GET",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  }
+                },
+                "body": ""
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "WebActivity_FetchPage2",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_HasPage2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@if(not(equals(variables('nextLink_page1'), '')), variables('nextLink_page1'), concat(pipeline().parameters.api_base_url, '?pageSize=', pipeline().parameters.page_size, '&page=2&env=', pipeline().parameters.env))"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": ""
+        }
+      },
+      {
+        "name": "SetVariable_NextLink2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_FetchPage2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "nextLink_page2",
+          "value": {
+            "type": "Expression",
+            "value": "@if(contains(activity('WebActivity_FetchPage2').output, 'nextLink'), activity('WebActivity_FetchPage2').output.nextLink, '')"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_HasPage3",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_NextLink2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('nextLink_page2'), ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLog_Page3Exists",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_base_url, '/health')"
+                },
+                "method": "GET",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  }
+                },
+                "body": ""
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "WebActivity_FetchPage3",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_HasPage3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@if(not(equals(variables('nextLink_page2'), '')), variables('nextLink_page2'), concat(pipeline().parameters.api_base_url, '?pageSize=', pipeline().parameters.page_size, '&page=3&env=', pipeline().parameters.env))"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": ""
+        }
+      },
+      {
+        "name": "Copy_PaginatedDataToLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_FetchPage3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM staging.api_responses WHERE env = ''', pipeline().parameters.env, ''' AND batch_id IN (''', activity('WebActivity_FetchPage1').output.batchId, ''',''', activity('WebActivity_FetchPage2').output.batchId, ''',''', activity('WebActivity_FetchPage3').output.batchId, ''')')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "response_payload",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "page_number"
+                },
+                "sink": {
+                  "name": "page_num",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "ingestion_ts",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_tag"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

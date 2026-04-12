@@ -1,0 +1,151 @@
+{
+  "name": "param_math_in_lookup_query",
+  "properties": {
+    "parameters": {
+      "page_number": {
+        "type": "Int",
+        "defaultValue": 1
+      },
+      "page_size": {
+        "type": "Int",
+        "defaultValue": 100
+      },
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 5000
+      }
+    },
+    "variables": {
+      "offset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "has_more_pages": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalculateOffset",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(sub(pipeline().parameters.page_number, 1), pipeline().parameters.page_size))"
+          }
+        }
+      },
+      {
+        "name": "LookupPagedRecords",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "CalculateOffset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM dbo.orders ORDER BY order_id OFFSET ', string(mul(sub(pipeline().parameters.page_number, 1), pipeline().parameters.page_size)), ' ROWS FETCH NEXT ', string(pipeline().parameters.page_size), ' ROWS ONLY; SELECT CEILING(CAST(', string(pipeline().parameters.total_records), ' AS FLOAT) / ', string(pipeline().parameters.page_size), ') AS total_pages, ', string(add(mul(sub(pipeline().parameters.page_number, 1), pipeline().parameters.page_size), pipeline().parameters.page_size)), ' AS next_offset, ', string(mul(pipeline().parameters.page_number, pipeline().parameters.page_size)), ' AS records_processed_so_far')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CheckIfMorePages",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupPagedRecords",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@less(mul(pipeline().parameters.page_number, pipeline().parameters.page_size), pipeline().parameters.total_records)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetHasMorePagesTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "has_more_pages",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(div(add(pipeline().parameters.total_records, sub(pipeline().parameters.page_size, 1)), pipeline().parameters.page_size), pipeline().parameters.page_number))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetHasMorePagesFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "has_more_pages",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(0)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalSummary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIfMorePages",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(sub(pipeline().parameters.page_number, 1), pipeline().parameters.page_size), pipeline().parameters.page_size))"
+          }
+        }
+      }
+    ]
+  }
+}

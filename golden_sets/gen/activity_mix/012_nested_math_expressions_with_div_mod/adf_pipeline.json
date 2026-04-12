@@ -1,0 +1,112 @@
+{
+  "name": "nested_math_expressions_with_div_mod",
+  "properties": {
+    "parameters": {
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 10000
+      },
+      "partition_size": {
+        "type": "Int",
+        "defaultValue": 500
+      },
+      "offset": {
+        "type": "Int",
+        "defaultValue": 0
+      }
+    },
+    "variables": {
+      "num_partitions": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "remainder_records": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "current_partition_start": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "adjusted_partition_index": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CalculateNumPartitions",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "num_partitions",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(add(pipeline().parameters.total_records, sub(pipeline().parameters.partition_size, 1)), pipeline().parameters.partition_size))"
+          }
+        }
+      },
+      {
+        "name": "CalculateRemainderRecords",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalculateNumPartitions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_records",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(add(pipeline().parameters.total_records, pipeline().parameters.offset), pipeline().parameters.partition_size))"
+          }
+        }
+      },
+      {
+        "name": "CalculateCurrentPartitionStart",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalculateRemainderRecords",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_partition_start",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(div(pipeline().parameters.offset, pipeline().parameters.partition_size), pipeline().parameters.partition_size), mod(pipeline().parameters.offset, pipeline().parameters.partition_size)))"
+          }
+        }
+      },
+      {
+        "name": "CalculateAdjustedPartitionIndex",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalculateCurrentPartitionStart",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "adjusted_partition_index",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(sub(pipeline().parameters.total_records, mod(pipeline().parameters.total_records, pipeline().parameters.partition_size)), pipeline().parameters.partition_size), mul(div(mod(pipeline().parameters.offset, pipeline().parameters.partition_size), pipeline().parameters.partition_size), add(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), 1))))"
+          }
+        }
+      }
+    ]
+  }
+}

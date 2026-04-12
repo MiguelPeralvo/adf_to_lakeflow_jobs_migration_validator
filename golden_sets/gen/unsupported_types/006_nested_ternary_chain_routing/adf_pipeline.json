@@ -1,0 +1,359 @@
+{
+  "name": "nested_ternary_chain_routing",
+  "properties": {
+    "parameters": {
+      "source_type": {
+        "type": "String",
+        "defaultValue": "sql"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "priority": {
+        "type": "String",
+        "defaultValue": "high"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east"
+      }
+    },
+    "variables": {
+      "resolved_source": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_env_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "routing_key": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedSource",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_source",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.source_type,'sql'),'AzureSQL',if(equals(pipeline().parameters.source_type,'blob'),'BlobStorage',if(equals(pipeline().parameters.source_type,'api'),'RestAPI',if(equals(pipeline().parameters.source_type,'delta'),'DeltaLake','UnknownSource'))))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedEnvConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedSource",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_env_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.region,'us-east'),'prod-east-config',if(equals(pipeline().parameters.region,'us-west'),'prod-west-config',if(equals(pipeline().parameters.region,'eu-west'),'prod-eu-config','prod-default-config'))),if(equals(pipeline().parameters.env,'staging'),if(equals(pipeline().parameters.region,'us-east'),'staging-east-config','staging-default-config'),if(equals(pipeline().parameters.env,'dev'),'dev-config','sandbox-config')))"
+          }
+        }
+      },
+      {
+        "name": "SetRoutingKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedEnvConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "routing_key",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.priority,'high'),equals(pipeline().parameters.env,'prod')),concat('PRIORITY_',variables('resolved_source'),'_',variables('resolved_env_config')),if(and(equals(pipeline().parameters.priority,'high'),not(equals(pipeline().parameters.env,'prod'))),concat('ELEVATED_',variables('resolved_source'),'_',variables('resolved_env_config')),if(equals(pipeline().parameters.priority,'medium'),concat('STANDARD_',variables('resolved_source'),'_',variables('resolved_env_config')),concat('LOW_',variables('resolved_source'),'_',variables('resolved_env_config')))))"
+          }
+        }
+      },
+      {
+        "name": "CheckHighPriorityRoute",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRoutingKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.priority,'high'),and(equals(pipeline().parameters.priority,'medium'),equals(pipeline().parameters.env,'prod')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyHighPriorityData",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ',if(equals(pipeline().parameters.source_type,'sql'),'dbo.high_priority_table',if(equals(pipeline().parameters.source_type,'blob'),'dbo.blob_index_table','dbo.default_source_table')),' WHERE region = ''',pipeline().parameters.region,''' AND env = ''',pipeline().parameters.env,''' AND routing_key = ''',variables('routing_key'),'''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_region"
+                      },
+                      "sink": {
+                        "name": "tgt_region",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_priority"
+                      },
+                      "sink": {
+                        "name": "tgt_priority",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogLowPrioritySkip",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://',if(equals(pipeline().parameters.env,'prod'),'prod-api',if(equals(pipeline().parameters.env,'staging'),'staging-api','dev-api')),'.contoso.com/api/log/skip')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"routing_key\":\"',variables('routing_key'),'\",\"source\":\"',variables('resolved_source'),'\",\"env_config\":\"',variables('resolved_env_config'),'\",\"reason\":\"low_priority_skip\",\"timestamp\":\"',utcNow(),'\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckRegionSpecificProcessing",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckHighPriorityRoute",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.region,'us-east'),equals(pipeline().parameters.region,'eu-west'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "NotifyRegionProcessing",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://',if(equals(pipeline().parameters.env,'prod'),'prod-notifications',if(equals(pipeline().parameters.env,'staging'),'staging-notifications','dev-notifications')),'.contoso.com/api/v2/routing/',if(equals(pipeline().parameters.region,'us-east'),'east-handler',if(equals(pipeline().parameters.region,'eu-west'),'eu-handler','default-handler')))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Routing-Key": {
+                    "type": "Expression",
+                    "value": "@variables('routing_key')"
+                  },
+                  "X-Environment": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_env_config')"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline_run_id\":\"',pipeline().RunId,'\",\"routing_key\":\"',variables('routing_key'),'\",\"resolved_source\":\"',variables('resolved_source'),'\",\"resolved_env_config\":\"',variables('resolved_env_config'),'\",\"region\":\"',pipeline().parameters.region,'\",\"priority\":\"',pipeline().parameters.priority,'\",\"source_type\":\"',pipeline().parameters.source_type,'\",\"processed_at\":\"',utcNow(),'\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CopyRoutedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckRegionSpecificProcessing",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT *, ''',variables('routing_key'),''' AS routing_key, ''',variables('resolved_env_config'),''' AS env_config FROM ',if(equals(pipeline().parameters.source_type,'sql'),if(equals(pipeline().parameters.env,'prod'),'dbo.prod_final_output','dbo.nonprod_final_output'),if(equals(pipeline().parameters.source_type,'blob'),'dbo.blob_final_output','dbo.generic_final_output')),' WHERE region = ''',pipeline().parameters.region,''' AND priority_level = ''',if(equals(pipeline().parameters.priority,'high'),'1',if(equals(pipeline().parameters.priority,'medium'),'2','3')),'''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "routing_key"
+                },
+                "sink": {
+                  "name": "tgt_routing_key",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_config"
+                },
+                "sink": {
+                  "name": "tgt_env_config",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "FinalNotification",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyRoutedData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://',if(equals(pipeline().parameters.env,'prod'),'prod-api',if(equals(pipeline().parameters.env,'staging'),'staging-api','dev-api')),'.contoso.com/api/v2/pipeline/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"nested_ternary_chain_routing\",\"run_id\":\"',pipeline().RunId,'\",\"routing_key\":\"',variables('routing_key'),'\",\"resolved_source\":\"',variables('resolved_source'),'\",\"resolved_env_config\":\"',variables('resolved_env_config'),'\",\"source_type\":\"',pipeline().parameters.source_type,'\",\"env\":\"',pipeline().parameters.env,'\",\"priority\":\"',pipeline().parameters.priority,'\",\"region\":\"',pipeline().parameters.region,'\",\"status\":\"completed\",\"completed_at\":\"',utcNow(),'\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "name": "nested_xml_json_conversion_expressions",
+  "properties": {
+    "parameters": {
+      "xml_endpoint": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/data.xml"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "response_path": {
+        "type": "String",
+        "defaultValue": "root.records.record"
+      }
+    },
+    "variables": {
+      "raw_xml_response": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "parsed_json_output": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "record_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "FetchXmlFromEndpoint",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "value": "@concat(pipeline().parameters.xml_endpoint, '?env=', pipeline().parameters.env)",
+            "type": "Expression"
+          },
+          "method": "GET",
+          "headers": {
+            "Accept": "application/xml",
+            "X-Environment": {
+              "value": "@pipeline().parameters.env",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "SetRawXmlResponse",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FetchXmlFromEndpoint",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "raw_xml_response",
+          "value": {
+            "value": "@string(json(string(xml(activity('FetchXmlFromEndpoint').output.Response))).root)",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "SetParsedJsonOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetRawXmlResponse",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "parsed_json_output",
+          "value": {
+            "value": "@string(json(string(json(string(xml(variables('raw_xml_response')))).root.records)).record)",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CheckRecordsExist",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetParsedJsonOutput",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(length(json(variables('parsed_json_output'))), 0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogRecordCount",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "record_count",
+                "value": {
+                  "value": "@string(length(json(string(json(string(xml(activity('FetchXmlFromEndpoint').output.Response))).root.records)).record)))",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogZeroRecords",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "record_count",
+                "value": "0"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyParsedRecords",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckRecordsExist",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "value": "@concat('SELECT * FROM ', pipeline().parameters.env, '_staging.xml_imports WHERE batch_id = ''', json(string(json(string(xml(variables('raw_xml_response')))).root.metadata)).batchId, ''' AND record_count = ', variables('record_count'), ' AND response_path = ''', pipeline().parameters.response_path, '''')",
+              "type": "Expression"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_identifier",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "xml_payload"
+                },
+                "sink": {
+                  "name": "raw_xml_content",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "json_converted"
+                },
+                "sink": {
+                  "name": "parsed_json_content",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "record_count"
+                },
+                "sink": {
+                  "name": "total_records",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

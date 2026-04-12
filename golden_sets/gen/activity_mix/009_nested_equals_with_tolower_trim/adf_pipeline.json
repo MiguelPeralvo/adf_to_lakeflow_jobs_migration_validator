@@ -1,0 +1,285 @@
+{
+  "name": "nested_equals_with_tolower_trim",
+  "properties": {
+    "parameters": {
+      "input_value": {
+        "type": "String",
+        "defaultValue": "  Hello World  "
+      },
+      "expected_value": {
+        "type": "String",
+        "defaultValue": "hello world"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "normalized_input": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_result": {
+        "type": "String",
+        "defaultValue": "not_set"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigValues",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_value FROM dbo.pipeline_config WHERE environment = ''', pipeline().parameters.env, ''' AND is_active = 1')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetNormalizedInput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigValues",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "normalized_input",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(pipeline().parameters.input_value))"
+          }
+        }
+      },
+      {
+        "name": "CheckEqualsWithNesting",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetNormalizedInput",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(toLower(trim(pipeline().parameters.input_value)), pipeline().parameters.expected_value)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetResultMatched",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "processing_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('MATCHED: normalized input [', toLower(trim(pipeline().parameters.input_value)), '] equals expected [', pipeline().parameters.expected_value, '] in env=', pipeline().parameters.env)"
+                }
+              }
+            },
+            {
+              "name": "NestedEnvCheckOnMatch",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "SetResultMatched",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(toLower(trim(pipeline().parameters.env)), 'prod'), equals(toLower(trim(pipeline().parameters.env)), 'production'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "NotifyProdMatch",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.company.com/api/pipelines/', pipeline().RunId, '/notify')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"nested_equals_with_tolower_trim\",\"status\":\"matched_prod\",\"env\":\"', toLower(trim(pipeline().parameters.env)), '\",\"normalized_input\":\"', toLower(trim(pipeline().parameters.input_value)), '\",\"expected\":\"', pipeline().parameters.expected_value, '\",\"runId\":\"', pipeline().RunId, '\"}'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "LogNonProdMatch",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.company.com/api/pipelines/', pipeline().RunId, '/log')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"nested_equals_with_tolower_trim\",\"status\":\"matched_non_prod\",\"env\":\"', toLower(trim(pipeline().parameters.env)), '\",\"normalized_input\":\"', toLower(trim(pipeline().parameters.input_value)), '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetResultNotMatched",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "processing_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('NOT_MATCHED: normalized input [', toLower(trim(pipeline().parameters.input_value)), '] does not equal expected [', pipeline().parameters.expected_value, ']')"
+                }
+              }
+            },
+            {
+              "name": "NestedEnvCheckOnMismatch",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "SetResultNotMatched",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(equals(toLower(trim(pipeline().parameters.input_value)), pipeline().parameters.expected_value)), equals(toLower(trim(pipeline().parameters.env)), 'prod'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "AlertProdMismatch",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": "https://hooks.company.com/api/alerts/prod-mismatch",
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"severity\":\"high\",\"pipeline\":\"nested_equals_with_tolower_trim\",\"message\":\"Input mismatch in PROD\",\"actual\":\"', toLower(trim(pipeline().parameters.input_value)), '\",\"expected\":\"', pipeline().parameters.expected_value, '\"}'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "LogNonProdMismatch",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": "https://hooks.company.com/api/log/non-prod-mismatch",
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"severity\":\"low\",\"pipeline\":\"nested_equals_with_tolower_trim\",\"env\":\"', toLower(trim(pipeline().parameters.env)), '\",\"actual\":\"', toLower(trim(pipeline().parameters.input_value)), '\",\"expected\":\"', pipeline().parameters.expected_value, '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalProcessingResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEqualsWithNesting",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_result",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('FINAL|env=', toLower(trim(pipeline().parameters.env)), '|match=', string(equals(toLower(trim(pipeline().parameters.input_value)), pipeline().parameters.expected_value)), '|lookupCount=', string(activity('LookupConfigValues').output.count))"
+          }
+        }
+      },
+      {
+        "name": "PostFinalStatus",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalProcessingResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.company.com/api/pipelines/', pipeline().RunId, '/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_equals_with_tolower_trim\",\"runId\":\"', pipeline().RunId, '\",\"env\":\"', toLower(trim(pipeline().parameters.env)), '\",\"inputMatched\":', string(equals(toLower(trim(pipeline().parameters.input_value)), pipeline().parameters.expected_value)), ',\"normalizedInput\":\"', toLower(trim(pipeline().parameters.input_value)), '\",\"expectedValue\":\"', pipeline().parameters.expected_value, '\",\"configRowsFound\":', string(activity('LookupConfigValues').output.count), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

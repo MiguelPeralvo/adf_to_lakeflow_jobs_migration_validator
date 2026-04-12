@@ -1,0 +1,170 @@
+{
+  "name": "nested_ternary_bool_evaluation",
+  "properties": {
+    "parameters": {
+      "flag_a": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "flag_b": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "flag_c": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "eval_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "branch_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "EvalNestedTernaryResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "eval_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(or(pipeline().parameters.flag_a, pipeline().parameters.flag_b), pipeline().parameters.flag_c), if(and(pipeline().parameters.flag_a, not(pipeline().parameters.flag_b)), if(equals(pipeline().parameters.env, 'prod'), 'PROD_PATH_A_ONLY', 'NON_PROD_PATH_A_ONLY'), if(or(and(pipeline().parameters.flag_a, pipeline().parameters.flag_b), and(not(pipeline().parameters.flag_a), pipeline().parameters.flag_c)), 'COMBINED_AB_OR_C_PATH', 'FALLBACK_MIXED')), if(and(not(pipeline().parameters.flag_a), not(pipeline().parameters.flag_b)), if(pipeline().parameters.flag_c, 'ISOLATED_C_ONLY', 'ALL_FLAGS_FALSE'), 'PARTIAL_DISABLED'))"
+          }
+        }
+      },
+      {
+        "name": "DetermineBranchLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EvalNestedTernaryResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "branch_label",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(or(equals(variables('eval_result'), 'PROD_PATH_A_ONLY'), equals(variables('eval_result'), 'NON_PROD_PATH_A_ONLY')), not(equals(pipeline().parameters.env, 'staging'))), concat('BRANCH_PRIMARY_', pipeline().parameters.env), if(and(equals(variables('eval_result'), 'COMBINED_AB_OR_C_PATH'), or(pipeline().parameters.flag_a, pipeline().parameters.flag_b)), 'BRANCH_COMBINED_ACTIVE', if(or(equals(variables('eval_result'), 'ALL_FLAGS_FALSE'), equals(variables('eval_result'), 'PARTIAL_DISABLED')), 'BRANCH_DISABLED', 'BRANCH_DEFAULT')))"
+          }
+        }
+      },
+      {
+        "name": "CheckBranchCondition",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DetermineBranchLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(variables('branch_label'), 'BRANCH_COMBINED_ACTIVE'), startsWith(variables('branch_label'), 'BRANCH_PRIMARY')), not(equals(variables('eval_result'), 'ALL_FLAGS_FALSE')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFinalOutputTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(and(or(pipeline().parameters.flag_a, pipeline().parameters.flag_c), equals(pipeline().parameters.env, 'prod')), concat('APPROVED_', variables('branch_label'), '_', variables('eval_result')), if(and(not(pipeline().parameters.flag_b), or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'staging'))), concat('REVIEW_', variables('branch_label'), '_', pipeline().parameters.env), concat('PENDING_', variables('eval_result'))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFinalOutputFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('REJECTED_', variables('branch_label'), '_', variables('eval_result'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetAuditSummary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckBranchCondition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "eval_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(or(contains(variables('final_output'), 'APPROVED'), contains(variables('final_output'), 'REVIEW')), not(contains(variables('final_output'), 'REJECTED'))), concat('AUDIT_PASS|flags=', string(pipeline().parameters.flag_a), ',', string(pipeline().parameters.flag_b), ',', string(pipeline().parameters.flag_c), '|env=', pipeline().parameters.env, '|result=', variables('final_output')), if(and(contains(variables('final_output'), 'REJECTED'), or(not(pipeline().parameters.flag_a), not(pipeline().parameters.flag_c))), concat('AUDIT_FAIL|reason=flags_disabled|output=', variables('final_output')), concat('AUDIT_WARN|output=', variables('final_output'))))"
+          }
+        }
+      },
+      {
+        "name": "PostResultToWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetAuditSummary",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@if(and(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), not(contains(variables('eval_result'), 'AUDIT_FAIL'))), concat('https://hooks.internal.corp/', pipeline().parameters.env, '/pipeline-results'), if(and(equals(pipeline().parameters.env, 'dev'), or(pipeline().parameters.flag_a, pipeline().parameters.flag_b)), 'https://hooks.internal.corp/dev/pipeline-results-debug', 'https://hooks.internal.corp/default/pipeline-results'))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_ternary_bool_evaluation\",\"env\":\"', pipeline().parameters.env, '\",\"flag_a\":', string(pipeline().parameters.flag_a), ',\"flag_b\":', string(pipeline().parameters.flag_b), ',\"flag_c\":', string(pipeline().parameters.flag_c), ',\"eval_result\":\"', variables('eval_result'), '\",\"final_output\":\"', variables('final_output'), '\",\"branch_label\":\"', variables('branch_label'), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

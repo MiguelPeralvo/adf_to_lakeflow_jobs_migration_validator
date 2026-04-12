@@ -1,0 +1,415 @@
+{
+  "name": "complex_date_expression_nesting",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "lookback_days": {
+        "type": "String",
+        "defaultValue": "7"
+      },
+      "date_format": {
+        "type": "String",
+        "defaultValue": "yyyy-MM-dd"
+      },
+      "timezone": {
+        "type": "String",
+        "defaultValue": "UTC"
+      }
+    },
+    "variables": {
+      "computed_start_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "computed_end_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "is_historical_run": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetComputedStartDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_start_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addDays(formatDateTime(addDays(utcNow(), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "SetComputedEndDate",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedStartDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_end_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addDays(formatDateTime(utcNow(), pipeline().parameters.date_format), 0), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "SetIsHistoricalRun",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedEndDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_historical_run",
+          "value": {
+            "type": "Expression",
+            "value": "@string(greater(int(pipeline().parameters.lookback_days), 30))"
+          }
+        }
+      },
+      {
+        "name": "CheckDateRangeValidity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetIsHistoricalRun",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(formatDateTime(addDays(formatDateTime(addDays(utcNow(), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, mul(int(pipeline().parameters.lookback_days), 2))), pipeline().parameters.date_format), formatDateTime(addDays(utcNow(), sub(0, 365)), pipeline().parameters.date_format))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogValidRange",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_historical_run",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(true)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogInvalidRange",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_historical_run",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckEnvironmentAndDateWindow",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckDateRangeValidity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env, 'prod'), greater(formatDateTime(addDays(formatDateTime(addDays(formatDateTime(pipeline().parameters.run_date, pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), formatDateTime(addDays(utcNow(), sub(0, 90)), pipeline().parameters.date_format)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ProdDateConfirm",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_historical_run",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(and(equals(pipeline().parameters.env, 'prod'), greater(int(pipeline().parameters.lookback_days), 0)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NonProdDateConfirm",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_historical_run",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "LookupDateBoundaries",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentAndDateWindow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT MIN(event_date) AS min_date, MAX(event_date) AS max_date, COUNT(*) AS row_count FROM staging.events WHERE event_date BETWEEN ''', formatDateTime(addDays(formatDateTime(addDays(utcNow(), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), ''' AND ''', formatDateTime(addDays(formatDateTime(utcNow(), pipeline().parameters.date_format), 0), pipeline().parameters.date_format), ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CopyEventsToLakehouse",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "LookupDateBoundaries",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT event_id, event_date, event_type, payload, created_at FROM staging.events WHERE event_date >= ''', formatDateTime(addDays(formatDateTime(addDays(formatDateTime(pipeline().parameters.run_date, pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), ''' AND event_date <= ''', formatDateTime(addDays(formatDateTime(utcNow(), pipeline().parameters.date_format), 0), pipeline().parameters.date_format), ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "event_id"
+                },
+                "sink": {
+                  "name": "event_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "event_date"
+                },
+                "sink": {
+                  "name": "event_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "event_type"
+                },
+                "sink": {
+                  "name": "event_type",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "payload",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "created_at",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "TransformWithDatabricks",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CopyEventsToLakehouse",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/transform_events')"
+          },
+          "baseParameters": {
+            "start_date": {
+              "type": "Expression",
+              "value": "@formatDateTime(addDays(formatDateTime(addDays(formatDateTime(pipeline().parameters.run_date, pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format), sub(0, int(pipeline().parameters.lookback_days))), pipeline().parameters.date_format)"
+            },
+            "end_date": {
+              "type": "Expression",
+              "value": "@formatDateTime(addDays(formatDateTime(utcNow(), pipeline().parameters.date_format), 0), pipeline().parameters.date_format)"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "timezone": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.timezone"
+            },
+            "lookback_days": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.lookback_days"
+            },
+            "row_count": {
+              "type": "Expression",
+              "value": "@string(activity('LookupDateBoundaries').output.firstRow.row_count)"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

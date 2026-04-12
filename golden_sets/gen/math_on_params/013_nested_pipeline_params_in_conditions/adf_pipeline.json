@@ -1,0 +1,242 @@
+{
+  "name": "nested_pipeline_params_in_conditions",
+  "properties": {
+    "parameters": {
+      "is_incremental": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "is_production": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "force_full_load": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "load_mode": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "should_execute": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "DetermineLoadMode",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "load_mode",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.is_incremental, true), not(equals(pipeline().parameters.force_full_load, true))), 'incremental', 'full')"
+          }
+        }
+      },
+      {
+        "name": "CheckProductionAndIncremental",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DetermineLoadMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(and(equals(pipeline().parameters.is_production, true), equals(pipeline().parameters.is_incremental, true)), equals(pipeline().parameters.force_full_load, true)), not(and(equals(pipeline().parameters.env, 'dev'), not(equals(pipeline().parameters.force_full_load, true)))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetShouldExecuteTrue",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "should_execute",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetShouldExecuteFalse",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "should_execute",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "EvaluateEnvironmentConditions",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckProductionAndIncremental",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(and(not(equals(pipeline().parameters.env, 'dev')), or(equals(pipeline().parameters.is_production, true), and(equals(pipeline().parameters.force_full_load, true), not(equals(pipeline().parameters.is_incremental, false))))), and(equals(pipeline().parameters.env, 'prod'), not(or(equals(pipeline().parameters.force_full_load, false), and(not(equals(pipeline().parameters.is_production, true)), equals(pipeline().parameters.is_incremental, false))))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "NotifyProductionReady",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_pipeline_params_in_conditions\",\"env\":\"', pipeline().parameters.env, '\",\"load_mode\":\"', variables('load_mode'), '\",\"is_production\":', string(pipeline().parameters.is_production), ',\"force_full_load\":', string(pipeline().parameters.force_full_load), '}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogSkipped",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "should_execute",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalLoadMode",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EvaluateEnvironmentConditions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "load_mode",
+          "value": {
+            "type": "Expression",
+            "value": "@if(or(and(equals(pipeline().parameters.force_full_load, true), not(and(equals(pipeline().parameters.is_incremental, true), equals(pipeline().parameters.env, 'dev')))), and(equals(pipeline().parameters.is_production, true), not(or(equals(pipeline().parameters.is_incremental, true), equals(pipeline().parameters.env, 'staging'))))), 'full_override', variables('load_mode'))"
+          }
+        }
+      },
+      {
+        "name": "CopyDataToLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalLoadMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@if(and(equals(variables('load_mode'), 'incremental'), not(or(equals(pipeline().parameters.force_full_load, true), and(equals(pipeline().parameters.is_production, true), not(equals(pipeline().parameters.env, 'prod')))))), concat('SELECT src_col FROM source_table WHERE modified_date >= DATEADD(day, -1, GETDATE()) AND env = ''', pipeline().parameters.env, ''''), concat('SELECT src_col FROM source_table WHERE env = ''', pipeline().parameters.env, ''''))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "PostCopyNotification",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyDataToLake",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.is_production, true), or(not(equals(pipeline().parameters.env, 'dev')), and(equals(pipeline().parameters.force_full_load, true), not(equals(pipeline().parameters.is_incremental, false))))), concat('https://api.example.com/prod/', pipeline().parameters.env, '/complete'), concat('https://api.example.com/non-prod/', pipeline().parameters.env, '/complete'))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"status\":\"completed\",\"load_mode\":\"', variables('load_mode'), '\",\"is_incremental\":', string(pipeline().parameters.is_incremental), ',\"is_production\":', string(pipeline().parameters.is_production), ',\"force_full_load\":', string(pipeline().parameters.force_full_load), ',\"env\":\"', pipeline().parameters.env, '\",\"deeply_nested_check\":', string(and(or(equals(pipeline().parameters.is_production, true), not(equals(pipeline().parameters.force_full_load, false))), not(and(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.is_incremental, false))))), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

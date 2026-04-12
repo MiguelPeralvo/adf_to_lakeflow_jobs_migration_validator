@@ -1,0 +1,409 @@
+{
+  "name": "nested_web_activity_condition_handler",
+  "properties": {
+    "parameters": {
+      "api_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com"
+      },
+      "auth_token": {
+        "type": "String",
+        "defaultValue": "Bearer token123"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      },
+      "retry_count": {
+        "type": "Int",
+        "defaultValue": 3
+      }
+    },
+    "variables": {
+      "http_status_code": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "response_body": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "CallPrimaryAPI",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": "@pipeline().parameters.retry_count",
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_url, '/v1/status?env=', pipeline().parameters.env)"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      {
+        "name": "CheckPrimaryAPIResponse",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CallPrimaryAPI",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('CallPrimaryAPI').output.statusCode, 200)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CallDetailEndpoint",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_url, '/v1/details?env=', pipeline().parameters.env, '&id=', activity('CallPrimaryAPI').output.response.requestId)"
+                },
+                "method": "POST",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  },
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"env\":\"', pipeline().parameters.env, '\",\"requestId\":\"', activity('CallPrimaryAPI').output.response.requestId, '\"}'))"
+                }
+              }
+            },
+            {
+              "name": "EvaluateDetailResponse",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CallDetailEndpoint",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(equals(activity('CallDetailEndpoint').output.statusCode, 200), equals(activity('CallDetailEndpoint').output.response.status, 'ready'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CheckEnvironmentForProcessing",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@or(equals(pipeline().parameters.env, 'production'), and(equals(pipeline().parameters.env, 'staging'), greater(int(activity('CallDetailEndpoint').output.response.recordCount), 0)))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "SetProcessingFlag",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "variableName": "processing_flag",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@string(true)"
+                            }
+                          }
+                        },
+                        {
+                          "name": "RunDatabricksProcessing",
+                          "type": "DatabricksNotebook",
+                          "dependsOn": [
+                            {
+                              "activity": "SetProcessingFlag",
+                              "dependencyConditions": [
+                                "Succeeded"
+                              ]
+                            }
+                          ],
+                          "policy": {
+                            "timeout": "0.01:00:00",
+                            "retry": 1,
+                            "retryIntervalInSeconds": 60
+                          },
+                          "typeProperties": {
+                            "notebookPath": {
+                              "type": "Expression",
+                              "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_api_response')"
+                            },
+                            "baseParameters": {
+                              "env": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.env"
+                              },
+                              "request_id": {
+                                "type": "Expression",
+                                "value": "@activity('CallPrimaryAPI').output.response.requestId"
+                              },
+                              "record_count": {
+                                "type": "Expression",
+                                "value": "@string(activity('CallDetailEndpoint').output.response.recordCount)"
+                              },
+                              "processing_flag": {
+                                "type": "Expression",
+                                "value": "@variables('processing_flag')"
+                              }
+                            }
+                          },
+                          "linkedServiceName": {
+                            "referenceName": "ls_databricks",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "CallSkipNotification",
+                          "type": "WebActivity",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.00:02:00",
+                            "retry": 1,
+                            "retryIntervalInSeconds": 10
+                          },
+                          "typeProperties": {
+                            "url": {
+                              "type": "Expression",
+                              "value": "@concat(pipeline().parameters.api_url, '/v1/notify')"
+                            },
+                            "method": "POST",
+                            "headers": {
+                              "Authorization": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.auth_token"
+                              },
+                              "Content-Type": "application/json"
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"message\":\"Skipped processing for env: ', pipeline().parameters.env, ', status not eligible\",\"severity\":\"info\"}'))"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "CallErrorReportEndpoint",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:02:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 10
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.api_url, '/v1/errors/report')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Authorization": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.auth_token"
+                        },
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"error\":\"Detail endpoint returned non-ready status\",\"statusCode\":', string(activity('CallDetailEndpoint').output.statusCode), ',\"env\":\"', pipeline().parameters.env, '\",\"requestId\":\"', activity('CallPrimaryAPI').output.response.requestId, '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "CallFallbackAPI",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": "@pipeline().parameters.retry_count",
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_url, '/v1/fallback?env=', pipeline().parameters.env, '&originalStatus=', string(activity('CallPrimaryAPI').output.statusCode))"
+                },
+                "method": "GET",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  },
+                  "Content-Type": "application/json"
+                }
+              }
+            },
+            {
+              "name": "EvaluateFallbackResponse",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CallFallbackAPI",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('CallFallbackAPI').output.statusCode, 200)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetStatusFromFallback",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "http_status_code",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(activity('CallFallbackAPI').output.statusCode)"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "ReportFallbackFailure",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:02:00",
+                      "retry": 1,
+                      "retryIntervalInSeconds": 10
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.api_url, '/v1/errors/critical')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Authorization": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.auth_token"
+                        },
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"error\":\"Both primary and fallback APIs failed\",\"primaryStatus\":', string(activity('CallPrimaryAPI').output.statusCode), ',\"fallbackStatus\":', string(activity('CallFallbackAPI').output.statusCode), ',\"env\":\"', pipeline().parameters.env, '\",\"retryCount\":', string(pipeline().parameters.retry_count), '}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetHTTPStatusVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CallPrimaryAPI",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "http_status_code",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('CallPrimaryAPI').output.statusCode)"
+          }
+        }
+      },
+      {
+        "name": "FinalHealthCheck",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckPrimaryAPIResponse",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetHTTPStatusVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:02:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 10
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_url, '/v1/health')"
+          },
+          "method": "POST",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_web_activity_condition_handler\",\"env\":\"', pipeline().parameters.env, '\",\"lastStatusCode\":', variables('http_status_code'), ',\"processingFlag\":', variables('processing_flag'), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

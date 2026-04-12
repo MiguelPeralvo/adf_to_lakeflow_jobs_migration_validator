@@ -1,0 +1,199 @@
+{
+  "name": "nested_dynamic_url_builder",
+  "properties": {
+    "parameters": {
+      "api_base": {
+        "type": "String",
+        "defaultValue": "https://management.azure.com"
+      },
+      "api_version": {
+        "type": "String",
+        "defaultValue": "2023-01-01"
+      },
+      "resource_id": {
+        "type": "String",
+        "defaultValue": "/subscriptions/abc-123/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm01"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      },
+      "auth_token": {
+        "type": "String",
+        "defaultValue": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
+      }
+    },
+    "variables": {
+      "encoded_resource_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "dynamic_api_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetEncodedResourcePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded_resource_path",
+          "value": {
+            "type": "Expression",
+            "value": "@base64(replace(replace(pipeline().parameters.resource_id, '/', '%2F'), ' ', '%20'))"
+          }
+        }
+      },
+      {
+        "name": "BuildDynamicApiUrl",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetEncodedResourcePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_api_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(concat(concat(replace(pipeline().parameters.api_base, 'https://', concat('https://', replace(pipeline().parameters.env, 'production', 'prod'), '.')), pipeline().parameters.resource_id), concat('?api-version=', pipeline().parameters.api_version, '&encodedRef=', base64(concat(pipeline().parameters.resource_id, ':', pipeline().parameters.env)))), concat('&trace=', base64(concat('env=', replace(pipeline().parameters.env, 'production', 'prd'), '&ts=', utcNow()))))"
+          }
+        }
+      },
+      {
+        "name": "InvokeApiWithDynamicUrl",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildDynamicApiUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": true
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('dynamic_api_url')"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@concat('Bearer ', base64(concat(replace(pipeline().parameters.auth_token, 'Bearer ', ''), ':', pipeline().parameters.env)))"
+            },
+            "x-request-id": {
+              "type": "Expression",
+              "value": "@concat('req-', replace(guid(), '-', ''), '-', base64(concat(pipeline().parameters.env, utcNow())))"
+            },
+            "x-encoded-resource": {
+              "type": "Expression",
+              "value": "@variables('encoded_resource_path')"
+            },
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      {
+        "name": "CheckApiResponseStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "InvokeApiWithDynamicUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('InvokeApiWithDynamicUrl').output.statusCode, 200)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogSuccessfulResponse",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(replace(pipeline().parameters.api_base, 'management.azure.com', concat('logging.', replace(pipeline().parameters.env, 'production', 'prod'), '.internal')), '/api/log?encoded=', base64(concat('status=success&resource=', replace(pipeline().parameters.resource_id, '/', '_'), '&apiVersion=', pipeline().parameters.api_version)))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"status\":\"success\",\"url\":\"', variables('dynamic_api_url'), '\",\"encodedPath\":\"', variables('encoded_resource_path'), '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogFailedResponse",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(replace(pipeline().parameters.api_base, 'management.azure.com', concat('alerting.', replace(pipeline().parameters.env, 'production', 'prod'), '.internal')), '/api/alert?errorRef=', base64(concat('fail:', pipeline().parameters.resource_id, ':', utcNow())))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"status\":\"error\",\"url\":\"', variables('dynamic_api_url'), '\",\"encodedResource\":\"', base64(replace(pipeline().parameters.resource_id, '/', '-')), '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "name": "nested_intersection_filter_logic",
+  "properties": {
+    "parameters": {
+      "allowed_list": {
+        "type": "Array",
+        "defaultValue": [
+          "table_a",
+          "table_b",
+          "table_c"
+        ]
+      },
+      "input_list": {
+        "type": "Array",
+        "defaultValue": [
+          "table_b",
+          "table_c",
+          "table_d",
+          "table_e"
+        ]
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      }
+    },
+    "variables": {
+      "filtered_items": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "intersection_result": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "validated_items": {
+        "type": "Array",
+        "defaultValue": []
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeIntersection",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "intersection_result",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(pipeline().parameters.input_list, pipeline().parameters.allowed_list)"
+          }
+        }
+      },
+      {
+        "name": "FilterContainsValidation",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeIntersection",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "filtered_items",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(variables('intersection_result'), createArray(if(contains(pipeline().parameters.allowed_list, 'table_a'), 'table_a', ''), if(contains(pipeline().parameters.allowed_list, 'table_b'), 'table_b', ''), if(contains(pipeline().parameters.allowed_list, 'table_c'), 'table_c', ''), if(contains(pipeline().parameters.allowed_list, 'table_d'), 'table_d', ''), if(contains(pipeline().parameters.allowed_list, 'table_e'), 'table_e', '')))"
+          }
+        }
+      },
+      {
+        "name": "SetValidatedItems",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FilterContainsValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "validated_items",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(variables('filtered_items'), intersection(pipeline().parameters.input_list, pipeline().parameters.allowed_list))"
+          }
+        }
+      },
+      {
+        "name": "IterateFilteredItems",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetValidatedItems",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(if(greater(length(variables('validated_items')), 0), variables('validated_items')[0], json('null')), if(greater(length(variables('validated_items')), 1), variables('validated_items')[1], json('null')), if(greater(length(variables('validated_items')), 2), variables('validated_items')[2], json('null')))"
+          },
+          "activities": [
+            {
+              "name": "RunDatabricksProcessing",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_', item())"
+                },
+                "baseParameters": {
+                  "table_name": {
+                    "type": "Expression",
+                    "value": "@if(contains(intersection(pipeline().parameters.allowed_list, pipeline().parameters.input_list), item()), item(), 'skipped')"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "is_in_allowed": {
+                    "type": "Expression",
+                    "value": "@string(contains(pipeline().parameters.allowed_list, item()))"
+                  },
+                  "intersection_count": {
+                    "type": "Expression",
+                    "value": "@string(length(intersection(pipeline().parameters.input_list, pipeline().parameters.allowed_list)))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

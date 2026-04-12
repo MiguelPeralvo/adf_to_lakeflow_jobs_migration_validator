@@ -1,0 +1,256 @@
+{
+  "name": "nested_contains_and_startswith_router",
+  "properties": {
+    "parameters": {
+      "file_path": {
+        "type": "String",
+        "defaultValue": "/data/incoming/sales_2024.csv"
+      },
+      "source_system": {
+        "type": "String",
+        "defaultValue": "SAP"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      }
+    },
+    "variables": {
+      "routing_target": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "none"
+      }
+    },
+    "activities": [
+      {
+        "name": "DetermineRoutingTarget",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "routing_target",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(contains(pipeline().parameters.file_path, 'sales'), startsWith(pipeline().parameters.source_system, 'SAP')), 'sap_sales_route', if(and(contains(pipeline().parameters.file_path, 'inventory'), startsWith(pipeline().parameters.source_system, 'ORA')), 'oracle_inventory_route', if(contains(pipeline().parameters.env, 'prod'), 'prod_default_route', 'dev_fallback_route')))"
+          }
+        }
+      },
+      {
+        "name": "CheckSAPSalesRoute",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DetermineRoutingTarget",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('routing_target'), 'sap_sales_route'), contains(pipeline().parameters.batch_id, 'BATCH'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFlagForSAPSales",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": "sap_sales_active"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogSkippedSAPRoute",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging-api.contoso.com/api/v1/log?pipeline=nested_contains_and_startswith_router&batch_id=', pipeline().parameters.batch_id, '&event=sap_route_skipped')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"routing_target\":\"', variables('routing_target'), '\",\"source_system\":\"', pipeline().parameters.source_system, '\",\"skipped_reason\":\"not_sap_sales_route\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckProdEnvironmentRouting",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckSAPSalesRoute",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(startsWith(pipeline().parameters.env, 'prod'), or(contains(pipeline().parameters.file_path, 'sales'), contains(pipeline().parameters.file_path, 'finance')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyProdData",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM dbo.transactions WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND source_system = ''', pipeline().parameters.source_system, ''' AND environment = ''', pipeline().parameters.env, '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "batch_id"
+                      },
+                      "sink": {
+                        "name": "batch_identifier",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "source_sys"
+                      },
+                      "sink": {
+                        "name": "origin_system",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckNestedContainsForFileClassification",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckProdEnvironmentRouting",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(and(contains(pipeline().parameters.file_path, '/incoming/'), startsWith(pipeline().parameters.batch_id, 'BATCH')), and(contains(pipeline().parameters.file_path, '2024'), not(startsWith(pipeline().parameters.source_system, 'LEGACY'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetProcessingFlagClassified",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(and(contains(pipeline().parameters.file_path, 'sales'), startsWith(pipeline().parameters.env, 'prod')), 'classified_prod_sales', if(contains(pipeline().parameters.file_path, 'inventory'), 'classified_inventory', 'classified_general'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "FinalNotification",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckNestedContainsForFileClassification",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://hooks.contoso.com/api/v2/pipelines/notify",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_contains_and_startswith_router\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"routing_target\":\"', variables('routing_target'), '\",\"processing_flag\":\"', variables('processing_flag'), '\",\"env\":\"', pipeline().parameters.env, '\",\"source_system\":\"', pipeline().parameters.source_system, '\",\"file_path\":\"', pipeline().parameters.file_path, '\",\"status\":\"completed\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

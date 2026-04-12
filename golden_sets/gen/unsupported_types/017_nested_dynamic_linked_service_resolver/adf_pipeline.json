@@ -1,0 +1,314 @@
+{
+  "name": "nested_dynamic_linked_service_resolver",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "eastus"
+      },
+      "service_tier": {
+        "type": "String",
+        "defaultValue": "standard"
+      },
+      "connection_override": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "variables": {
+      "resolved_linked_service_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_connection_string": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_service_tier": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupLinkedServiceConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT linked_service_name, connection_string, service_tier FROM dbo.linked_service_registry WHERE environment = ''', pipeline().parameters.env, ''' AND region = ''', pipeline().parameters.region, ''' AND service_tier = ''', pipeline().parameters.service_tier, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetResolvedLinkedServiceName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupLinkedServiceConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_linked_service_name",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(pipeline().parameters.connection_override)), concat('ls_', pipeline().parameters.env, '_', pipeline().parameters.region, '_override_', replace(pipeline().parameters.connection_override, '-', '_')), concat('ls_', pipeline().parameters.env, '_', pipeline().parameters.region, '_', toLower(activity('LookupLinkedServiceConfig').output.firstRow.linked_service_name), '_', pipeline().parameters.service_tier))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedConnectionString",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedLinkedServiceName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_connection_string",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(pipeline().parameters.connection_override)), concat('Server=', pipeline().parameters.region, '-', pipeline().parameters.env, '-override.database.windows.net;Database=', replace(pipeline().parameters.connection_override, '-', '_'), ';Authentication=Active Directory Integrated;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;ApplicationIntent=', if(equals(pipeline().parameters.service_tier, 'premium'), 'ReadWrite', 'ReadOnly')), concat('Server=', pipeline().parameters.region, '-', pipeline().parameters.env, '.database.windows.net;Database=', activity('LookupLinkedServiceConfig').output.firstRow.linked_service_name, '_', pipeline().parameters.service_tier, ';Authentication=Active Directory Integrated;Encrypt=True;TrustServerCertificate=False;Connection Timeout=', if(equals(pipeline().parameters.service_tier, 'premium'), '60', if(equals(pipeline().parameters.service_tier, 'standard'), '30', '15'))))"
+          }
+        }
+      },
+      {
+        "name": "SetEffectiveServiceTier",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedConnectionString",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "effective_service_tier",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(not(empty(pipeline().parameters.connection_override)), equals(pipeline().parameters.service_tier, 'standard')), 'premium', if(and(equals(pipeline().parameters.env, 'prod'), or(equals(pipeline().parameters.region, 'eastus'), equals(pipeline().parameters.region, 'westeurope'))), 'premium', pipeline().parameters.service_tier))"
+          }
+        }
+      },
+      {
+        "name": "CheckOverrideAndTierEligibility",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetEffectiveServiceTier",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(and(not(empty(pipeline().parameters.connection_override)), not(equals(variables('effective_service_tier'), 'basic'))), and(equals(pipeline().parameters.env, 'prod'), equals(variables('effective_service_tier'), 'premium')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogEligibleCopy",
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('INSERT INTO dbo.pipeline_audit_log (pipeline_name, linked_service, connection_info, tier, logged_at) VALUES (''nested_dynamic_linked_service_resolver'', ''', variables('resolved_linked_service_name'), ''', ''', replace(variables('resolved_connection_string'), '''', ''''''), ''', ''', variables('effective_service_tier'), ''', GETUTCDATE()); SELECT 1 AS logged')"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_config",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": true,
+                "input_dataset_definitions": [
+                  {
+                    "type": "AzureSqlSource",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_sql",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogSkippedTier",
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('INSERT INTO dbo.pipeline_audit_log (pipeline_name, linked_service, tier, status, logged_at) VALUES (''nested_dynamic_linked_service_resolver'', ''', variables('resolved_linked_service_name'), ''', ''', variables('effective_service_tier'), ''', ''SKIPPED_INELIGIBLE'', GETUTCDATE()); SELECT 0 AS logged')"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_config",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": true,
+                "input_dataset_definitions": [
+                  {
+                    "type": "AzureSqlSource",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_sql",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyWithDynamicLinkedService",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckOverrideAndTierEligibility",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT t.* FROM dbo.source_data_', pipeline().parameters.env, '_', pipeline().parameters.region, ' t WHERE t.service_tier = ''', variables('effective_service_tier'), ''' AND t.linked_service_ref = ''', variables('resolved_linked_service_name'), ''' AND t.connection_hash = ''', base64(variables('resolved_connection_string')), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "service_tier"
+                },
+                "sink": {
+                  "name": "tier",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "linked_service_ref"
+                },
+                "sink": {
+                  "name": "resolved_ls_name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "data_payload",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "ingestion_timestamp",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": {
+                  "type": "Expression",
+                  "value": "@variables('resolved_linked_service_name')"
+                },
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": {
+                  "type": "Expression",
+                  "value": "@concat('ls_delta_', pipeline().parameters.env, '_', pipeline().parameters.region, '_', variables('effective_service_tier'))"
+                },
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

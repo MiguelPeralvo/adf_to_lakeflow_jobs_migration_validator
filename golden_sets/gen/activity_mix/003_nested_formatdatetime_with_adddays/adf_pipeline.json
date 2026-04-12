@@ -1,0 +1,115 @@
+{
+  "name": "nested_formatdatetime_with_adddays",
+  "properties": {
+    "parameters": {
+      "offset_days": {
+        "type": "Int",
+        "defaultValue": -7
+      },
+      "date_format": {
+        "type": "String",
+        "defaultValue": "yyyy-MM-dd"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "computed_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "nested_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetComputedDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_date",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Date_', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), pipeline().parameters.date_format), '_', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "SetNestedLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "nested_label",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('L1[', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy'), ']-L2[', formatDateTime(adddays(utcnow(), mul(pipeline().parameters.offset_days, 2)), 'MM-dd'), ']-L3[', formatDateTime(adddays(utcnow(), mul(pipeline().parameters.offset_days, 3)), 'yyyyMMddHHmmss'), ']')"
+          }
+        }
+      },
+      {
+        "name": "SetFinalOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNestedLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_output",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.env, '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'MM'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'dd'), '/report_', concat(formatDateTime(adddays(utcnow(), sub(0, pipeline().parameters.offset_days)), pipeline().parameters.date_format), '_', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), concat('yyyyMMdd', 'HHmmss'))), '.json')"
+          }
+        }
+      },
+      {
+        "name": "PostDateMetadata",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalOutput",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api-', pipeline().parameters.env, '.contoso.com/v1/metadata/dates')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_formatdatetime_with_adddays\",\"env\":\"', pipeline().parameters.env, '\",\"computed_date\":\"', variables('computed_date'), '\",\"nested_label\":\"', variables('nested_label'), '\",\"final_output_path\":\"', variables('final_output'), '\",\"level1_date\":\"', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), pipeline().parameters.date_format), '\",\"level2_date\":\"', formatDateTime(adddays(utcnow(), mul(pipeline().parameters.offset_days, 2)), concat('yyyy', '-MM-dd', 'THH:mm:ss')), '\",\"level3_date\":\"', formatDateTime(adddays(utcnow(), mul(pipeline().parameters.offset_days, 3)), concat(pipeline().parameters.date_format, concat('T', 'HH:mm:ssZ'))), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

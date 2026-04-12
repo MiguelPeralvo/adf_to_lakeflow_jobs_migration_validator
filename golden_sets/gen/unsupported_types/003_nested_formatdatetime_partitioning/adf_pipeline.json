@@ -1,0 +1,250 @@
+{
+  "name": "nested_formatdatetime_partitioning",
+  "properties": {
+    "parameters": {
+      "offset_days": {
+        "type": "Int",
+        "defaultValue": -3
+      },
+      "date_format": {
+        "type": "String",
+        "defaultValue": "yyyy/MM/dd"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "target_container": {
+        "type": "String",
+        "defaultValue": "curated"
+      }
+    },
+    "variables": {
+      "partition_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "partition_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "run_id": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetPartitionDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), pipeline().parameters.date_format)"
+          }
+        }
+      },
+      {
+        "name": "SetPartitionPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetPartitionDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.target_container, '/', pipeline().parameters.env, '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'MM'), '/', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetRunId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetPartitionPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "run_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.env, '-', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyyMMddHHmmss'), '-', pipeline().RunId)"
+          }
+        }
+      },
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetRunId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count, MIN(created_date) AS min_date, MAX(created_date) AS max_date FROM ', pipeline().parameters.env, '_schema.source_table WHERE created_date >= ''', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy-MM-dd'), ''' AND created_date < ''', formatDateTime(adddays(utcnow(), add(pipeline().parameters.offset_days, 1)), 'yyyy-MM-dd'), '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyPartitionedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT id, name, amount, category, created_date, ''', variables('run_id'), ''' AS etl_run_id, ''', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy-MM-dd'), ''' AS partition_date FROM ', pipeline().parameters.env, '_schema.source_table WHERE created_date >= ''', formatDateTime(adddays(utcnow(), pipeline().parameters.offset_days), 'yyyy-MM-dd 00:00:00'), ''' AND created_date < ''', formatDateTime(adddays(utcnow(), add(pipeline().parameters.offset_days, 1)), 'yyyy-MM-dd 00:00:00'), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "name"
+                },
+                "sink": {
+                  "name": "name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "amount"
+                },
+                "sink": {
+                  "name": "amount",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "category"
+                },
+                "sink": {
+                  "name": "category",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_date"
+                },
+                "sink": {
+                  "name": "created_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "etl_run_id"
+                },
+                "sink": {
+                  "name": "etl_run_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "partition_date"
+                },
+                "sink": {
+                  "name": "partition_date",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        },
+        "inputs": [],
+        "outputs": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "name": "nested_replace_and_tolower_sanitizer",
+  "properties": {
+    "parameters": {
+      "raw_input": {
+        "type": "String",
+        "defaultValue": "  Hello World@Special#Chars  "
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      }
+    },
+    "variables": {
+      "sanitized_input": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_batch_id": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SanitizeRawInput",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_input",
+          "value": {
+            "type": "Expression",
+            "value": "@trim(toLower(replace(replace(replace(pipeline().parameters.raw_input, '@', '_at_'), '#', '_hash_'), ' ', '_')))"
+          }
+        }
+      },
+      {
+        "name": "SanitizeEnv",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizeRawInput",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_env",
+          "value": {
+            "type": "Expression",
+            "value": "@trim(toLower(replace(replace(replace(pipeline().parameters.env, ' ', ''), '-', '_'), '.', '_')))"
+          }
+        }
+      },
+      {
+        "name": "SanitizeBatchId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizeEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_batch_id",
+          "value": {
+            "type": "Expression",
+            "value": "@trim(toLower(replace(replace(replace(pipeline().parameters.batch_id, '-', '_'), ' ', ''), '#', '')))"
+          }
+        }
+      },
+      {
+        "name": "PostSanitizedPayload",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SanitizeBatchId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api-', variables('sanitized_env'), '.example.com/v1/ingest')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@variables('sanitized_batch_id')"
+            },
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@variables('sanitized_env')"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"sanitized_input\":\"', variables('sanitized_input'), '\",\"environment\":\"', variables('sanitized_env'), '\",\"batch_id\":\"', variables('sanitized_batch_id'), '\",\"original_raw_input\":\"', trim(toLower(replace(replace(replace(pipeline().parameters.raw_input, '@', '_at_'), '#', '_hash_'), '\\', '_slash_'))), '\",\"processing_timestamp\":\"', utcNow(), '\"}'))"
+          },
+          "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      },
+      {
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        }
+      }
+    ]
+  }
+}

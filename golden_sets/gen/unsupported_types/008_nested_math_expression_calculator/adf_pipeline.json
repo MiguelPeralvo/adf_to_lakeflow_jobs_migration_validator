@@ -1,0 +1,165 @@
+{
+  "name": "nested_math_expression_calculator",
+  "properties": {
+    "parameters": {
+      "batch_size": {
+        "type": "Int",
+        "defaultValue": 1000
+      },
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 50000
+      },
+      "parallelism": {
+        "type": "Int",
+        "defaultValue": 4
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "num_batches": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "records_per_thread": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "remainder_records": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "adjusted_batch_size": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "Calculate_Num_Batches",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "num_batches",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(add(pipeline().parameters.total_records, sub(pipeline().parameters.batch_size, 1)), pipeline().parameters.batch_size))"
+          }
+        }
+      },
+      {
+        "name": "Calculate_Records_Per_Thread",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Calculate_Num_Batches",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "records_per_thread",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(mul(pipeline().parameters.batch_size, div(add(pipeline().parameters.total_records, sub(pipeline().parameters.batch_size, 1)), pipeline().parameters.batch_size)), pipeline().parameters.parallelism))"
+          }
+        }
+      },
+      {
+        "name": "Calculate_Remainder_Records",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Calculate_Records_Per_Thread",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_records",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(add(pipeline().parameters.total_records, mul(pipeline().parameters.parallelism, mod(pipeline().parameters.total_records, pipeline().parameters.batch_size))), pipeline().parameters.parallelism))"
+          }
+        }
+      },
+      {
+        "name": "Calculate_Adjusted_Batch_Size",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Calculate_Remainder_Records",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "adjusted_batch_size",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(div(pipeline().parameters.batch_size, pipeline().parameters.parallelism), pipeline().parameters.parallelism), mod(add(pipeline().parameters.batch_size, mul(2, mod(pipeline().parameters.total_records, pipeline().parameters.parallelism))), pipeline().parameters.parallelism)))"
+          }
+        }
+      },
+      {
+        "name": "Check_If_Remainder_Needs_Extra_Batch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Calculate_Adjusted_Batch_Size",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(mod(add(pipeline().parameters.total_records, mul(div(pipeline().parameters.batch_size, pipeline().parameters.parallelism), pipeline().parameters.parallelism)), pipeline().parameters.batch_size), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set_Final_Adjusted_Batch_With_Remainder",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "adjusted_batch_size",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(int(variables('adjusted_batch_size')), div(add(mod(pipeline().parameters.total_records, mul(pipeline().parameters.batch_size, pipeline().parameters.parallelism)), sub(pipeline().parameters.parallelism, 1)), pipeline().parameters.parallelism)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_Final_Adjusted_Batch_No_Remainder",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "adjusted_batch_size",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(mul(div(pipeline().parameters.total_records, mul(pipeline().parameters.batch_size, pipeline().parameters.parallelism)), pipeline().parameters.batch_size))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

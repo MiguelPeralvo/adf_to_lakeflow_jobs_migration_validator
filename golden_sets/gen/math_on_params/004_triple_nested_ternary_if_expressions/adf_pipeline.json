@@ -1,0 +1,207 @@
+{
+  "name": "triple_nested_ternary_if_expressions",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "tier": {
+        "type": "String",
+        "defaultValue": "standard"
+      },
+      "priority": {
+        "type": "String",
+        "defaultValue": "medium"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B001"
+      }
+    },
+    "variables": {
+      "resolved_env_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "routing_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "copy_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedEnvLabel",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_env_label",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),if(equals(pipeline().parameters.priority,'high'),'PROD_PREMIUM_HIGH','PROD_PREMIUM_DEFAULT'),'PROD_STANDARD'),if(equals(pipeline().parameters.env,'staging'),if(equals(pipeline().parameters.tier,'premium'),if(equals(pipeline().parameters.priority,'high'),'STG_PREMIUM_HIGH','STG_PREMIUM_DEFAULT'),'STG_STANDARD'),if(equals(pipeline().parameters.tier,'premium'),if(equals(pipeline().parameters.priority,'high'),'DEV_PREMIUM_HIGH','DEV_PREMIUM_DEFAULT'),'DEV_STANDARD')))"
+          }
+        }
+      },
+      {
+        "name": "SetRoutingKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedEnvLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "routing_key",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.priority,'high'),if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),'ROUTE_FAST_DEDICATED','ROUTE_FAST_SHARED'),'ROUTE_NORMAL_PRIORITY'),if(equals(pipeline().parameters.priority,'medium'),if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),'ROUTE_MED_DEDICATED','ROUTE_MED_SHARED'),'ROUTE_MED_DEFAULT'),if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),'ROUTE_LOW_DEDICATED','ROUTE_LOW_SHARED'),'ROUTE_LOW_DEFAULT')))"
+          }
+        }
+      },
+      {
+        "name": "CheckHighPriorityProdPremium",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRoutingKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env,'prod'),and(equals(pipeline().parameters.tier,'premium'),equals(pipeline().parameters.priority,'high')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetCopyQueryTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND priority_flag = 1 ORDER BY created_at DESC')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetCopyQueryFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),concat('SELECT * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND tier_level = 2'),concat('SELECT * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND tier_level = 1')),if(equals(pipeline().parameters.env,'staging'),if(equals(pipeline().parameters.priority,'high'),concat('SELECT TOP 5000 * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''''),concat('SELECT TOP 1000 * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,'''')),if(equals(pipeline().parameters.priority,'high'),concat('SELECT TOP 500 * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''''),concat('SELECT TOP 100 * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''''))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyTransactionData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckHighPriorityProdPremium",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@if(equals(variables('copy_query'),''),if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),concat('SELECT * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND env = ''prod'' AND tier = ''premium'''),concat('SELECT * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND env = ''prod''')),concat('SELECT TOP 200 * FROM dbo.transactions WHERE batch_id = ''',pipeline().parameters.batch_id,'''')),variables('copy_query'))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "created_at",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "priority_flag"
+                },
+                "sink": {
+                  "name": "priority_flag",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

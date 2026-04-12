@@ -1,0 +1,295 @@
+{
+  "name": "foreach_conditional_copy_deep_branch",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "table_list": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      },
+      "load_type": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "current_table": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, schema_name, is_active, load_priority FROM metadata.control_table WHERE environment = ''', pipeline().parameters.env, ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetProcessingStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupTableMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(activity('LookupTableMetadata').output.value), 0), 'ready', 'empty')"
+          }
+        }
+      },
+      {
+        "name": "ForEachTable",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('LookupTableMetadata').output.value"
+          },
+          "activities": [
+            {
+              "name": "CheckIfTableActive",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(item().is_active, true)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CheckLoadType",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental'))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "CheckLoadPriority",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@greater(int(item().load_priority), 0)"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "CopyTableData",
+                                "type": "Copy",
+                                "dependsOn": [],
+                                "policy": {
+                                  "timeout": "0.01:00:00",
+                                  "retry": 3,
+                                  "retryIntervalInSeconds": 60
+                                },
+                                "typeProperties": {
+                                  "source": {
+                                    "type": "AzureSqlSource",
+                                    "sql_reader_query": {
+                                      "type": "Expression",
+                                      "value": "@concat('SELECT * FROM ', item().schema_name, '.', item().table_name, if(equals(pipeline().parameters.load_type, 'incremental'), concat(' WHERE modified_date >= DATEADD(day, -1, GETDATE()) AND batch_id = ''', pipeline().parameters.batch_id, ''''), ''))"
+                                    }
+                                  },
+                                  "sink": {
+                                    "type": "AzureDatabricksDeltaLakeSink"
+                                  },
+                                  "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                      {
+                                        "source": {
+                                          "name": "src_col"
+                                        },
+                                        "sink": {
+                                          "name": "tgt_col",
+                                          "type": "String"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "enableStaging": false
+                                },
+                                "input_dataset_definitions": [
+                                  {
+                                    "type": "AzureSqlSource",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_sql",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ],
+                                "output_dataset_definitions": [
+                                  {
+                                    "type": "AzureDatabricksDeltaLakeSink",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_delta",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "name": "RunDatabricksTransform",
+                                "type": "DatabricksNotebook",
+                                "dependsOn": [
+                                  {
+                                    "activity": "CopyTableData",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "typeProperties": {
+                                  "notebookPath": {
+                                    "type": "Expression",
+                                    "value": "@concat('/Workspace/pipelines/', pipeline().parameters.env, '/transform_', item().table_name)"
+                                  },
+                                  "baseParameters": {
+                                    "table_name": {
+                                      "type": "Expression",
+                                      "value": "@item().table_name"
+                                    },
+                                    "schema_name": {
+                                      "type": "Expression",
+                                      "value": "@item().schema_name"
+                                    },
+                                    "batch_id": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.batch_id"
+                                    },
+                                    "load_type": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.load_type"
+                                    },
+                                    "environment": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.env"
+                                    }
+                                  }
+                                },
+                                "linkedServiceName": {
+                                  "referenceName": "ls_databricks",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "NotifyLowPriority",
+                                "type": "WebActivity",
+                                "dependsOn": [],
+                                "typeProperties": {
+                                  "url": {
+                                    "type": "Expression",
+                                    "value": "@concat('https://hooks.slack.com/services/', pipeline().parameters.env, '/webhook')"
+                                  },
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json"
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"text\": \"Skipped low priority table: ', item().schema_name, '.', item().table_name, ' in batch ', pipeline().parameters.batch_id, ' (priority: ', item().load_priority, ')\"}'))"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": []
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            },
+            {
+              "name": "LogTableProcessing",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "CheckIfTableActive",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging-api.', pipeline().parameters.env, '.internal/api/log')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"batch_id\": \"', pipeline().parameters.batch_id, '\", \"table\": \"', item().table_name, '\", \"status\": \"processed\", \"is_active\": ', string(item().is_active), ', \"load_type\": \"', pipeline().parameters.load_type, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

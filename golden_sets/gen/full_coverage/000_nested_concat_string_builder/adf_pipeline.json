@@ -1,0 +1,218 @@
+{
+  "name": "nested_concat_string_builder",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "eastus"
+      },
+      "dataset_name": {
+        "type": "String",
+        "defaultValue": "sales_data"
+      },
+      "date_suffix": {
+        "type": "String",
+        "defaultValue": "20240101"
+      }
+    },
+    "variables": {
+      "base_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "full_table_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "dynamic_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Set_BasePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "base_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(concat(concat(concat('abfss://', pipeline().parameters.env), concat('-', pipeline().parameters.region)), concat('/', concat('data/', concat(pipeline().parameters.dataset_name, concat('/', pipeline().parameters.date_suffix))))), concat('/', concat(concat(pipeline().parameters.env, concat('_', pipeline().parameters.region)), concat('_', concat(pipeline().parameters.dataset_name, concat('_', pipeline().parameters.date_suffix))))))"
+          }
+        }
+      },
+      {
+        "name": "Set_FullTableName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_BasePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "full_table_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(concat(concat(concat('[', pipeline().parameters.env), concat('_catalog].[', concat(pipeline().parameters.region, concat('_schema].[', concat(concat(pipeline().parameters.dataset_name, concat('_', pipeline().parameters.date_suffix)), ']'))))), ''), '')"
+          }
+        }
+      },
+      {
+        "name": "Set_DynamicQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_FullTableName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(concat('SELECT * FROM ', variables('full_table_name')), concat(' WHERE load_date = ''', concat(concat(concat(substring(pipeline().parameters.date_suffix, 0, 4), '-'), concat(substring(pipeline().parameters.date_suffix, 4, 2), concat('-', substring(pipeline().parameters.date_suffix, 6, 2)))), '''')))"
+          }
+        }
+      },
+      {
+        "name": "Check_Env_And_Region",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Set_DynamicQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.region, 'westus'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Log_ProdOrWest",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "dynamic_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('dynamic_query'), concat(' AND env_flag = ''', concat(concat(pipeline().parameters.env, concat('_', pipeline().parameters.region)), '''')))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Log_NonProd",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "dynamic_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('dynamic_query'), concat(' AND env_flag = ''', concat(concat('non_prod_', concat(pipeline().parameters.env, concat('_', pipeline().parameters.region))), '''')))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Copy_To_DeltaLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Check_Env_And_Region",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@variables('dynamic_query')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "load_date"
+                },
+                "sink": {
+                  "name": "load_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_flag"
+                },
+                "sink": {
+                  "name": "env_flag",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

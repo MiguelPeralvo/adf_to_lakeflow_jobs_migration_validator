@@ -1,0 +1,172 @@
+{
+  "name": "nested_range_and_loop_control",
+  "properties": {
+    "parameters": {
+      "start_index": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "page_size": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "total_pages": {
+        "type": "Int",
+        "defaultValue": 5
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "computed_start": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "page_range": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_page_label": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeDynamicStart",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_start",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(pipeline().parameters.start_index, pipeline().parameters.page_size), div(pipeline().parameters.page_size, 2)))"
+          }
+        }
+      },
+      {
+        "name": "BuildPageRange",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeDynamicStart",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "page_range",
+          "value": {
+            "type": "Expression",
+            "value": "@range(int(variables('computed_start')), add(pipeline().parameters.total_pages, mod(pipeline().parameters.start_index, max(pipeline().parameters.page_size, 1))))"
+          }
+        }
+      },
+      {
+        "name": "LoopOverPages",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "BuildPageRange",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "items": {
+            "type": "Expression",
+            "value": "@variables('page_range')"
+          },
+          "batchCount": 4,
+          "activities": [
+            {
+              "name": "CheckEnvironmentCondition",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.env, 'prod'), greater(item(), add(int(variables('computed_start')), div(pipeline().parameters.total_pages, 2))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunDatabricksNotebook",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_page')"
+                      },
+                      "baseParameters": {
+                        "page_number": {
+                          "type": "Expression",
+                          "value": "@string(item())"
+                        },
+                        "offset": {
+                          "type": "Expression",
+                          "value": "@string(mul(item(), pipeline().parameters.page_size))"
+                        },
+                        "limit": {
+                          "type": "Expression",
+                          "value": "@string(pipeline().parameters.page_size)"
+                        },
+                        "dynamic_range_start": {
+                          "type": "Expression",
+                          "value": "@string(first(range(mul(item(), pipeline().parameters.page_size), add(1, mod(item(), max(pipeline().parameters.page_size, 1))))))"
+                        },
+                        "nested_range_end": {
+                          "type": "Expression",
+                          "value": "@string(last(range(add(mul(item(), pipeline().parameters.page_size), 1), sub(pipeline().parameters.page_size, mod(item(), max(pipeline().parameters.page_size, 1))))))"
+                        },
+                        "env": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalPageLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LoopOverPages",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_page_label",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Completed ', string(length(variables('page_range'))), ' pages starting from offset ', variables('computed_start'), ' in env=', pipeline().parameters.env, ' | nested_range_sample=', string(range(int(variables('computed_start')), min(pipeline().parameters.total_pages, pipeline().parameters.page_size))))"
+          }
+        }
+      }
+    ]
+  }
+}

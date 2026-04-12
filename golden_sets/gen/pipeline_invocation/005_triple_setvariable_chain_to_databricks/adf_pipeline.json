@@ -1,0 +1,191 @@
+{
+  "name": "triple_setvariable_chain_to_databricks",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "base_path": {
+        "type": "String",
+        "defaultValue": "/mnt/data"
+      },
+      "run_id": {
+        "type": "String",
+        "defaultValue": "run_001"
+      }
+    },
+    "variables": {
+      "var_step1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step3": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVar_Step1_BuildBasePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_step1",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_path, '/', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "SetVar_Step2_AppendRunId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Step1_BuildBasePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_step2",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_step1'), '/', pipeline().parameters.run_id)"
+          }
+        }
+      },
+      {
+        "name": "SetVar_Step3_FinalOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Step2_AppendRunId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_step3",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_step2'), '/output_', utcNow('yyyyMMddHHmmss'), '.parquet')"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook_ProcessData",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Step3_FinalOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Workspace/pipelines/', pipeline().parameters.env, '/process_data')"
+          },
+          "baseParameters": {
+            "output_path": {
+              "type": "Expression",
+              "value": "@variables('var_step3')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "run_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.run_id"
+            },
+            "base_path": {
+              "type": "Expression",
+              "value": "@variables('var_step1')"
+            },
+            "full_run_path": {
+              "type": "Expression",
+              "value": "@variables('var_step2')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_adb_workspace",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "WebActivity_NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "RunDatabricksNotebook_ProcessData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.slack.com/services/', pipeline().parameters.env, '/webhook')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"text\":\"Pipeline triple_setvariable_chain_to_databricks completed successfully. Environment: ', pipeline().parameters.env, ', Run ID: ', pipeline().parameters.run_id, ', Output Path: ', variables('var_step3'), '\"}'))"
+          }
+        }
+      }
+    ],
+    "annotations": [
+      "chained-setvariable",
+      "databricks-integration",
+      "multi-step-variable-resolution"
+    ]
+  }
+}

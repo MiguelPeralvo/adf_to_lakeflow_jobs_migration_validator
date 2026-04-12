@@ -1,0 +1,160 @@
+{
+  "name": "foreach_math_index_calculation",
+  "properties": {
+    "parameters": {
+      "item_count": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "batch_size": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "offset": {
+        "type": "Int",
+        "defaultValue": 100
+      }
+    },
+    "variables": {
+      "current_index": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "calculated_position": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "InitializeIndex",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_index",
+          "value": {
+            "type": "Expression",
+            "value": "@string(pipeline().parameters.offset)"
+          }
+        }
+      },
+      {
+        "name": "IterateItems",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "InitializeIndex",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(0,1,2,3,4,5,6,7,8,9)"
+          },
+          "activities": [
+            {
+              "name": "ComputePosition",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "calculated_position",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(add(pipeline().parameters.offset, mul(item(), pipeline().parameters.batch_size)), mod(mul(item(), pipeline().parameters.batch_size), pipeline().parameters.item_count)))"
+                }
+              }
+            },
+            {
+              "name": "CheckWithinBounds",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ComputePosition",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@less(int(variables('calculated_position')), add(pipeline().parameters.offset, mul(pipeline().parameters.item_count, pipeline().parameters.batch_size)))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunDatabricksProcessing",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/process_batch",
+                      "baseParameters": {
+                        "batch_index": {
+                          "type": "Expression",
+                          "value": "@string(item())"
+                        },
+                        "absolute_position": {
+                          "type": "Expression",
+                          "value": "@variables('calculated_position')"
+                        },
+                        "row_start": {
+                          "type": "Expression",
+                          "value": "@string(add(pipeline().parameters.offset, mul(item(), pipeline().parameters.batch_size)))"
+                        },
+                        "row_end": {
+                          "type": "Expression",
+                          "value": "@string(add(add(pipeline().parameters.offset, mul(item(), pipeline().parameters.batch_size)), sub(pipeline().parameters.batch_size, 1)))"
+                        },
+                        "total_items": {
+                          "type": "Expression",
+                          "value": "@string(pipeline().parameters.item_count)"
+                        },
+                        "normalized_index": {
+                          "type": "Expression",
+                          "value": "@string(div(mul(item(), 100), pipeline().parameters.item_count))"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalizeIndex",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IterateItems",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_index",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(pipeline().parameters.offset, mul(pipeline().parameters.item_count, pipeline().parameters.batch_size)))"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "name": "foreach_dynamic_range_math",
+  "properties": {
+    "parameters": {
+      "range_start": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "range_end": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "step_size": {
+        "type": "Int",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "range_count": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "range_array": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "dynamic_range": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_item": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcRangeCount",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "range_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(sub(pipeline().parameters.range_end, pipeline().parameters.range_start), pipeline().parameters.step_size))"
+          }
+        }
+      },
+      {
+        "name": "BuildRangeExpression",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcRangeCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "range_array",
+          "value": {
+            "type": "Expression",
+            "value": "@string(range(pipeline().parameters.range_start, add(1, div(sub(pipeline().parameters.range_end, pipeline().parameters.range_start), pipeline().parameters.step_size))))"
+          }
+        }
+      },
+      {
+        "name": "SetDynamicRangeArray",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildRangeExpression",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_range",
+          "value": {
+            "type": "Expression",
+            "value": "@range(pipeline().parameters.range_start, add(1, div(sub(pipeline().parameters.range_end, pipeline().parameters.range_start), pipeline().parameters.step_size)))"
+          }
+        }
+      },
+      {
+        "name": "IterateOverRange",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetDynamicRangeArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(variables('dynamic_range'))"
+          },
+          "batchCount": 5,
+          "activities": [
+            {
+              "name": "SetCurrentItem",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_item",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(mul(item(), pipeline().parameters.step_size), pipeline().parameters.range_start))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IterateOverRange",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_item",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Processed ', string(length(variables('dynamic_range'))), ' items from ', string(pipeline().parameters.range_start), ' to ', string(pipeline().parameters.range_end), ' with step ', string(pipeline().parameters.step_size))"
+          }
+        }
+      },
+      {
+        "name": "LookupRangeSummary",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetFinalStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS total_items, ', string(pipeline().parameters.range_start), ' AS range_start, ', string(pipeline().parameters.range_end), ' AS range_end, ', string(pipeline().parameters.step_size), ' AS step_size, ', string(div(sub(pipeline().parameters.range_end, pipeline().parameters.range_start), pipeline().parameters.step_size)), ' AS computed_steps FROM INFORMATION_SCHEMA.TABLES')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        },
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        }
+      }
+    ]
+  }
+}

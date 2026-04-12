@@ -1,0 +1,138 @@
+{
+  "name": "nested_ternary_chain_config_selector",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "tier": {
+        "type": "String",
+        "defaultValue": "standard"
+      },
+      "feature_flag": {
+        "type": "String",
+        "defaultValue": "disabled"
+      },
+      "default_config": {
+        "type": "String",
+        "defaultValue": "base_config_v1"
+      }
+    },
+    "variables": {
+      "env_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "tier_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_config": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ResolveEnvConfig",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "env_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),if(equals(pipeline().parameters.tier,'premium'),'prod_premium_config',if(equals(pipeline().parameters.tier,'enterprise'),'prod_enterprise_config','prod_standard_config')),if(equals(pipeline().parameters.env,'staging'),if(equals(pipeline().parameters.tier,'premium'),'staging_premium_config',if(equals(pipeline().parameters.tier,'enterprise'),'staging_enterprise_config','staging_standard_config')),if(equals(pipeline().parameters.env,'qa'),if(equals(pipeline().parameters.tier,'premium'),'qa_premium_config','qa_standard_config'),if(equals(pipeline().parameters.env,'dev'),'dev_default_config',pipeline().parameters.default_config))))"
+          }
+        }
+      },
+      {
+        "name": "ResolveTierConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ResolveEnvConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "tier_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.feature_flag,'enabled'),if(equals(pipeline().parameters.tier,'enterprise'),concat(variables('env_config'),'_feature_enterprise_override'),if(equals(pipeline().parameters.tier,'premium'),concat(variables('env_config'),'_feature_premium_override'),concat(variables('env_config'),'_feature_standard_override'))),if(equals(pipeline().parameters.feature_flag,'beta'),if(equals(pipeline().parameters.env,'prod'),concat(variables('env_config'),'_beta_prod_restricted'),if(equals(pipeline().parameters.env,'staging'),concat(variables('env_config'),'_beta_staging_allowed'),concat(variables('env_config'),'_beta_open'))),variables('env_config')))"
+          }
+        }
+      },
+      {
+        "name": "ComputeFinalConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ResolveTierConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.feature_flag,'enabled')),if(equals(pipeline().parameters.tier,'enterprise'),concat('LOCKED_',variables('tier_config'),'_v3'),if(equals(pipeline().parameters.tier,'premium'),concat('REVIEWED_',variables('tier_config'),'_v2'),concat('APPROVED_',variables('tier_config'),'_v1'))),if(and(equals(pipeline().parameters.env,'staging'),not(equals(pipeline().parameters.feature_flag,'disabled'))),concat('CANDIDATE_',variables('tier_config'),'_rc1'),if(equals(pipeline().parameters.env,'dev'),concat('SNAPSHOT_',variables('tier_config'),'_latest'),if(equals(variables('tier_config'),pipeline().parameters.default_config),concat('FALLBACK_',pipeline().parameters.default_config),concat('RESOLVED_',variables('tier_config'))))))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksWithConfig",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "ComputeFinalConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/config_driven_processing",
+          "baseParameters": {
+            "resolved_config": {
+              "type": "Expression",
+              "value": "@variables('final_config')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "tier": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.tier"
+            },
+            "feature_flag": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.feature_flag"
+            },
+            "fallback_config": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.default_config"
+            },
+            "config_chain_audit": {
+              "type": "Expression",
+              "value": "@concat('env_config=',variables('env_config'),' | tier_config=',variables('tier_config'),' | final_config=',variables('final_config'))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks_workspace",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

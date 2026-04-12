@@ -1,0 +1,208 @@
+{
+  "name": "nested_dynamic_url_builder",
+  "properties": {
+    "parameters": {
+      "base_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com"
+      },
+      "api_version": {
+        "type": "String",
+        "defaultValue": "2023-01-01"
+      },
+      "resource_id": {
+        "type": "String",
+        "defaultValue": "res-12345"
+      },
+      "query_filter": {
+        "type": "String",
+        "defaultValue": "status eq 'active'"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "encoded_filter": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "api_path_segment": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "constructed_url": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "EncodeQueryFilter",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded_filter",
+          "value": {
+            "type": "Expression",
+            "value": "@uriComponent(concat(if(equals(pipeline().parameters.env, 'prod'), concat('$filter=', pipeline().parameters.query_filter, ' and env eq ''prod'''), concat('$filter=', pipeline().parameters.query_filter, ' and env eq ''', pipeline().parameters.env, '''')), '&api-version=', pipeline().parameters.api_version))"
+          }
+        }
+      },
+      {
+        "name": "BuildApiPathSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EncodeQueryFilter",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "api_path_segment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(if(equals(pipeline().parameters.env, 'prod'), '/v2/', concat('/v1-', pipeline().parameters.env, '/')), if(greater(length(pipeline().parameters.resource_id), 0), concat('resources/', uriComponent(pipeline().parameters.resource_id)), 'resources/default'))"
+          }
+        }
+      },
+      {
+        "name": "ConstructFullUrl",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildApiPathSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "constructed_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(if(equals(pipeline().parameters.env, 'prod'), concat('https://', 'api.prod.example.com'), concat(pipeline().parameters.base_url, if(equals(pipeline().parameters.env, 'staging'), '.staging', concat('.', pipeline().parameters.env)))), variables('api_path_segment'), '?', concat(if(equals(pipeline().parameters.env, 'prod'), concat('subscription-key=', uriComponent(concat('pk_', pipeline().parameters.env, '_', pipeline().parameters.resource_id))), concat('dev-key=', uriComponent(concat('dk_', pipeline().parameters.env)))), '&', variables('encoded_filter')))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalUrlWithHeaders",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ConstructFullUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('constructed_url'), if(and(not(equals(pipeline().parameters.query_filter, '')), greater(length(pipeline().parameters.resource_id), 5)), concat('&expand=', uriComponent(concat('details,metadata,', if(equals(pipeline().parameters.env, 'prod'), 'audit_logs', 'debug_logs'))), '&format=json&maxpagesize=', if(equals(pipeline().parameters.env, 'prod'), '1000', '100')), concat('&format=json&maxpagesize=', if(equals(pipeline().parameters.env, 'prod'), '500', '50'))))"
+          }
+        }
+      },
+      {
+        "name": "CallDynamicRestApi",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalUrlWithHeaders",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('final_url')"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "X-Request-Id": {
+              "type": "Expression",
+              "value": "@concat('adf-', pipeline().parameters.env, '-', utcNow('yyyyMMddHHmmss'), '-', pipeline().parameters.resource_id)"
+            },
+            "Authorization": {
+              "type": "Expression",
+              "value": "@concat('Bearer ', if(equals(pipeline().parameters.env, 'prod'), 'PROD_TOKEN_PLACEHOLDER', concat('DEV_TOKEN_', toUpper(pipeline().parameters.env))))"
+            }
+          },
+          "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      },
+      {
+        "name": "CheckApiResponseStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CallDynamicRestApi",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(activity('CallDynamicRestApi').output.statusCode, 200), greater(length(string(activity('CallDynamicRestApi').output)), 10))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogSuccessUrl",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SUCCESS: ', variables('final_url'), ' | Records: ', string(if(contains(string(activity('CallDynamicRestApi').output), 'value'), length(activity('CallDynamicRestApi').output.value), 0)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogFailureUrl",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('FAILURE: URL=', variables('final_url'), ' | env=', pipeline().parameters.env, ' | resource=', pipeline().parameters.resource_id, ' | timestamp=', utcNow())"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

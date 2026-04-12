@@ -1,0 +1,327 @@
+{
+  "name": "nested_if_equals_with_coalesce",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "fallback_value": {
+        "type": "String",
+        "defaultValue": "DEFAULT_BATCH"
+      }
+    },
+    "variables": {
+      "resolved_batch_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "target_schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedBatchId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_batch_id",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(coalesce(pipeline().parameters.batch_id, ''), ''), pipeline().parameters.fallback_value, pipeline().parameters.batch_id)"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironment",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedBatchId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(coalesce(pipeline().parameters.env, 'dev'), 'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetSchemaProd",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "target_schema",
+                "value": "prod_schema"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetSchemaNonProd",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "target_schema",
+                "value": "dev_schema"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetTargetSchema",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "target_schema",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), 'prod_schema', if(equals(pipeline().parameters.env, 'staging'), 'staging_schema', coalesce(variables('target_schema'), 'dev_schema')))"
+          }
+        }
+      },
+      {
+        "name": "CheckBatchExists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetTargetSchema",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(coalesce(variables('resolved_batch_id'), pipeline().parameters.fallback_value), pipeline().parameters.fallback_value))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LookupBatchMetadata",
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT batch_status, record_count FROM ', variables('target_schema'), '.batch_metadata WHERE batch_id = ''', if(equals(coalesce(variables('resolved_batch_id'), ''), ''), pipeline().parameters.fallback_value, variables('resolved_batch_id')), '''')"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_lookup",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": true
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LookupDefaultBatch",
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT TOP 1 batch_id, batch_status, record_count FROM ', variables('target_schema'), '.batch_metadata WHERE batch_id = ''', pipeline().parameters.fallback_value, ''' ORDER BY created_date DESC')"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_lookup",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": true
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "LookupBatchData",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "CheckBatchExists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS total_records FROM ', variables('target_schema'), '.source_data WHERE batch_id = ''', if(equals(coalesce(variables('resolved_batch_id'), ''), ''), pipeline().parameters.fallback_value, variables('resolved_batch_id')), ''' AND env = ''', if(equals(coalesce(pipeline().parameters.env, 'dev'), 'prod'), 'production', if(equals(pipeline().parameters.env, 'staging'), 'staging', 'development')), '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_lookup",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CopyBatchData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT id, batch_id, payload, created_date, ''', if(equals(coalesce(pipeline().parameters.env, 'dev'), 'prod'), 'PROD', if(equals(pipeline().parameters.env, 'staging'), 'STG', 'DEV')), ''' AS env_label FROM ', variables('target_schema'), '.source_data WHERE batch_id = ''', if(equals(coalesce(variables('resolved_batch_id'), ''), ''), pipeline().parameters.fallback_value, variables('resolved_batch_id')), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_identifier",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "data_payload",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_date"
+                },
+                "sink": {
+                  "name": "ingestion_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_label"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_source",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_sink",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

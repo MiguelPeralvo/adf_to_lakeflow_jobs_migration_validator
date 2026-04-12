@@ -1,0 +1,536 @@
+{
+  "name": "end_to_end_chain_all_activity_types",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      },
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": "/Shared/etl/transform"
+      },
+      "api_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/status"
+      },
+      "source_table": {
+        "type": "String",
+        "defaultValue": "dbo.source_data"
+      },
+      "dest_table": {
+        "type": "String",
+        "defaultValue": "delta.dest_data"
+      }
+    },
+    "variables": {
+      "row_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "batch_items": {
+        "type": "Array",
+        "defaultValue": []
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count, MIN(id) AS min_id, MAX(id) AS max_id FROM ', pipeline().parameters.source_table, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_source",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariableRowCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "row_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('LookupSourceMetadata').output.value[0].row_count)"
+          }
+        }
+      },
+      {
+        "name": "IfDataExists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariableRowCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('row_count')), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebActivityNotifyStart",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_url, '/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Batch-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"event\":\"pipeline_start\",\"env\":\"', pipeline().parameters.env, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"row_count\":', variables('row_count'), ',\"timestamp\":\"', utcNow(), '\"}'))"
+                }
+              }
+            },
+            {
+              "name": "DatabricksTransformNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "WebActivityNotifyStart",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.notebook_path"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "source_table": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.source_table"
+                  },
+                  "row_count": {
+                    "type": "Expression",
+                    "value": "@variables('row_count')"
+                  },
+                  "min_id": {
+                    "type": "Expression",
+                    "value": "@string(activity('LookupSourceMetadata').output.value[0].min_id)"
+                  },
+                  "max_id": {
+                    "type": "Expression",
+                    "value": "@string(activity('LookupSourceMetadata').output.value[0].max_id)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "SetVariableProcessingFlag",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "DatabricksTransformNotebook",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(activity('DatabricksTransformNotebook').output.runOutput.status, 'SUCCESS'), 'true', 'false')"
+                }
+              }
+            },
+            {
+              "name": "IfNotebookSucceeded",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "SetVariableProcessingFlag",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(variables('processing_flag'), 'true')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ForEachPartition",
+                    "type": "ForEach",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "isSequential": false,
+                      "batchCount": 4,
+                      "items": {
+                        "type": "Expression",
+                        "value": "@createArray(json(concat('{\"partition\":1,\"min_id\":', string(activity('LookupSourceMetadata').output.value[0].min_id), ',\"max_id\":', string(div(add(int(string(activity('LookupSourceMetadata').output.value[0].min_id)), int(string(activity('LookupSourceMetadata').output.value[0].max_id))), 2)), '}')), json(concat('{\"partition\":2,\"min_id\":', string(add(div(add(int(string(activity('LookupSourceMetadata').output.value[0].min_id)), int(string(activity('LookupSourceMetadata').output.value[0].max_id))), 2), 1)), ',\"max_id\":', string(activity('LookupSourceMetadata').output.value[0].max_id), '}')))"
+                      }
+                    },
+                    "activities": [
+                      {
+                        "name": "CopyPartitionData",
+                        "type": "Copy",
+                        "dependsOn": [],
+                        "policy": {
+                          "timeout": "0.01:00:00",
+                          "retry": 2,
+                          "retryIntervalInSeconds": 30
+                        },
+                        "typeProperties": {
+                          "source": {
+                            "type": "AzureSqlSource",
+                            "sql_reader_query": {
+                              "type": "Expression",
+                              "value": "@concat('SELECT * FROM ', pipeline().parameters.source_table, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND id BETWEEN ', string(item().min_id), ' AND ', string(item().max_id))"
+                            }
+                          },
+                          "sink": {
+                            "type": "AzureDatabricksDeltaLakeSink",
+                            "importSettings": {
+                              "type": "AzureDatabricksDeltaLakeImportCommand"
+                            }
+                          },
+                          "enableStaging": false,
+                          "translator": {
+                            "type": "TabularTranslator",
+                            "mappings": [
+                              {
+                                "source": {
+                                  "name": "id"
+                                },
+                                "sink": {
+                                  "name": "id",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "name"
+                                },
+                                "sink": {
+                                  "name": "name",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "value"
+                                },
+                                "sink": {
+                                  "name": "value",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "batch_id"
+                                },
+                                "sink": {
+                                  "name": "batch_id",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "created_at"
+                                },
+                                "sink": {
+                                  "name": "created_at",
+                                  "type": "String"
+                                }
+                              },
+                              {
+                                "source": {
+                                  "name": "src_col"
+                                },
+                                "sink": {
+                                  "name": "tgt_col",
+                                  "type": "String"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "inputs": [
+                          {
+                            "referenceName": "ds_azure_sql_source",
+                            "type": "DatasetReference"
+                          }
+                        ],
+                        "outputs": [
+                          {
+                            "referenceName": "ds_delta_lake_dest",
+                            "type": "DatasetReference"
+                          }
+                        ],
+                        "input_dataset_definitions": [
+                          {
+                            "type": "AzureSqlSource",
+                            "schema": [],
+                            "linkedServiceName": {
+                              "referenceName": "ls_sql",
+                              "type": "LinkedServiceReference"
+                            }
+                          }
+                        ],
+                        "output_dataset_definitions": [
+                          {
+                            "type": "AzureDatabricksDeltaLakeSink",
+                            "schema": [],
+                            "linkedServiceName": {
+                              "referenceName": "ls_delta",
+                              "type": "LinkedServiceReference"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "IfPartitionValidation",
+                        "type": "IfCondition",
+                        "dependsOn": [
+                          {
+                            "activity": "CopyPartitionData",
+                            "dependencyConditions": [
+                              "Succeeded"
+                            ]
+                          }
+                        ],
+                        "typeProperties": {
+                          "expression": {
+                            "type": "Expression",
+                            "value": "@greater(activity('CopyPartitionData').output.rowsCopied, 0)"
+                          },
+                          "ifTrueActivities": [
+                            {
+                              "name": "WebActivityLogPartitionSuccess",
+                              "type": "WebActivity",
+                              "dependsOn": [],
+                              "policy": {
+                                "timeout": "0.00:05:00",
+                                "retry": 1,
+                                "retryIntervalInSeconds": 10
+                              },
+                              "typeProperties": {
+                                "url": {
+                                  "type": "Expression",
+                                  "value": "@concat(pipeline().parameters.api_url, '/log')"
+                                },
+                                "method": "POST",
+                                "headers": {
+                                  "Content-Type": "application/json"
+                                },
+                                "body": {
+                                  "type": "Expression",
+                                  "value": "@json(concat('{\"event\":\"partition_copy_success\",\"partition\":', string(item().partition), ',\"rows_copied\":', string(activity('CopyPartitionData').output.rowsCopied), ',\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                                }
+                              }
+                            }
+                          ],
+                          "ifFalseActivities": [
+                            {
+                              "name": "WebActivityLogPartitionEmpty",
+                              "type": "WebActivity",
+                              "dependsOn": [],
+                              "policy": {
+                                "timeout": "0.00:05:00",
+                                "retry": 1,
+                                "retryIntervalInSeconds": 10
+                              },
+                              "typeProperties": {
+                                "url": {
+                                  "type": "Expression",
+                                  "value": "@concat(pipeline().parameters.api_url, '/log')"
+                                },
+                                "method": "POST",
+                                "headers": {
+                                  "Content-Type": "application/json"
+                                },
+                                "body": {
+                                  "type": "Expression",
+                                  "value": "@json(concat('{\"event\":\"partition_copy_empty\",\"partition\":', string(item().partition), ',\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "WebActivityNotifyNotebookFailure",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:05:00",
+                      "retry": 1,
+                      "retryIntervalInSeconds": 10
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.api_url, '/alert')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"event\":\"notebook_failed\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"notebook_path\":\"', pipeline().parameters.notebook_path, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebActivityNotifyNoData",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 10
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_url, '/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"event\":\"no_data_found\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"source_table\":\"', pipeline().parameters.source_table, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivityFinalCallback",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IfDataExists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_url, '/callback')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run-Id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"event\":\"pipeline_complete\",\"pipeline_name\":\"', pipeline().Pipeline, '\",\"run_id\":\"', pipeline().RunId, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"row_count\":', variables('row_count'), ',\"processing_flag\":\"', variables('processing_flag'), '\",\"dest_table\":\"', pipeline().parameters.dest_table, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+          }
+        }
+      }
+    ],
+    "annotations": [
+      "full_e2e",
+      "stress_test",
+      "all_activity_types",
+      "output_chaining",
+      "three_level_nesting"
+    ]
+  }
+}

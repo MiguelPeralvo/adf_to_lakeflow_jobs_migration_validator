@@ -1,0 +1,254 @@
+{
+  "name": "nested_union_intersection_arrays",
+  "properties": {
+    "parameters": {
+      "list_a_query": {
+        "type": "String",
+        "defaultValue": "SELECT id, name FROM dbo.list_a"
+      },
+      "list_b_query": {
+        "type": "String",
+        "defaultValue": "SELECT id, name FROM dbo.list_b"
+      },
+      "merge_strategy": {
+        "type": "String",
+        "defaultValue": "union"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "merged_ids": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "final_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupListA",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.list_a_query"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "LookupListB",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.list_b_query"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetMergedIds",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupListA",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "LookupListB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "merged_ids",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.merge_strategy, 'union'), union(activity('LookupListA').output.value, activity('LookupListB').output.value), if(equals(pipeline().parameters.merge_strategy, 'intersection'), intersection(activity('LookupListA').output.value, activity('LookupListB').output.value), if(equals(pipeline().parameters.env, 'prod'), intersection(activity('LookupListA').output.value, activity('LookupListB').output.value), union(activity('LookupListA').output.value, activity('LookupListB').output.value))))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetMergedIds",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "final_query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM dbo.master_data WHERE id IN (', join(if(equals(pipeline().parameters.merge_strategy, 'union'), union(activity('LookupListA').output.value, activity('LookupListB').output.value), intersection(activity('LookupListA').output.value, activity('LookupListB').output.value)), ','), ') AND env = ''', pipeline().parameters.env, '''')"
+          }
+        }
+      },
+      {
+        "name": "ForEachMergedRecord",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 20,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(if(equals(pipeline().parameters.merge_strategy, 'union'), string(length(union(activity('LookupListA').output.value, activity('LookupListB').output.value))), string(length(intersection(activity('LookupListA').output.value, activity('LookupListB').output.value)))))"
+          },
+          "activities": [
+            {
+              "name": "LogBatchCount",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Processing batch size: ', item())"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyMergedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "ForEachMergedRecord",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@variables('final_query')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "name"
+                },
+                "sink": {
+                  "name": "name",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

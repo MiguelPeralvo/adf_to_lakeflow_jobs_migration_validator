@@ -1,0 +1,334 @@
+{
+  "name": "dynamic_path_resolution_deep_conditions",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "base_url": {
+        "type": "String",
+        "defaultValue": "https://storage.blob.core.windows.net"
+      },
+      "container_name": {
+        "type": "String",
+        "defaultValue": "raw-data"
+      },
+      "folder_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "file_prefix": {
+        "type": "String",
+        "defaultValue": "Sales_Export"
+      }
+    },
+    "variables": {
+      "resolved_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "normalized_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "full_file_name": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetNormalizedEnv",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "normalized_env",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(replace(replace(pipeline().parameters.env, ' ', ''), '-', ''))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNormalizedEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_url, '/', toLower(replace(pipeline().parameters.container_name, '-', '_')), '/', variables('normalized_env'), '/', replace(pipeline().parameters.folder_date, '-', '/'))"
+          }
+        }
+      },
+      {
+        "name": "SetFullFileName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "full_file_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toLower(replace(pipeline().parameters.file_prefix, '_', '-')), '-', replace(pipeline().parameters.folder_date, '-', ''), '-', variables('normalized_env'), '.parquet')"
+          }
+        }
+      },
+      {
+        "name": "LookupFileMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetFullFileName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT file_name, file_size, status FROM dbo.file_registry WHERE file_path = ''', variables('resolved_path'), '/', variables('full_file_name'), ''' AND environment = ''', variables('normalized_env'), '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CheckEnvIsProduction",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupFileMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('normalized_env'), 'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebNotifyProdExecution",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.base_url, '/api/notify?env=', variables('normalized_env'), '&file=', variables('full_file_name'))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"dynamic_path_resolution_deep_conditions\",\"env\":\"', variables('normalized_env'), '\",\"path\":\"', concat(variables('resolved_path'), '/', variables('full_file_name')), '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckFileExists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvIsProduction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(activity('LookupFileMetadata').output.count, 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyResolvedData",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM dbo.', toLower(replace(pipeline().parameters.file_prefix, '_', '')), '_', variables('normalized_env'), ' WHERE load_date = ''', pipeline().parameters.folder_date, '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "load_date"
+                      },
+                      "sink": {
+                        "name": "load_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "file_path"
+                      },
+                      "sink": {
+                        "name": "file_path",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [],
+              "outputs": [],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckPathContainsSpecialChars",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckFileExists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(indexOf(concat(variables('resolved_path'), '/', variables('full_file_name')), ' '), -1), equals(toLower(concat(replace(variables('resolved_path'), '/', '_'), '__', replace(variables('full_file_name'), '.', '_'))), concat(replace(variables('resolved_path'), '/', '_'), '__', replace(variables('full_file_name'), '.', '_'))))"
+          }
+        },
+        "ifTrueActivities": [
+          {
+            "name": "WebLogCleanPath",
+            "type": "WebActivity",
+            "dependsOn": [],
+            "userProperties": [],
+            "typeProperties": {
+              "url": {
+                "type": "Expression",
+                "value": "@concat(pipeline().parameters.base_url, '/api/log')"
+              },
+              "method": "POST",
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "type": "Expression",
+                "value": "@json(concat('{\"message\":\"Path validated\",\"resolved_full_path\":\"', concat(variables('resolved_path'), '/', variables('full_file_name')), '\",\"normalized_key\":\"', toLower(concat(replace(replace(variables('resolved_path'), '/', '_'), ' ', ''), '_', replace(replace(variables('full_file_name'), '.', '_'), '-', '_'))), '\"}'))"
+              }
+            }
+          }
+        ],
+        "ifFalseActivities": []
+      },
+      {
+        "name": "WebFinalCallback",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckPathContainsSpecialChars",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_url, '/api/callback?pipeline=dynamic_path_resolution_deep_conditions&env=', variables('normalized_env'), '&path=', replace(concat(variables('resolved_path'), '/', variables('full_file_name')), '/', '%2F'))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"status\":\"completed\",\"env\":\"', variables('normalized_env'), '\",\"resolved_path\":\"', variables('resolved_path'), '\",\"file_name\":\"', variables('full_file_name'), '\",\"completion_time\":\"', utcNow(), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

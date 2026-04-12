@@ -1,0 +1,204 @@
+{
+  "name": "multi_lookup_chain_to_foreach",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "schema_name": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "variables": {
+      "combined_results": {
+        "type": "Array",
+        "defaultValue": []
+      }
+    },
+    "activities": [
+      {
+        "name": "Lookup_BatchMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, load_type FROM ', pipeline().parameters.schema_name, '.batch_metadata WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, ''' AND is_active = 1')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Lookup_IncrementalConfig",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "Lookup_BatchMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, watermark_column, last_watermark FROM ', pipeline().parameters.schema_name, '.incremental_config WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariable_CombinedResults",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Lookup_IncrementalConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "combined_results",
+          "value": {
+            "type": "Expression",
+            "value": "@union(activity('Lookup_BatchMetadata').output.value, activity('Lookup_IncrementalConfig').output.value)"
+          }
+        }
+      },
+      {
+        "name": "ForEach_ProcessTables",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_CombinedResults",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 10,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(variables('combined_results'))"
+          },
+          "activities": [
+            {
+              "name": "Copy_TableData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.schema_name, '.', item().table_name, ' WHERE 1=1')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                },
+                "enableStaging": false
+              },
+              "inputs": [
+                {
+                  "referenceName": "ds_azure_sql_source",
+                  "type": "DatasetReference"
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_delta_lake_sink",
+                  "type": "DatasetReference"
+                }
+              ],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

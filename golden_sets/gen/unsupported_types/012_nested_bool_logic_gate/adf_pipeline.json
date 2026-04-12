@@ -1,0 +1,323 @@
+{
+  "name": "nested_bool_logic_gate",
+  "properties": {
+    "parameters": {
+      "flag_a": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "flag_b": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "flag_c": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "gate_result": {
+        "type": "String",
+        "defaultValue": "NONE"
+      },
+      "execution_path": {
+        "type": "String",
+        "defaultValue": "UNKNOWN"
+      },
+      "final_status": {
+        "type": "String",
+        "defaultValue": "PENDING"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVar_EvaluateGateResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "gate_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(or(pipeline().parameters.flag_a, pipeline().parameters.flag_b), not(and(not(pipeline().parameters.flag_c), equals(pipeline().parameters.env, 'dev')))), 'PASS', 'FAIL')"
+          }
+        }
+      },
+      {
+        "name": "SetVar_DetermineExecutionPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_EvaluateGateResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "execution_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(variables('gate_result'), 'PASS'), or(equals(pipeline().parameters.run_mode, 'full'), and(equals(pipeline().parameters.run_mode, 'incremental'), not(equals(pipeline().parameters.env, 'sandbox'))))), 'PRIMARY', 'FALLBACK')"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_PrimaryGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVar_DetermineExecutionPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('execution_path'), 'PRIMARY'), or(and(pipeline().parameters.flag_a, not(and(pipeline().parameters.flag_b, not(pipeline().parameters.flag_c)))), and(not(pipeline().parameters.flag_b), or(pipeline().parameters.flag_c, equals(pipeline().parameters.env, 'prod')))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetVar_PrimaryPass",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_status",
+                "value": "PRIMARY_GATE_PASSED"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetVar_PrimaryFail",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_status",
+                "value": "PRIMARY_GATE_FAILED"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_SecondaryGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_PrimaryGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(and(not(or(and(not(pipeline().parameters.flag_a), pipeline().parameters.flag_b), and(pipeline().parameters.flag_c, not(equals(pipeline().parameters.env, 'staging'))))), equals(variables('gate_result'), 'PASS')), and(equals(pipeline().parameters.run_mode, 'full'), not(and(not(pipeline().parameters.flag_a), not(pipeline().parameters.flag_c)))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebActivity_NotifySecondaryPass",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.example.com/api/notify/', pipeline().parameters.env, '/secondary-pass')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_bool_logic_gate\",\"gate\":\"secondary\",\"result\":\"PASS\",\"flag_a\":\"', string(pipeline().parameters.flag_a), '\",\"flag_b\":\"', string(pipeline().parameters.flag_b), '\",\"flag_c\":\"', string(pipeline().parameters.flag_c), '\",\"env\":\"', pipeline().parameters.env, '\",\"run_mode\":\"', pipeline().parameters.run_mode, '\",\"execution_path\":\"', variables('execution_path'), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebActivity_NotifySecondaryFail",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.example.com/api/notify/secondary-fail",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_bool_logic_gate\",\"gate\":\"secondary\",\"result\":\"FAIL\",\"final_status\":\"', variables('final_status'), '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_TertiaryDeepNested",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_SecondaryGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(and(pipeline().parameters.flag_a, or(not(pipeline().parameters.flag_b), and(pipeline().parameters.flag_c, not(and(equals(pipeline().parameters.env, 'dev'), not(equals(pipeline().parameters.run_mode, 'full'))))))), not(and(not(pipeline().parameters.flag_a), not(or(pipeline().parameters.flag_b, pipeline().parameters.flag_c))))), not(and(equals(variables('gate_result'), 'FAIL'), and(not(pipeline().parameters.flag_a), or(not(pipeline().parameters.flag_c), equals(pipeline().parameters.env, 'sandbox'))))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetVar_TertiaryPass",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_status",
+                "value": "ALL_GATES_PASSED"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetVar_TertiaryFail",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_status",
+                "value": "TERTIARY_GATE_BLOCKED"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVar_FinalStatusCapture",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_TertiaryDeepNested",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(variables('final_status'), 'ALL_GATES_PASSED'), or(not(and(not(pipeline().parameters.flag_a), and(not(pipeline().parameters.flag_b), not(pipeline().parameters.flag_c)))), equals(pipeline().parameters.env, 'prod'))), concat('COMPLETED_', pipeline().parameters.env, '_', pipeline().parameters.run_mode), concat('BLOCKED_', variables('execution_path')))"
+          }
+        }
+      },
+      {
+        "name": "WebActivity_FinalCallback",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetVar_FinalStatusCapture",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.example.com/pipelines/nested_bool_logic_gate/runs/', pipeline().RunId, '/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"nested_bool_logic_gate\",\"run_id\":\"', pipeline().RunId, '\",\"final_status\":\"', variables('final_status'), '\",\"gate_result\":\"', variables('gate_result'), '\",\"execution_path\":\"', variables('execution_path'), '\",\"parameters\":{\"flag_a\":', string(pipeline().parameters.flag_a), ',\"flag_b\":', string(pipeline().parameters.flag_b), ',\"flag_c\":', string(pipeline().parameters.flag_c), ',\"env\":\"', pipeline().parameters.env, '\",\"run_mode\":\"', pipeline().parameters.run_mode, '\"}}'))"
+          }
+        }
+      }
+    ]
+  }
+}

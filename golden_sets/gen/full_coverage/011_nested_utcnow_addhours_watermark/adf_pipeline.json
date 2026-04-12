@@ -1,0 +1,343 @@
+{
+  "name": "nested_utcnow_addhours_watermark",
+  "properties": {
+    "parameters": {
+      "offset_hours": {
+        "type": "Int",
+        "defaultValue": -6
+      },
+      "watermark_format": {
+        "type": "String",
+        "defaultValue": "yyyy-MM-dd HH:mm:ss"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "table_name": {
+        "type": "String",
+        "defaultValue": "dbo.sales_transactions"
+      }
+    },
+    "variables": {
+      "watermark_start": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "watermark_end": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "record_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetWatermarkEnd",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "watermark_end",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(utcnow(), pipeline().parameters.watermark_format)"
+          }
+        }
+      },
+      {
+        "name": "SetWatermarkStart",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetWatermarkEnd",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "watermark_start",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addHours(utcnow(), pipeline().parameters.offset_hours), pipeline().parameters.watermark_format)"
+          }
+        }
+      },
+      {
+        "name": "LookupRecordCount",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetWatermarkStart",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count FROM ', pipeline().parameters.table_name, ' WHERE modified_date >= ''', variables('watermark_start'), ''' AND modified_date < ''', variables('watermark_end'), '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetRecordCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupRecordCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "record_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('LookupRecordCount').output.firstRow.row_count)"
+          }
+        }
+      },
+      {
+        "name": "CheckRecordsExist",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRecordCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('record_count')), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyIncrementalData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.table_name, ' WHERE modified_date >= ''', formatDateTime(addHours(utcnow(), pipeline().parameters.offset_hours), pipeline().parameters.watermark_format), ''' AND modified_date < ''', formatDateTime(utcnow(), pipeline().parameters.watermark_format), '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "id"
+                      },
+                      "sink": {
+                        "name": "id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "modified_date"
+                      },
+                      "sink": {
+                        "name": "modified_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                },
+                "enableStaging": false
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogNoRecords",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "record_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(0)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyWatermarkData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckRecordsExist",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ''', pipeline().parameters.env, ''' AS environment, ''', pipeline().parameters.table_name, ''' AS table_name, ''', formatDateTime(addHours(utcnow(), pipeline().parameters.offset_hours), pipeline().parameters.watermark_format), ''' AS watermark_start, ''', formatDateTime(utcnow(), pipeline().parameters.watermark_format), ''' AS watermark_end, ', variables('record_count'), ' AS rows_copied')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "table_name"
+                },
+                "sink": {
+                  "name": "table_name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "watermark_start"
+                },
+                "sink": {
+                  "name": "watermark_start",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "watermark_end"
+                },
+                "sink": {
+                  "name": "watermark_end",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "rows_copied"
+                },
+                "sink": {
+                  "name": "rows_copied",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

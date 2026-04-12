@@ -1,0 +1,204 @@
+{
+  "name": "nested_xpath_xml_extractor",
+  "properties": {
+    "parameters": {
+      "xml_source": {
+        "type": "String",
+        "defaultValue": "<config><database><host>sqlserver01.database.windows.net</host><port>1433</port><name>analytics_db</name></database><settings><timeout>30</timeout><retry>3</retry><env_override prod=\"prod-db\" staging=\"staging-db\" dev=\"dev-db\"/></settings></config>"
+      },
+      "xpath_query": {
+        "type": "String",
+        "defaultValue": "/config/database/host"
+      },
+      "fallback_value": {
+        "type": "String",
+        "defaultValue": "default-host.database.windows.net"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "extracted_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "xml_is_valid": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupXmlValidation",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT CASE WHEN ''', replace(pipeline().parameters.xml_source, '''', ''''''), ''' IS NOT NULL THEN 1 ELSE 0 END AS xml_valid, ''', pipeline().parameters.env, ''' AS current_env')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariableXmlValid",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupXmlValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "xml_is_valid",
+          "value": {
+            "type": "Expression",
+            "value": "@string(equals(string(xpath(xml(pipeline().parameters.xml_source), 'count(/config)')), '1'))"
+          }
+        }
+      },
+      {
+        "name": "SetVariableExtractedXPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVariableXmlValid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "extracted_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('xml_is_valid'), 'true'), if(greater(length(xpath(xml(pipeline().parameters.xml_source), concat(pipeline().parameters.xpath_query, '/text()'))), 0), string(first(xpath(xml(pipeline().parameters.xml_source), concat(pipeline().parameters.xpath_query, '/text()')))), if(greater(length(xpath(xml(pipeline().parameters.xml_source), concat('/config/settings/env_override/@', pipeline().parameters.env))), 0), string(first(xpath(xml(pipeline().parameters.xml_source), concat('/config/settings/env_override/@', pipeline().parameters.env)))), pipeline().parameters.fallback_value)), pipeline().parameters.fallback_value)"
+          }
+        }
+      },
+      {
+        "name": "CheckExtractedValueNotFallback",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariableExtractedXPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(variables('extracted_value'), pipeline().parameters.fallback_value)), greater(length(variables('extracted_value')), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebCallWithExtractedConfig",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://config-service-', pipeline().parameters.env, '.azurewebsites.net/api/register?host=', encodeUriComponent(variables('extracted_value')), '&port=', if(greater(length(xpath(xml(pipeline().parameters.xml_source), '/config/database/port/text()')), 0), string(first(xpath(xml(pipeline().parameters.xml_source), '/config/database/port/text()'))), '1433'), '&db=', if(greater(length(xpath(xml(pipeline().parameters.xml_source), '/config/database/name/text()')), 0), string(first(xpath(xml(pipeline().parameters.xml_source), '/config/database/name/text()'))), 'default_db'))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "X-Timeout": {
+                    "type": "Expression",
+                    "value": "@if(greater(length(xpath(xml(pipeline().parameters.xml_source), '/config/settings/timeout/text()')), 0), string(first(xpath(xml(pipeline().parameters.xml_source), '/config/settings/timeout/text()'))), '30')"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"host\":\"', variables('extracted_value'), '\",\"xpath_used\":\"', pipeline().parameters.xpath_query, '\",\"env\":\"', pipeline().parameters.env, '\",\"retry_count\":', if(greater(length(xpath(xml(pipeline().parameters.xml_source), '/config/settings/retry/text()')), 0), string(first(xpath(xml(pipeline().parameters.xml_source), '/config/settings/retry/text()'))), '1'), ',\"nested_db_name\":\"', if(greater(length(xpath(xml(pipeline().parameters.xml_source), '/config/database/name/text()')), 0), string(first(xpath(xml(pipeline().parameters.xml_source), '/config/database/name/text()'))), 'unknown'), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebCallFallbackNotification",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://config-service-', pipeline().parameters.env, '.azurewebsites.net/api/fallback-alert')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"message\":\"XPath extraction fell back to default\",\"xpath_query\":\"', pipeline().parameters.xpath_query, '\",\"fallback_value\":\"', pipeline().parameters.fallback_value, '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivityPostProcessing",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckExtractedValueNotFallback",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://audit-service-', pipeline().parameters.env, '.azurewebsites.net/api/log-extraction')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_xpath_xml_extractor\",\"run_id\":\"', pipeline().RunId, '\",\"extracted_value\":\"', variables('extracted_value'), '\",\"was_fallback\":', string(equals(variables('extracted_value'), pipeline().parameters.fallback_value)), ',\"xml_valid\":', variables('xml_is_valid'), ',\"all_db_nodes_count\":\"', string(xpath(xml(pipeline().parameters.xml_source), 'count(/config/database/*)')), '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

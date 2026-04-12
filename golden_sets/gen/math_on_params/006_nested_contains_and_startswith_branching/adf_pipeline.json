@@ -1,0 +1,177 @@
+{
+  "name": "nested_contains_and_startswith_branching",
+  "properties": {
+    "parameters": {
+      "file_name": {
+        "type": "String",
+        "defaultValue": "report_sales_2024.csv"
+      },
+      "allowed_prefixes": {
+        "type": "String",
+        "defaultValue": "report,summary,data"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "branch_result": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "processing_tier": {
+        "type": "String",
+        "defaultValue": "standard"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetInitialBranchResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "branch_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(contains(pipeline().parameters.allowed_prefixes, 'report'), startsWith(pipeline().parameters.file_name, 'report')), 'prefix_match_report', if(and(contains(pipeline().parameters.allowed_prefixes, 'summary'), startsWith(pipeline().parameters.file_name, 'summary')), 'prefix_match_summary', if(and(contains(pipeline().parameters.allowed_prefixes, 'data'), startsWith(pipeline().parameters.file_name, 'data')), 'prefix_match_data', 'no_prefix_match')))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvAndPrefixMatch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetInitialBranchResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), and(contains(variables('branch_result'), 'prefix_match'), startsWith(pipeline().parameters.file_name, 'report')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTierToPremium",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_tier",
+                "value": "premium"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetTierToBasic",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_tier",
+                "value": "basic"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "NestedContainsStartsWithBranch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvAndPrefixMatch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(contains(pipeline().parameters.file_name, 'sales'), and(startsWith(variables('processing_tier'), 'prem'), or(contains(pipeline().parameters.env, 'prod'), startsWith(pipeline().parameters.env, 'stag'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetBranchResultHighPriority",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_result",
+                "value": "high_priority_sales_processing"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetBranchResultLowPriority",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_result",
+                "value": "standard_processing"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "UpdateFinalProcessingTier",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "NestedContainsStartsWithBranch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_tier",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(contains(variables('branch_result'), 'high_priority'), startsWith(pipeline().parameters.env, 'prod')), 'tier_1_critical', if(and(contains(variables('branch_result'), 'standard'), startsWith(pipeline().parameters.file_name, 'report')), 'tier_2_normal', 'tier_3_low'))"
+          }
+        }
+      },
+      {
+        "name": "NotifyProcessingResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "UpdateFinalProcessingTier",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/adf/', pipeline().parameters.env, '/notify')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"nested_contains_and_startswith_branching\",\"file_name\":\"', pipeline().parameters.file_name, '\",\"branch_result\":\"', variables('branch_result'), '\",\"processing_tier\":\"', variables('processing_tier'), '\",\"env\":\"', pipeline().parameters.env, '\",\"prefix_matched\":', string(and(contains(pipeline().parameters.allowed_prefixes, 'report'), startsWith(pipeline().parameters.file_name, 'report'))), ',\"run_id\":\"', pipeline().RunId, '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

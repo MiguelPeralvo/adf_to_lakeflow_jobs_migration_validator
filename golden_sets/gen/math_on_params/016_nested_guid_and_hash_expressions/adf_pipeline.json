@@ -1,0 +1,178 @@
+{
+  "name": "nested_guid_and_hash_expressions",
+  "properties": {
+    "parameters": {
+      "source_name": {
+        "type": "String",
+        "defaultValue": "default_source"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_id": {
+        "type": "String",
+        "defaultValue": "000"
+      }
+    },
+    "variables": {
+      "unique_guid": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "hashed_filename": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GenerateGuid",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "unique_guid",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.env, '_', substring(guid(), 0, 8), '_', pipeline().parameters.run_id)"
+          }
+        }
+      },
+      {
+        "name": "ComputeHashedFilename",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GenerateGuid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "hashed_filename",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.source_name, '/', substring(concat(guid(), guid()), 0, 12), '_', substring(concat('hash_', pipeline().parameters.run_id, '_', guid()), 5, 8), '.parquet')"
+          }
+        }
+      },
+      {
+        "name": "BuildFinalOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeHashedFilename",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_output_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('abfss://landing@storage', pipeline().parameters.env, '.dfs.core.windows.net/', pipeline().parameters.source_name, '/', substring(guid(), 0, 8), '/', variables('hashed_filename'), '_', substring(concat(guid(), pipeline().parameters.run_id), 0, 16), '_final.parquet')"
+          }
+        }
+      },
+      {
+        "name": "CopyWithUniqueNaming",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "BuildFinalOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT *, ''', variables('unique_guid'), ''' AS batch_guid, ''', substring(concat(guid(), guid()), 0, 16), ''' AS row_hash_prefix FROM ', pipeline().parameters.source_name, '_', pipeline().parameters.env, '_table WHERE run_id = ''', pipeline().parameters.run_id, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_guid"
+                },
+                "sink": {
+                  "name": "batch_guid",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "row_hash_prefix"
+                },
+                "sink": {
+                  "name": "row_hash_prefix",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_source",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_sink",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

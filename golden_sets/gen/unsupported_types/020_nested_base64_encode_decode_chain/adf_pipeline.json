@@ -1,0 +1,123 @@
+{
+  "name": "nested_base64_encode_decode_chain",
+  "properties": {
+    "parameters": {
+      "payload": {
+        "type": "String",
+        "defaultValue": "hello_world"
+      },
+      "encoding_key": {
+        "type": "String",
+        "defaultValue": "secret123"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "encoded_payload": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "double_encoded": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "decoded_result": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "EncodePayloadWithKey",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded_payload",
+          "value": {
+            "type": "Expression",
+            "value": "@base64(concat(pipeline().parameters.payload, ':', pipeline().parameters.encoding_key, ':', pipeline().parameters.env))"
+          }
+        }
+      },
+      {
+        "name": "DoubleEncodePayload",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EncodePayloadWithKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "double_encoded",
+          "value": {
+            "type": "Expression",
+            "value": "@base64(concat('v2_', pipeline().parameters.env, '|', base64(concat(pipeline().parameters.payload, ':', pipeline().parameters.encoding_key))))"
+          }
+        }
+      },
+      {
+        "name": "DecodeAndVerifyChain",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "DoubleEncodePayload",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "decoded_result",
+          "value": {
+            "type": "Expression",
+            "value": "@base64ToString(base64(concat(base64ToString(variables('double_encoded')), '||decoded_check||', base64ToString(variables('encoded_payload')))))"
+          }
+        }
+      },
+      {
+        "name": "PostEncodedPayloadToEndpoint",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "DecodeAndVerifyChain",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.', pipeline().parameters.env, '.example.com/ingest')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Encoded-Auth": {
+              "type": "Expression",
+              "value": "@base64(concat(pipeline().parameters.encoding_key, ':', pipeline().parameters.env))"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"original_payload\":\"', pipeline().parameters.payload, '\",\"single_encoded\":\"', variables('encoded_payload'), '\",\"double_encoded\":\"', variables('double_encoded'), '\",\"decoded_verification\":\"', base64(concat(base64ToString(variables('decoded_result')), ':verified:', pipeline().parameters.env)), '\",\"nested_round_trip\":\"', base64ToString(base64(concat('round_trip_', base64ToString(base64(pipeline().parameters.payload))))), '\"}'))"
+          },
+          "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      }
+    ]
+  }
+}

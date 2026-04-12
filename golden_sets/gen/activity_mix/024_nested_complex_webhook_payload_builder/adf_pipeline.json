@@ -1,0 +1,218 @@
+{
+  "name": "nested_complex_webhook_payload_builder",
+  "properties": {
+    "parameters": {
+      "webhook_url": {
+        "type": "String",
+        "defaultValue": "https://hooks.example.com/webhook"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "correlation_id": {
+        "type": "String",
+        "defaultValue": "00000000-0000-0000-0000-000000000000"
+      },
+      "notify_on_failure": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      }
+    },
+    "variables": {
+      "payload_body": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "status_field": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "metadata_fragment": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "notification_fragment": {
+        "type": "String",
+        "defaultValue": "{}"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupBatchStatus",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_id, status, record_count, error_message, started_at, completed_at FROM dbo.batch_runs WHERE batch_id = ''', pipeline().parameters.batch_id, ''' ORDER BY completed_at DESC')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_batch",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetStatusField",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "status_field",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(activity('LookupBatchStatus').output.firstRow.status, 'SUCCESS'), 'completed', if(equals(activity('LookupBatchStatus').output.firstRow.status, 'PARTIAL'), 'partial_success', 'failed'))"
+          }
+        }
+      },
+      {
+        "name": "SetMetadataFragment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetStatusField",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "metadata_fragment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"environment\":\"', pipeline().parameters.env, '\",\"correlation_id\":\"', pipeline().parameters.correlation_id, '\",\"pipeline_name\":\"', pipeline().Pipeline, '\",\"pipeline_run_id\":\"', pipeline().RunId, '\",\"trigger_type\":\"', pipeline().TriggerType, '\",\"record_count\":', string(activity('LookupBatchStatus').output.firstRow.record_count), ',\"started_at\":\"', string(activity('LookupBatchStatus').output.firstRow.started_at), '\",\"completed_at\":\"', string(activity('LookupBatchStatus').output.firstRow.completed_at), '\"}')"
+          }
+        }
+      },
+      {
+        "name": "SetNotificationFragment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetMetadataFragment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "notification_fragment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"notify_on_failure\":', string(pipeline().parameters.notify_on_failure), ',\"severity\":\"', if(equals(variables('status_field'), 'failed'), 'critical', if(equals(variables('status_field'), 'partial_success'), 'warning', 'info')), '\",\"error_details\":', if(equals(variables('status_field'), 'failed'), concat('\"', string(activity('LookupBatchStatus').output.firstRow.error_message), '\"'), 'null'), ',\"recipients\":', if(equals(pipeline().parameters.env, 'prod'), '[\"ops-team@example.com\",\"data-eng@example.com\"]', '[\"dev-alerts@example.com\"]'), '}')"
+          }
+        }
+      },
+      {
+        "name": "SetPayloadBody",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNotificationFragment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "payload_body",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"schema_version\":\"2.0\",\"event_type\":\"batch_completion\",\"timestamp\":\"', utcNow(), '\",\"status\":\"', variables('status_field'), '\",\"metadata\":', variables('metadata_fragment'), ',\"notification\":', variables('notification_fragment'), ',\"context\":{\"environment\":\"', pipeline().parameters.env, '\",\"is_production\":', if(equals(pipeline().parameters.env, 'prod'), 'true', 'false'), ',\"retry_eligible\":', if(and(not(equals(variables('status_field'), 'completed')), equals(pipeline().parameters.env, 'prod')), 'true', 'false'), ',\"source_system\":\"azure_data_factory\",\"region\":\"', if(equals(pipeline().parameters.env, 'prod'), 'eastus2', if(equals(pipeline().parameters.env, 'staging'), 'eastus', 'centralus')), '\"}}')"
+          }
+        }
+      },
+      {
+        "name": "CheckIfShouldNotify",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetPayloadBody",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('status_field'), 'completed'), and(not(equals(variables('status_field'), 'completed')), equals(pipeline().parameters.notify_on_failure, true)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendWebhookNotification",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.webhook_url"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Correlation-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.correlation_id"
+                  },
+                  "X-Environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "X-Batch-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "X-Pipeline-Run-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().RunId"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(variables('payload_body'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ]
+  }
+}

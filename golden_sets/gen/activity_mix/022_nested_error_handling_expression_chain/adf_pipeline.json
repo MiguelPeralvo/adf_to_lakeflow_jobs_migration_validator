@@ -1,0 +1,276 @@
+{
+  "name": "nested_error_handling_expression_chain",
+  "properties": {
+    "parameters": {
+      "retry_count": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "error_email": {
+        "type": "String",
+        "defaultValue": "alerts@company.com"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "alert_threshold": {
+        "type": "Int",
+        "defaultValue": 5
+      }
+    },
+    "variables": {
+      "error_message": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "error_status": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "should_alert": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "unknown"
+      }
+    },
+    "activities": [
+      {
+        "name": "CallHealthCheckAPI",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": {
+            "value": "@pipeline().parameters.retry_count",
+            "type": "Expression"
+          },
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "value": "@concat('https://api.', pipeline().parameters.env, '.company.com/health')",
+            "type": "Expression"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "value": "@pipeline().parameters.env",
+              "type": "Expression"
+            }
+          }
+        }
+      },
+      {
+        "name": "SetErrorMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CallHealthCheckAPI",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "error_message",
+          "value": {
+            "value": "@if(equals(activity('CallHealthCheckAPI').status, 'Succeeded'), if(contains(string(activity('CallHealthCheckAPI').output), 'error'), coalesce(activity('CallHealthCheckAPI').output.error.message, 'Unknown error in response body'), 'No error detected'), if(not(empty(coalesce(activity('CallHealthCheckAPI').error?.message, ''))), activity('CallHealthCheckAPI').error.message, concat('Activity failed with status: ', activity('CallHealthCheckAPI').status)))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CheckIfErrorExists",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetErrorMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@and(not(equals(variables('error_message'), 'No error detected')), not(empty(variables('error_message'))))",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetStatusOnError",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "error_status",
+                "value": {
+                  "value": "@concat('ERROR_DETECTED_IN_', toUpper(pipeline().parameters.env), '_AT_', utcNow())",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetStatusOnSuccess",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "error_status",
+                "value": {
+                  "value": "@concat('HEALTHY_', toUpper(pipeline().parameters.env))",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetShouldAlert",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIfErrorExists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "should_alert",
+          "value": {
+            "value": "@string(if(and(not(equals(variables('error_message'), 'No error detected')), or(equals(pipeline().parameters.env, 'prod'), greater(pipeline().parameters.alert_threshold, 0))), if(greater(length(variables('error_message')), pipeline().parameters.alert_threshold), true, false), false))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CheckAlertThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetShouldAlert",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(variables('should_alert'), 'true')",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendAlertNotification",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "value": "@concat('https://api.', pipeline().parameters.env, '.company.com/notifications/send')",
+                  "type": "Expression"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "value": "@json(concat('{\"to\":\"', pipeline().parameters.error_email, '\",\"subject\":\"ADF Alert: ', variables('error_status'), '\",\"body\":\"Error Details: ', replace(variables('error_message'), '\"', '\\\"'), '\",\"environment\":\"', pipeline().parameters.env, '\",\"severity\":\"', if(greater(length(variables('error_message')), mul(pipeline().parameters.alert_threshold, 2)), 'CRITICAL', 'WARNING'), '\",\"retryCount\":', string(pipeline().parameters.retry_count), ',\"timestamp\":\"', utcNow(), '\"}'))",
+                  "type": "Expression"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogNoAlertNeeded",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": {
+                  "value": "@concat('No alert needed. Status: ', variables('error_status'), ' | Env: ', pipeline().parameters.env, ' | Threshold: ', string(pipeline().parameters.alert_threshold))",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalErrorStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckAlertThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "error_status",
+          "value": {
+            "value": "@if(equals(variables('should_alert'), 'true'), concat('ALERTED_', variables('error_status'), '_retry_', string(pipeline().parameters.retry_count)), if(equals(variables('error_message'), 'No error detected'), concat('COMPLETED_OK_', pipeline().parameters.env), concat('SUPPRESSED_', variables('error_status'), '_below_threshold_', string(pipeline().parameters.alert_threshold))))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CallFinalStatusAPI",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalErrorStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:03:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "value": "@concat('https://api.', pipeline().parameters.env, '.company.com/pipeline/status')",
+            "type": "Expression"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": {
+              "value": "@pipeline().RunId",
+              "type": "Expression"
+            }
+          },
+          "body": {
+            "value": "@json(concat('{\"pipelineRunId\":\"', pipeline().RunId, '\",\"pipelineName\":\"', pipeline().Pipeline, '\",\"finalStatus\":\"', variables('error_status'), '\",\"errorMessage\":\"', replace(coalesce(variables('error_message'), 'none'), '\"', '\\\"'), '\",\"alertSent\":', variables('should_alert'), ',\"environment\":\"', pipeline().parameters.env, '\",\"retryConfig\":', string(pipeline().parameters.retry_count), ',\"alertThreshold\":', string(pipeline().parameters.alert_threshold), ',\"completedAt\":\"', utcNow(), '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "SetFinalResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CallFinalStatusAPI",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "value": "@if(equals(activity('CallFinalStatusAPI').status, 'Succeeded'), concat('Pipeline completed successfully. Final status: ', variables('error_status'), ' | Alert sent: ', variables('should_alert'), ' | Error: ', if(equals(variables('error_message'), 'No error detected'), 'None', variables('error_message')), ' | API response code: ', coalesce(string(activity('CallFinalStatusAPI').output?.statusCode), '200')), concat('Final status API call failed: ', coalesce(activity('CallFinalStatusAPI').error?.message, 'Unknown failure'), ' | Fallback status: ', variables('error_status')))",
+            "type": "Expression"
+          }
+        }
+      }
+    ]
+  }
+}

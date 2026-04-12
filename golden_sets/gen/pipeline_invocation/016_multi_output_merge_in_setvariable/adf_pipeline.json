@@ -1,0 +1,354 @@
+{
+  "name": "multi_output_merge_in_setvariable",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "merge_key": {
+        "type": "String",
+        "defaultValue": "record_id"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B-00001"
+      }
+    },
+    "variables": {
+      "mergedOutput": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "validationFlag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 merge_key, record_count, last_updated FROM dbo.batch_metadata WHERE env = ''', pipeline().parameters.env, ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_metadata",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "WebActivityGetConfig",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://config-api-', pipeline().parameters.env, '.azurewebsites.net/api/merge-config?batchId=', pipeline().parameters.batch_id, '&mergeKey=', pipeline().parameters.merge_key)"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            }
+          }
+        }
+      },
+      {
+        "name": "CopySourceData",
+        "type": "Copy",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT src_col, status, processed_ts FROM dbo.source_records WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "status"
+                },
+                "sink": {
+                  "name": "tgt_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "processed_ts"
+                },
+                "sink": {
+                  "name": "tgt_processed_ts",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_source",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_target",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetMergedOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "WebActivityGetConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "CopySourceData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "mergedOutput",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"merge_key\":\"', pipeline().parameters.merge_key, '\",\"lookup_record_count\":\"', string(json(string(activity('LookupMetadata').output.firstRow)).record_count), '\",\"lookup_last_updated\":\"', replace(string(json(string(activity('LookupMetadata').output.firstRow)).last_updated), '\"', ''), '\",\"web_config_threshold\":\"', string(json(string(activity('WebActivityGetConfig').output)).threshold), '\",\"web_config_mode\":\"', replace(replace(string(json(string(activity('WebActivityGetConfig').output)).mode), '\"', ''), ' ', '_'), '\",\"copy_rows_read\":\"', string(activity('CopySourceData').output.rowsRead), '\",\"copy_rows_written\":\"', string(activity('CopySourceData').output.rowsCopied), '\",\"merged_signature\":\"', replace(base64(concat(string(json(string(activity('LookupMetadata').output.firstRow)).merge_key), '|', string(activity('CopySourceData').output.rowsCopied), '|', replace(string(json(string(activity('WebActivityGetConfig').output)).mode), '\"', ''))), '=', ''), '\"}')"
+          }
+        }
+      },
+      {
+        "name": "SetValidationFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetMergedOutput",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "validationFlag",
+          "value": {
+            "type": "Expression",
+            "value": "@string(and(greater(int(string(json(variables('mergedOutput')).copy_rows_written)), 0), not(equals(string(json(variables('mergedOutput')).web_config_mode), 'disabled'))))"
+          }
+        }
+      },
+      {
+        "name": "CheckValidationAndProcess",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetValidationFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('validationFlag'), 'True')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunDatabricksNotebookTrue",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/merge_processor')"
+                },
+                "baseParameters": {
+                  "merged_payload": {
+                    "type": "Expression",
+                    "value": "@variables('mergedOutput')"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "merge_key": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.merge_key"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "rows_copied": {
+                    "type": "Expression",
+                    "value": "@string(json(variables('mergedOutput')).copy_rows_written)"
+                  },
+                  "config_mode": {
+                    "type": "Expression",
+                    "value": "@string(json(variables('mergedOutput')).web_config_mode)"
+                  }
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogSkippedBatch",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://config-api-', pipeline().parameters.env, '.azurewebsites.net/api/log-skipped?batchId=', pipeline().parameters.batch_id)"
+                },
+                "method": "POST",
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"reason\":\"validation_failed\",\"flag\":\"', variables('validationFlag'), '\",\"mergedOutput\":', variables('mergedOutput'), '}')"
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalDatabricksAudit",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckValidationAndProcess",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/audit_logger')"
+          },
+          "baseParameters": {
+            "batch_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "merged_output_hash": {
+              "type": "Expression",
+              "value": "@replace(base64(concat(variables('mergedOutput'), '|', variables('validationFlag'))), '=', '')"
+            },
+            "validation_result": {
+              "type": "Expression",
+              "value": "@variables('validationFlag')"
+            },
+            "pipeline_run_id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

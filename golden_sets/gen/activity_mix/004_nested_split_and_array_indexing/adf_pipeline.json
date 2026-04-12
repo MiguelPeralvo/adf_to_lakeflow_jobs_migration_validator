@@ -1,0 +1,194 @@
+{
+  "name": "nested_split_and_array_indexing",
+  "properties": {
+    "parameters": {
+      "delimited_input": {
+        "type": "String",
+        "defaultValue": "alpha-beta-gamma-delta"
+      },
+      "index_position": {
+        "type": "String",
+        "defaultValue": "2"
+      },
+      "fallback": {
+        "type": "String",
+        "defaultValue": "UNKNOWN"
+      }
+    },
+    "variables": {
+      "split_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "selected_element": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetSplitResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "split_result",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SPLIT_COUNT=', string(length(split(pipeline().parameters.delimited_input, '-'))), '|ELEMENT=', split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)])"
+          }
+        }
+      },
+      {
+        "name": "SetSelectedElement",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetSplitResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "selected_element",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(split(pipeline().parameters.delimited_input, '-')), int(pipeline().parameters.index_position)), concat('FOUND_', split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], '_AT_', pipeline().parameters.index_position), concat('FALLBACK_', pipeline().parameters.fallback))"
+          }
+        }
+      },
+      {
+        "name": "CheckElementValidity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetSelectedElement",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(length(split(pipeline().parameters.delimited_input, '-')), int(pipeline().parameters.index_position)), not(equals(split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], pipeline().parameters.fallback)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFinalOutputTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('VALID|', split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], '|INDEX=', pipeline().parameters.index_position, '|NESTED=', if(greater(length(split(pipeline().parameters.delimited_input, '-')), add(int(pipeline().parameters.index_position), 1)), concat(split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], '_NEXT_', split(pipeline().parameters.delimited_input, '-')[add(int(pipeline().parameters.index_position), 1)]), concat(split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], '_LAST')))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFinalOutputFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('INVALID|', pipeline().parameters.fallback, '|REQUESTED_INDEX=', pipeline().parameters.index_position, '|AVAILABLE=', string(length(split(pipeline().parameters.delimited_input, '-'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetQueryParam",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckElementValidity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "selected_element",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(if(equals(variables('final_output'), ''), pipeline().parameters.fallback, split(variables('final_output'), '|')[1]), '_', split(pipeline().parameters.delimited_input, '-')[0])"
+          }
+        }
+      },
+      {
+        "name": "CopyFilteredData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetQueryParam",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM records WHERE category = ''', if(greater(length(split(pipeline().parameters.delimited_input, '-')), int(pipeline().parameters.index_position)), split(pipeline().parameters.delimited_input, '-')[int(pipeline().parameters.index_position)], pipeline().parameters.fallback), ''' AND source_tag = ''', concat(split(pipeline().parameters.delimited_input, '-')[0], '_', variables('selected_element')), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

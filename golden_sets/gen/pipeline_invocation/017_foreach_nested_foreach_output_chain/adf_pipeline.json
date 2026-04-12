@@ -1,0 +1,297 @@
+{
+  "name": "foreach_nested_foreach_output_chain",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "outer_query": {
+        "type": "String",
+        "defaultValue": "SELECT * FROM dbo.outer_control_table WHERE env = 'dev'"
+      },
+      "inner_query": {
+        "type": "String",
+        "defaultValue": "SELECT * FROM dbo.inner_control_table WHERE parent_id = "
+      }
+    },
+    "variables": {
+      "outer_accumulator": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "inner_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupOuterItems",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.outer_query"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_control",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "OuterForEach",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupOuterItems",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('LookupOuterItems').output.value"
+          },
+          "activities": [
+            {
+              "name": "LookupInnerItems",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.inner_query, item().id)"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_control",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": false
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "InnerForEach",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "LookupInnerItems",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@activity('LookupInnerItems').output.value"
+                },
+                "activities": [
+                  {
+                    "name": "CheckInnerCondition",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@equals(item().is_active, true)"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "CopyInnerData",
+                          "type": "Copy",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.01:00:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 60
+                          },
+                          "typeProperties": {
+                            "source": {
+                              "type": "AzureSqlSource",
+                              "sql_reader_query": {
+                                "type": "Expression",
+                                "value": "@concat('SELECT * FROM dbo.', item().table_name, ' WHERE env = ''', pipeline().parameters.env, ''' AND parent_id = ''', item().parent_id, '''')"
+                              }
+                            },
+                            "sink": {
+                              "type": "AzureDatabricksDeltaLakeSink"
+                            },
+                            "translator": {
+                              "type": "TabularTranslator",
+                              "mappings": [
+                                {
+                                  "source": {
+                                    "name": "src_col"
+                                  },
+                                  "sink": {
+                                    "name": "tgt_col",
+                                    "type": "String"
+                                  }
+                                }
+                              ]
+                            },
+                            "enableStaging": false
+                          },
+                          "inputs": [
+                            {
+                              "referenceName": "ds_sql_source",
+                              "type": "DatasetReference"
+                            }
+                          ],
+                          "outputs": [
+                            {
+                              "referenceName": "ds_delta_sink",
+                              "type": "DatasetReference"
+                            }
+                          ],
+                          "input_dataset_definitions": [
+                            {
+                              "type": "AzureSqlSource",
+                              "schema": [],
+                              "linkedServiceName": {
+                                "referenceName": "ls_sql",
+                                "type": "LinkedServiceReference"
+                              }
+                            }
+                          ],
+                          "output_dataset_definitions": [
+                            {
+                              "type": "AzureDatabricksDeltaLakeSink",
+                              "schema": [],
+                              "linkedServiceName": {
+                                "referenceName": "ls_delta",
+                                "type": "LinkedServiceReference"
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "ifFalseActivities": []
+                    }
+                  },
+                  {
+                    "name": "SetInnerResult",
+                    "type": "SetVariable",
+                    "dependsOn": [
+                      {
+                        "activity": "CheckInnerCondition",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "typeProperties": {
+                      "variableName": "inner_result",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat(variables('inner_result'), '|', item().table_name, ':', if(equals(item().is_active, true), 'copied', 'skipped'), ':', item().parent_id)"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "AccumulateOuterResult",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "InnerForEach",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "variableName": "outer_accumulator",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('outer_accumulator'), ';outer_id=', item().id, '[inner_chain=', variables('inner_result'), ']')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivityNotify",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "OuterForEach",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/pipeline-complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"foreach_nested_foreach_output_chain\",\"env\":\"', pipeline().parameters.env, '\",\"status\":\"Succeeded\",\"outer_items_processed\":', length(activity('LookupOuterItems').output.value), ',\"accumulated_results\":\"', replace(variables('outer_accumulator'), '\"', '\\\"'), '\",\"inner_chain_detail\":\"', replace(variables('inner_result'), '\"', '\\\"'), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

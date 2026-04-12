@@ -1,0 +1,299 @@
+{
+  "name": "lookup_chain_five_deep_variable_propagation",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "config_table": {
+        "type": "String",
+        "defaultValue": "dbo.pipeline_config"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east-1"
+      }
+    },
+    "variables": {
+      "var_step1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step3": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step4": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_step5": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Lookup_Step1",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 config_key, config_value FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' AND region = ''', pipeline().parameters.region, ''' AND step_order = 1')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariable_Step1",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Lookup_Step1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "var_step1",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('Lookup_Step1').output.firstRow.config_value"
+          }
+        }
+      },
+      {
+        "name": "Lookup_Step2",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_Step1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 config_key, config_value FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' AND parent_key = ''', variables('var_step1'), ''' AND step_order = 2')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariable_Step2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Lookup_Step2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "var_step2",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('Lookup_Step2').output.firstRow.config_value"
+          }
+        }
+      },
+      {
+        "name": "Lookup_Step3",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_Step2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 config_key, config_value, is_active FROM ', pipeline().parameters.config_table, ' WHERE env = ''', pipeline().parameters.env, ''' AND parent_key = ''', variables('var_step2'), ''' AND region = ''', pipeline().parameters.region, ''' AND step_order = 3')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVariable_Step3",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Lookup_Step3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "var_step3",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('Lookup_Step3').output.firstRow.config_value"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_CheckActive",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_Step3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('Lookup_Step3').output.firstRow.is_active, '1')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Copy_FinalData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM dbo.source_data WHERE config_key = ''', variables('var_step3'), ''' AND env = ''', pipeline().parameters.env, ''' AND region = ''', pipeline().parameters.region, '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "config_key"
+                      },
+                      "sink": {
+                        "name": "config_key",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "region"
+                      },
+                      "sink": {
+                        "name": "region",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,434 @@
+{
+  "name": "deep_nesting_copy_routing_logic",
+  "properties": {
+    "parameters": {
+      "source_type": {
+        "type": "String",
+        "defaultValue": "sql"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east"
+      },
+      "compression_type": {
+        "type": "String",
+        "defaultValue": "gzip"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      }
+    },
+    "variables": {
+      "routing_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT source_config, is_active, priority FROM dbo.pipeline_config WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND region = ''', pipeline().parameters.region, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetRoutingKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "routing_key",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.source_type, '_', pipeline().parameters.env, '_', pipeline().parameters.region)"
+          }
+        }
+      },
+      {
+        "name": "IfConditionLevel1_EnvCheck",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRoutingKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "IfConditionLevel2_RegionCheck",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(equals(pipeline().parameters.region, 'us-east'), or(equals(pipeline().parameters.source_type, 'sql'), equals(pipeline().parameters.source_type, 'oracle')))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "IfConditionLevel3_CompressionCheck",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@and(equals(pipeline().parameters.compression_type, 'gzip'), greater(length(pipeline().parameters.batch_id), 0))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "CopyProdUsEastGzip",
+                          "type": "Copy",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.01:00:00",
+                            "retry": 3,
+                            "retryIntervalInSeconds": 60
+                          },
+                          "typeProperties": {
+                            "source": {
+                              "type": "AzureSqlSource",
+                              "sql_reader_query": {
+                                "type": "Expression",
+                                "value": "@concat('SELECT * FROM dbo.transactions_', pipeline().parameters.env, ' WHERE region = ''', pipeline().parameters.region, ''' AND batch_id = ''', pipeline().parameters.batch_id, ''' AND compression = ''', pipeline().parameters.compression_type, ''' ORDER BY created_date DESC')"
+                              }
+                            },
+                            "sink": {
+                              "type": "AzureDatabricksDeltaLakeSink"
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                              "type": "TabularTranslator",
+                              "mappings": [
+                                {
+                                  "source": {
+                                    "name": "transaction_id"
+                                  },
+                                  "sink": {
+                                    "name": "transaction_id",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "amount"
+                                  },
+                                  "sink": {
+                                    "name": "amount",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "region"
+                                  },
+                                  "sink": {
+                                    "name": "region",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "batch_id"
+                                  },
+                                  "sink": {
+                                    "name": "batch_id",
+                                    "type": "String"
+                                  }
+                                }
+                              ]
+                            },
+                            "input_dataset_definitions": [
+                              {
+                                "type": "AzureSqlSource",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_sql",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ],
+                            "output_dataset_definitions": [
+                              {
+                                "type": "AzureDatabricksDeltaLakeSink",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_delta",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "CopyProdUsEastNoGzip",
+                          "type": "Copy",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.01:00:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 45
+                          },
+                          "typeProperties": {
+                            "source": {
+                              "type": "AzureSqlSource",
+                              "sql_reader_query": {
+                                "type": "Expression",
+                                "value": "@concat('SELECT * FROM dbo.transactions_', pipeline().parameters.env, ' WHERE region = ''', pipeline().parameters.region, ''' AND batch_id = ''', pipeline().parameters.batch_id, ''' AND compression = ''none'' ORDER BY created_date DESC')"
+                              }
+                            },
+                            "sink": {
+                              "type": "AzureDatabricksDeltaLakeSink"
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                              "type": "TabularTranslator",
+                              "mappings": [
+                                {
+                                  "source": {
+                                    "name": "transaction_id"
+                                  },
+                                  "sink": {
+                                    "name": "transaction_id",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "amount"
+                                  },
+                                  "sink": {
+                                    "name": "amount",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "region"
+                                  },
+                                  "sink": {
+                                    "name": "region",
+                                    "type": "String"
+                                  }
+                                }
+                              ]
+                            },
+                            "input_dataset_definitions": [
+                              {
+                                "type": "AzureSqlSource",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_sql",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ],
+                            "output_dataset_definitions": [
+                              {
+                                "type": "AzureDatabricksDeltaLakeSink",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_delta",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "CopyProdOtherRegion",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM dbo.transactions_', pipeline().parameters.env, '_global WHERE region = ''', pipeline().parameters.region, ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink"
+                      },
+                      "enableStaging": false,
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "transaction_id"
+                            },
+                            "sink": {
+                              "name": "transaction_id",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "amount"
+                            },
+                            "sink": {
+                              "name": "amount",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "region"
+                            },
+                            "sink": {
+                              "name": "region",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "source_system"
+                            },
+                            "sink": {
+                              "name": "source_system",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      },
+                      "input_dataset_definitions": [
+                        {
+                          "type": "AzureSqlSource",
+                          "schema": [],
+                          "linkedServiceName": {
+                            "referenceName": "ls_sql",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ],
+                      "output_dataset_definitions": [
+                        {
+                          "type": "AzureDatabricksDeltaLakeSink",
+                          "schema": [],
+                          "linkedServiceName": {
+                            "referenceName": "ls_delta",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetResolvedQueryForDev",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "resolved_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT TOP 1000 * FROM dbo.transactions_dev WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND region = ''', pipeline().parameters.region, '''')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IfConditionLevel1_EnvCheck",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.internal.company.com/api/v2/pipelines/', pipeline().parameters.env, '/notifications')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"deep_nesting_copy_routing_logic\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"region\":\"', pipeline().parameters.region, '\",\"source_type\":\"', pipeline().parameters.source_type, '\",\"routing_key\":\"', variables('routing_key'), '\",\"status\":\"completed\",\"timestamp\":\"', utcNow(), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

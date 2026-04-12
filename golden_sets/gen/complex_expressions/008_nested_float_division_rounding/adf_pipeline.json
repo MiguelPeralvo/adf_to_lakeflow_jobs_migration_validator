@@ -1,0 +1,227 @@
+{
+  "name": "nested_float_division_rounding",
+  "properties": {
+    "parameters": {
+      "numerator": {
+        "type": "Float",
+        "defaultValue": 100.0
+      },
+      "denominator": {
+        "type": "Float",
+        "defaultValue": 3.0
+      },
+      "precision": {
+        "type": "Int",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "rawDivisionResult": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "roundedResult": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "finalOutput": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeRawDivision",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "rawDivisionResult",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(float(pipeline().parameters.numerator), float(pipeline().parameters.denominator)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeRoundedResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeRawDivision",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "roundedResult",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(float(int(mul(div(float(pipeline().parameters.numerator), float(pipeline().parameters.denominator)), float(string(mul(10, int(pipeline().parameters.precision))))))), float(string(mul(10, int(pipeline().parameters.precision))))))"
+          }
+        }
+      },
+      {
+        "name": "ComputeFinalNestedRound",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeRoundedResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "finalOutput",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(float(int(add(mul(div(float(pipeline().parameters.numerator), float(pipeline().parameters.denominator)), mul(10, int(pipeline().parameters.precision))), 0.5))), float(mul(10, int(pipeline().parameters.precision)))))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfResultExceedsThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeFinalNestedRound",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(float(variables('finalOutput')), div(float(pipeline().parameters.numerator), 2.0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunNotebookHighResult",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/nested_float_division_rounding/process_high_result",
+                "baseParameters": {
+                  "raw_division": {
+                    "type": "Expression",
+                    "value": "@variables('rawDivisionResult')"
+                  },
+                  "rounded_result": {
+                    "type": "Expression",
+                    "value": "@variables('roundedResult')"
+                  },
+                  "final_output": {
+                    "type": "Expression",
+                    "value": "@variables('finalOutput')"
+                  },
+                  "numerator": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.numerator)"
+                  },
+                  "denominator": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.denominator)"
+                  },
+                  "precision": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.precision)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunNotebookLowResult",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/nested_float_division_rounding/process_low_result",
+                "baseParameters": {
+                  "raw_division": {
+                    "type": "Expression",
+                    "value": "@variables('rawDivisionResult')"
+                  },
+                  "rounded_result": {
+                    "type": "Expression",
+                    "value": "@variables('roundedResult')"
+                  },
+                  "final_output": {
+                    "type": "Expression",
+                    "value": "@variables('finalOutput')"
+                  },
+                  "numerator": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.numerator)"
+                  },
+                  "denominator": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.denominator)"
+                  },
+                  "precision": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.precision)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunFinalProcessingNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckIfResultExceedsThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/nested_float_division_rounding/final_processing",
+          "baseParameters": {
+            "raw_division": {
+              "type": "Expression",
+              "value": "@variables('rawDivisionResult')"
+            },
+            "rounded_result": {
+              "type": "Expression",
+              "value": "@variables('roundedResult')"
+            },
+            "final_output": {
+              "type": "Expression",
+              "value": "@variables('finalOutput')"
+            },
+            "nested_recompute": {
+              "type": "Expression",
+              "value": "@string(div(float(int(mul(div(float(pipeline().parameters.numerator), float(pipeline().parameters.denominator)), float(string(mul(10, int(pipeline().parameters.precision))))))), float(string(mul(10, int(pipeline().parameters.precision))))))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

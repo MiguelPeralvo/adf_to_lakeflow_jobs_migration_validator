@@ -1,0 +1,54 @@
+{
+  "top_failures": 10,
+  "dimension_failure_counts": {
+    "activity_coverage": 10,
+    "expression_coverage": 10,
+    "control_flow_fidelity": 7
+  },
+  "sample_failures": [
+    {
+      "name": "nested_base64_encode_decode_chain",
+      "score": 54.0,
+      "weakest": [
+        "activity_coverage",
+        "expression_coverage"
+      ]
+    },
+    {
+      "name": "nested_ticks_and_datetime_comparison",
+      "score": 54.0,
+      "weakest": [
+        "activity_coverage",
+        "expression_coverage",
+        "control_flow_fidelity"
+      ]
+    },
+    {
+      "name": "foreach_nested_foreach_conditions",
+      "score": 54.0,
+      "weakest": [
+        "activity_coverage",
+        "expression_coverage",
+        "control_flow_fidelity"
+      ]
+    },
+    {
+      "name": "nested_base64_encode_decode_chain",
+      "score": 54.0,
+      "weakest": [
+        "activity_coverage",
+        "expression_coverage"
+      ]
+    },
+    {
+      "name": "nested_ticks_and_date_diff_calc",
+      "score": 54.0,
+      "weakest": [
+        "activity_coverage",
+        "expression_coverage",
+        "control_flow_fidelity"
+      ]
+    }
+  ],
+  "prompt": "Generate 50 ADF pipelines that specifically stress these converter weaknesses:\n\n- **activity_coverage**: 10/10 lowest-scoring pipelines failed here\n- **expression_coverage**: 10/10 lowest-scoring pipelines failed here\n- **control_flow_fidelity**: 7/10 lowest-scoring pipelines failed here\n\nEach pipeline should:\n- Use the FLAT ADF format (activities at root, NOT inside properties.typeProperties)\n- Use realistic naming (etl_*, extract_*, transform_*)\n- Include 4-8 activities with dependency chains\n- Use pipeline parameters of various types\n- Use expressions 2+ levels deep\n- Include at least one activity referencing upstream activity output\n- Policy values must be numeric (retry: 3, not an expression)\n- Copy activities MUST include input_dataset_definitions and output_dataset_definitions\n\nOutput ONLY valid ADF pipeline JSON."
+}

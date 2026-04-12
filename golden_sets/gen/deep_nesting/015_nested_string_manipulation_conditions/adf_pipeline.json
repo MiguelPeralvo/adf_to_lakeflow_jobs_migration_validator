@@ -1,0 +1,276 @@
+{
+  "name": "nested_string_manipulation_conditions",
+  "properties": {
+    "parameters": {
+      "input_file_name": {
+        "type": "String",
+        "defaultValue": "data_prod_2024.csv"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "delimiter": {
+        "type": "String",
+        "defaultValue": ","
+      },
+      "encoding": {
+        "type": "String",
+        "defaultValue": "UTF-8"
+      }
+    },
+    "variables": {
+      "normalized_file_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "file_prefix": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetNormalizedFileName",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "normalized_file_name",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(concat(substring(pipeline().parameters.input_file_name, 0, indexOf(pipeline().parameters.input_file_name, '.')), '_', pipeline().parameters.env), ' ', '_'), '-', '_')"
+          }
+        }
+      },
+      {
+        "name": "SetFilePrefix",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNormalizedFileName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "file_prefix",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(variables('normalized_file_name'), 0, indexOf(concat(variables('normalized_file_name'), '_'), '_'))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvAndFilePattern",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFilePrefix",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(substring(replace(concat(pipeline().parameters.env, '_suffix'), '_suffix', ''), 0, indexOf(concat(replace(pipeline().parameters.env, 'prod', 'production'), '_end'), '_end')), 'production'), greater(indexOf(concat(variables('normalized_file_name'), pipeline().parameters.delimiter), replace(concat(variables('file_prefix'), pipeline().parameters.delimiter), pipeline().parameters.delimiter, '_delim')), -1))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetProcessingFlagTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('true', substring(replace(pipeline().parameters.encoding, 'UTF-8', ''), 0, 0))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetProcessingFlagFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckDelimiterAndEncoding",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvAndFilePattern",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('processing_flag'), 'true'), or(equals(replace(concat(pipeline().parameters.delimiter, pipeline().parameters.encoding), concat(pipeline().parameters.delimiter, pipeline().parameters.encoding), concat(pipeline().parameters.delimiter, pipeline().parameters.encoding)), concat(',', 'UTF-8')), equals(substring(concat(pipeline().parameters.encoding, '_padded'), indexOf(concat(pipeline().parameters.encoding, '_padded'), '-'), add(indexOf(concat(pipeline().parameters.encoding, '_padded'), '-'), 1)), '-')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyProcessedData",
+              "type": "Copy",
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM staging.', replace(variables('normalized_file_name'), concat('_', pipeline().parameters.env), ''), ' WHERE delimiter_type = ''', replace(pipeline().parameters.delimiter, '''', ''''''), ''' AND encoding = ''', substring(concat(pipeline().parameters.encoding, '____'), 0, indexOf(concat(pipeline().parameters.encoding, '____'), '____')), '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "file_name"
+                      },
+                      "sink": {
+                        "name": "source_file",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "load_date"
+                      },
+                      "sink": {
+                        "name": "load_timestamp",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [],
+              "outputs": [],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "NotifySuccess",
+              "type": "WebActivity",
+              "userProperties": [],
+              "dependsOn": [
+                {
+                  "activity": "CopyProcessedData",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://api.', replace(pipeline().parameters.env, 'prod', 'production'), '.example.com/notify/', replace(substring(variables('normalized_file_name'), 0, indexOf(concat(variables('normalized_file_name'), '_end'), '_end')), '_', '-'))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"', pipeline().Pipeline, '\",\"file\":\"', replace(replace(variables('normalized_file_name'), '\"', ''), '''', ''), '\",\"prefix\":\"', variables('file_prefix'), '\",\"env\":\"', substring(concat(pipeline().parameters.env, '________'), 0, indexOf(concat(pipeline().parameters.env, '________'), '________')), '\",\"encoding\":\"', pipeline().parameters.encoding, '\",\"status\":\"completed\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NotifySkipped",
+              "type": "WebActivity",
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://api.', pipeline().parameters.env, '.example.com/notify/skipped/', replace(concat(variables('file_prefix'), '_', substring(pipeline().parameters.encoding, 0, indexOf(concat(pipeline().parameters.encoding, '-'), '-'))), ' ', ''))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"', pipeline().Pipeline, '\",\"reason\":\"delimiter_encoding_mismatch\",\"delimiter\":\"', replace(pipeline().parameters.delimiter, '\"', '\\\"'), '\",\"encoding\":\"', pipeline().parameters.encoding, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckDelimiterAndEncoding",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('completed_', substring(replace(concat(variables('normalized_file_name'), '_', variables('file_prefix'), '_', pipeline().parameters.env), ' ', ''), 0, indexOf(concat(replace(concat(variables('normalized_file_name'), '_', variables('file_prefix'), '_', pipeline().parameters.env), ' ', ''), '_sentinel'), '_sentinel')))"
+          }
+        }
+      }
+    ]
+  }
+}

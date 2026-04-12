@@ -1,0 +1,254 @@
+{
+  "name": "web_activity_chain_three_step",
+  "properties": {
+    "parameters": {
+      "base_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com"
+      },
+      "auth_token": {
+        "type": "String",
+        "defaultValue": "Bearer xxx"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "step1_response": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "step2_response": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "WebActivity_Step1_GetSession",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_url, '/', pipeline().parameters.env, '/session/init')"
+          },
+          "method": "POST",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"environment\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\"}'))"
+          },
+          "disableCertValidation": false
+        }
+      },
+      {
+        "name": "SetVariable_Step1_Response",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_Step1_GetSession",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "step1_response",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('WebActivity_Step1_GetSession').output.sessionId)"
+          }
+        }
+      },
+      {
+        "name": "WebActivity_Step2_FetchData",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_Step1_Response",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 45
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_url, '/', pipeline().parameters.env, '/data/fetch?sessionId=', variables('step1_response'))"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "X-Session-Id": {
+              "type": "Expression",
+              "value": "@variables('step1_response')"
+            },
+            "Content-Type": "application/json"
+          },
+          "disableCertValidation": false
+        }
+      },
+      {
+        "name": "SetVariable_Step2_Response",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_Step2_FetchData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "step2_response",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('WebActivity_Step2_FetchData').output.recordCount)"
+          }
+        }
+      },
+      {
+        "name": "WebActivity_Step3_Confirm",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_Step2_Response",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_url, '/', pipeline().parameters.env, '/data/confirm')"
+          },
+          "method": "POST",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.auth_token"
+            },
+            "X-Session-Id": {
+              "type": "Expression",
+              "value": "@variables('step1_response')"
+            },
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"sessionId\":\"', variables('step1_response'), '\",\"recordCount\":', variables('step2_response'), ',\"environment\":\"', pipeline().parameters.env, '\",\"confirmedAt\":\"', utcNow(), '\"}'))"
+          },
+          "disableCertValidation": false
+        }
+      },
+      {
+        "name": "IfCondition_CheckRecordCount",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_Step3_Confirm",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('step2_response')), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebActivity_NotifySuccess",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.base_url, '/', pipeline().parameters.env, '/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  },
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"status\":\"success\",\"sessionId\":\"', variables('step1_response'), '\",\"recordsProcessed\":', variables('step2_response'), ',\"confirmationStatus\":\"', string(activity('WebActivity_Step3_Confirm').output.status), '\"}'))"
+                },
+                "disableCertValidation": false
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebActivity_NotifyEmpty",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.base_url, '/', pipeline().parameters.env, '/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Authorization": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.auth_token"
+                  },
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"status\":\"warning\",\"message\":\"No records found for session ', variables('step1_response'), ' in environment ', pipeline().parameters.env, '\"}'))"
+                },
+                "disableCertValidation": false
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "name": "setvariable_expression_deep_concat_chain",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "prefix": {
+        "type": "String",
+        "defaultValue": "adf"
+      },
+      "suffix": {
+        "type": "String",
+        "defaultValue": "output"
+      },
+      "delimiter": {
+        "type": "String",
+        "defaultValue": "-"
+      }
+    },
+    "variables": {
+      "var_stage1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_stage2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_stage3": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_stage4": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVar_Stage1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_stage1",
+          "value": {
+            "value": "@toLower(concat(pipeline().parameters.prefix, pipeline().parameters.delimiter, replace(concat(pipeline().parameters.env, pipeline().parameters.delimiter, pipeline().parameters.suffix), ' ', '_')))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "SetVar_Stage2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Stage1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_stage2",
+          "value": {
+            "value": "@toLower(replace(concat(variables('var_stage1'), pipeline().parameters.delimiter, concat(pipeline().parameters.prefix, '_', replace(toLower(pipeline().parameters.env), 'prod', 'production'))), '--', pipeline().parameters.delimiter))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "SetVar_Stage3",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Stage2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_stage3",
+          "value": {
+            "value": "@toLower(concat(replace(variables('var_stage2'), '_', pipeline().parameters.delimiter), pipeline().parameters.delimiter, replace(concat(toLower(pipeline().parameters.suffix), pipeline().parameters.delimiter, variables('var_stage1')), concat(pipeline().parameters.delimiter, pipeline().parameters.delimiter), pipeline().parameters.delimiter)))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "SetVar_Stage4",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Stage3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_stage4",
+          "value": {
+            "value": "@toLower(replace(concat(variables('var_stage3'), pipeline().parameters.delimiter, replace(toLower(concat(variables('var_stage2'), pipeline().parameters.delimiter, variables('var_stage1'))), concat(pipeline().parameters.delimiter, pipeline().parameters.delimiter), pipeline().parameters.delimiter), pipeline().parameters.delimiter, concat(pipeline().parameters.prefix, '_final')), '  ', '_'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetVar_Stage4",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_', variables('var_stage4'))",
+            "type": "Expression"
+          },
+          "baseParameters": {
+            "stage1_result": {
+              "value": "@variables('var_stage1')",
+              "type": "Expression"
+            },
+            "stage2_result": {
+              "value": "@variables('var_stage2')",
+              "type": "Expression"
+            },
+            "stage3_result": {
+              "value": "@variables('var_stage3')",
+              "type": "Expression"
+            },
+            "stage4_result": {
+              "value": "@variables('var_stage4')",
+              "type": "Expression"
+            },
+            "environment": {
+              "value": "@pipeline().parameters.env",
+              "type": "Expression"
+            },
+            "run_id": {
+              "value": "@pipeline().RunId",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ],
+    "annotations": [
+      "stress-test",
+      "nested-expressions",
+      "concat-chain"
+    ]
+  }
+}

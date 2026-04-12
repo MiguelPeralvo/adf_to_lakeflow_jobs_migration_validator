@@ -1,0 +1,345 @@
+{
+  "name": "cascading_division_remainder",
+  "properties": {
+    "parameters": {
+      "total_items": {
+        "type": "Int",
+        "defaultValue": 1000
+      },
+      "bucket_count": {
+        "type": "Int",
+        "defaultValue": 7
+      },
+      "min_bucket_size": {
+        "type": "Int",
+        "defaultValue": 10
+      }
+    },
+    "variables": {
+      "quotient_level1": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "remainder_level1": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "quotient_level2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "remainder_level2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_allocation": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "overflow_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeQuotientLevel1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "quotient_level1",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(pipeline().parameters.total_items, pipeline().parameters.bucket_count))"
+          }
+        }
+      },
+      {
+        "name": "ComputeRemainderLevel1",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeQuotientLevel1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_level1",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(pipeline().parameters.total_items, pipeline().parameters.bucket_count))"
+          }
+        }
+      },
+      {
+        "name": "ComputeQuotientLevel2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeRemainderLevel1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "quotient_level2",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(int(variables('remainder_level1')), pipeline().parameters.min_bucket_size))"
+          }
+        }
+      },
+      {
+        "name": "ComputeRemainderLevel2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeQuotientLevel2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_level2",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(int(variables('remainder_level1')), pipeline().parameters.min_bucket_size))"
+          }
+        }
+      },
+      {
+        "name": "CheckOverflowLevel1",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeRemainderLevel2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('remainder_level2')), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetOverflowFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "overflow_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(bool(greater(mod(div(int(variables('remainder_level1')), add(int(variables('remainder_level2')), 1)), pipeline().parameters.min_bucket_size), 0)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetNoOverflow",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "overflow_flag",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ComputeFinalAllocation",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckOverflowLevel1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_allocation",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(int(variables('quotient_level1')), pipeline().parameters.bucket_count), add(mul(int(variables('quotient_level2')), pipeline().parameters.min_bucket_size), mod(int(variables('remainder_level2')), add(pipeline().parameters.min_bucket_size, 1)))))"
+          }
+        }
+      },
+      {
+        "name": "CheckFinalAllocationValid",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeFinalAllocation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(int(variables('final_allocation')), 0), greater(div(int(variables('final_allocation')), pipeline().parameters.bucket_count), pipeline().parameters.min_bucket_size))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunDistributionNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/cascading_division_remainder/distribute_items",
+                "baseParameters": {
+                  "total_items": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.total_items)"
+                  },
+                  "bucket_count": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.bucket_count)"
+                  },
+                  "quotient_l1": {
+                    "type": "Expression",
+                    "value": "@variables('quotient_level1')"
+                  },
+                  "remainder_l1": {
+                    "type": "Expression",
+                    "value": "@variables('remainder_level1')"
+                  },
+                  "quotient_l2": {
+                    "type": "Expression",
+                    "value": "@variables('quotient_level2')"
+                  },
+                  "remainder_l2": {
+                    "type": "Expression",
+                    "value": "@variables('remainder_level2')"
+                  },
+                  "final_allocation": {
+                    "type": "Expression",
+                    "value": "@variables('final_allocation')"
+                  },
+                  "overflow": {
+                    "type": "Expression",
+                    "value": "@variables('overflow_flag')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunFallbackNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/cascading_division_remainder/fallback_equal_distribute",
+                "baseParameters": {
+                  "total_items": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.total_items)"
+                  },
+                  "bucket_count": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.bucket_count)"
+                  },
+                  "items_per_bucket": {
+                    "type": "Expression",
+                    "value": "@string(div(pipeline().parameters.total_items, pipeline().parameters.bucket_count))"
+                  },
+                  "leftover": {
+                    "type": "Expression",
+                    "value": "@string(mod(pipeline().parameters.total_items, pipeline().parameters.bucket_count))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunProcessingNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckFinalAllocationValid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/cascading_division_remainder/post_process",
+          "baseParameters": {
+            "total_items": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.total_items)"
+            },
+            "bucket_count": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.bucket_count)"
+            },
+            "min_bucket_size": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.min_bucket_size)"
+            },
+            "cascaded_quotient_sum": {
+              "type": "Expression",
+              "value": "@string(add(int(variables('quotient_level1')), int(variables('quotient_level2'))))"
+            },
+            "cascaded_remainder_sum": {
+              "type": "Expression",
+              "value": "@string(add(int(variables('remainder_level1')), int(variables('remainder_level2'))))"
+            },
+            "nested_div_result": {
+              "type": "Expression",
+              "value": "@string(div(mod(pipeline().parameters.total_items, pipeline().parameters.bucket_count), add(pipeline().parameters.min_bucket_size, 1)))"
+            },
+            "nested_mod_result": {
+              "type": "Expression",
+              "value": "@string(mod(div(pipeline().parameters.total_items, pipeline().parameters.min_bucket_size), pipeline().parameters.bucket_count))"
+            },
+            "final_allocation": {
+              "type": "Expression",
+              "value": "@variables('final_allocation')"
+            },
+            "overflow_flag": {
+              "type": "Expression",
+              "value": "@variables('overflow_flag')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

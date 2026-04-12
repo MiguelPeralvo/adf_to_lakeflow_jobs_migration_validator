@@ -1,0 +1,151 @@
+{
+  "name": "nested_base64_encode_decode_in_web",
+  "properties": {
+    "parameters": {
+      "api_user": {
+        "type": "String",
+        "defaultValue": "admin"
+      },
+      "api_secret": {
+        "type": "String",
+        "defaultValue": "s3cretP@ss"
+      },
+      "endpoint_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/v1/data"
+      }
+    },
+    "variables": {
+      "raw_credentials": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "encoded_auth": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "auth_header": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "api_response": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Build_Raw_Credentials",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "raw_credentials",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret)"
+          }
+        }
+      },
+      {
+        "name": "Encode_Credentials_Base64",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Build_Raw_Credentials",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded_auth",
+          "value": {
+            "type": "Expression",
+            "value": "@base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret))"
+          }
+        }
+      },
+      {
+        "name": "Construct_Auth_Header",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Encode_Credentials_Base64",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "auth_header",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Basic ', base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret)))"
+          }
+        }
+      },
+      {
+        "name": "Call_API_With_Auth",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Construct_Auth_Header",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@pipeline().parameters.endpoint_url"
+          },
+          "method": "GET",
+          "headers": {
+            "Authorization": {
+              "type": "Expression",
+              "value": "@concat('Basic ', base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret)))"
+            },
+            "Content-Type": "application/json",
+            "X-Decoded-User-Verify": {
+              "type": "Expression",
+              "value": "@base64ToString(base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret)))"
+            },
+            "X-Request-Id": {
+              "type": "Expression",
+              "value": "@concat('req-', base64(concat(pipeline().parameters.api_user, '-', utcNow())))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_generic_http",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "Store_Decoded_Response_Verification",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Call_API_With_Auth",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "api_response",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('decoded_credentials=', base64ToString(base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret))), '|encoded_credentials=', base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret)), '|roundtrip_check=', base64ToString(base64(concat(pipeline().parameters.api_user, ':', pipeline().parameters.api_secret))), '|response_status=', string(activity('Call_API_With_Auth').output.Response))"
+          }
+        }
+      }
+    ]
+  }
+}

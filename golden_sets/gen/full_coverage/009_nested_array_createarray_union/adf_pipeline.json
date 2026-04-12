@@ -1,0 +1,172 @@
+{
+  "name": "nested_array_createarray_union",
+  "properties": {
+    "parameters": {
+      "array_a": {
+        "type": "Array",
+        "defaultValue": [
+          "item1",
+          "item2"
+        ]
+      },
+      "array_b": {
+        "type": "Array",
+        "defaultValue": [
+          "item3",
+          "item4"
+        ]
+      },
+      "filter_key": {
+        "type": "String",
+        "defaultValue": "active"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "merged_array": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "filtered_array": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetMergedArray",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "merged_array",
+          "value": {
+            "type": "Expression",
+            "value": "@union(createArray(json(concat('[\"', pipeline().parameters.env, '_prefix\"]'))), union(pipeline().parameters.array_a, pipeline().parameters.array_b))"
+          }
+        }
+      },
+      {
+        "name": "SetFilteredArray",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetMergedArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "filtered_array",
+          "value": {
+            "type": "Expression",
+            "value": "@union(createArray(pipeline().parameters.filter_key), createArray(concat(pipeline().parameters.filter_key, '_', pipeline().parameters.env)), createArray(concat('merged_', pipeline().parameters.env)))"
+          }
+        }
+      },
+      {
+        "name": "SetProcessingStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFilteredArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('processing_', pipeline().parameters.env, '_items_', string(length(union(pipeline().parameters.array_a, pipeline().parameters.array_b))))"
+          }
+        }
+      },
+      {
+        "name": "ForEachMergedItem",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 10,
+          "items": {
+            "type": "Expression",
+            "value": "@union(createArray(createArray(pipeline().parameters.filter_key, pipeline().parameters.env)[0]), union(pipeline().parameters.array_a, pipeline().parameters.array_b))"
+          },
+          "activities": [
+            {
+              "name": "ProcessItem",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://', pipeline().parameters.env, '-api.example.com/process/', item())"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"item\":\"', item(), '\",\"filter_key\":\"', pipeline().parameters.filter_key, '\",\"env\":\"', pipeline().parameters.env, '\",\"merged_count\":', string(length(union(pipeline().parameters.array_a, pipeline().parameters.array_b))), ',\"source_arrays\":', string(createArray(length(pipeline().parameters.array_a), length(pipeline().parameters.array_b))), '}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ForEachMergedItem",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://', pipeline().parameters.env, '-api.example.com/notify/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_array_createarray_union\",\"status\":\"', variables('processing_status'), '\",\"env\":\"', pipeline().parameters.env, '\",\"total_merged_items\":', string(length(union(createArray(pipeline().parameters.filter_key), union(pipeline().parameters.array_a, pipeline().parameters.array_b)))), ',\"filter_key\":\"', pipeline().parameters.filter_key, '\",\"original_array_a_count\":', string(length(pipeline().parameters.array_a)), ',\"original_array_b_count\":', string(length(pipeline().parameters.array_b)), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

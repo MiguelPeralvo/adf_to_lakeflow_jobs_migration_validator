@@ -1,0 +1,253 @@
+{
+  "name": "nested_ternary_expression_pipeline",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B001"
+      },
+      "priority_level": {
+        "type": "String",
+        "defaultValue": "medium"
+      }
+    },
+    "variables": {
+      "env_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "priority_route": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "execution_mode": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetEnvConfig",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "env_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),'production_cluster',if(equals(pipeline().parameters.env,'staging'),'staging_cluster',if(equals(pipeline().parameters.env,'uat'),'uat_cluster',if(equals(pipeline().parameters.env,'qa'),'qa_cluster','dev_cluster'))))"
+          }
+        }
+      },
+      {
+        "name": "SetPriorityRoute",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetEnvConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "priority_route",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.priority_level,'critical'),if(equals(pipeline().parameters.env,'prod'),'fast_track_prod','fast_track_non_prod'),if(equals(pipeline().parameters.priority_level,'high'),if(equals(pipeline().parameters.env,'prod'),'priority_prod','priority_standard'),if(equals(pipeline().parameters.priority_level,'medium'),if(equals(pipeline().parameters.env,'prod'),'standard_prod','standard_default'),if(equals(pipeline().parameters.priority_level,'low'),'batch_queue','lowest_queue'))))"
+          }
+        }
+      },
+      {
+        "name": "SetExecutionMode",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetPriorityRoute",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "execution_mode",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.env,'prod'),or(equals(pipeline().parameters.priority_level,'critical'),equals(pipeline().parameters.priority_level,'high'))),if(greater(length(pipeline().parameters.batch_id),3),'parallel_high_priority','sequential_high_priority'),if(and(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.priority_level,'medium')),'parallel_standard',if(or(equals(pipeline().parameters.env,'staging'),equals(pipeline().parameters.env,'uat')),if(equals(pipeline().parameters.priority_level,'critical'),'parallel_test','sequential_test'),'sequential_dev')))"
+          }
+        }
+      },
+      {
+        "name": "CheckHighPriorityRoute",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetExecutionMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('priority_route'),'fast_track_prod'),equals(variables('priority_route'),'fast_track_non_prod'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunHighPriorityNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/',variables('env_config'),'/high_priority_',pipeline().parameters.batch_id)"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "priority_level": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.priority_level"
+                  },
+                  "execution_mode": {
+                    "type": "Expression",
+                    "value": "@variables('execution_mode')"
+                  },
+                  "cluster_config": {
+                    "type": "Expression",
+                    "value": "@variables('env_config')"
+                  },
+                  "route": {
+                    "type": "Expression",
+                    "value": "@variables('priority_route')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckStandardExecution",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckHighPriorityRoute",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('execution_mode'),'parallel_standard'),equals(variables('execution_mode'),'parallel_high_priority'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunParallelNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/',variables('env_config'),'/parallel_executor')"
+                },
+                "baseParameters": {
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "mode": {
+                    "type": "Expression",
+                    "value": "@variables('execution_mode')"
+                  },
+                  "route": {
+                    "type": "Expression",
+                    "value": "@variables('priority_route')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "RunFinalProcessingNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckStandardExecution",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/pipelines/',variables('env_config'),'/final_processing_',if(equals(variables('priority_route'),'fast_track_prod'),'expedited',if(equals(variables('priority_route'),'priority_prod'),'priority',if(equals(variables('execution_mode'),'sequential_dev'),'dev_finalize','standard_finalize'))))"
+          },
+          "baseParameters": {
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "batch_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "priority_level": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.priority_level"
+            },
+            "env_config": {
+              "type": "Expression",
+              "value": "@variables('env_config')"
+            },
+            "priority_route": {
+              "type": "Expression",
+              "value": "@variables('priority_route')"
+            },
+            "execution_mode": {
+              "type": "Expression",
+              "value": "@variables('execution_mode')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

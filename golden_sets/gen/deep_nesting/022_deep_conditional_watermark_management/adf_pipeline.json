@@ -1,0 +1,462 @@
+{
+  "name": "deep_conditional_watermark_management",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "watermark_table": {
+        "type": "String",
+        "defaultValue": "dbo.watermark_config"
+      },
+      "source_table": {
+        "type": "String",
+        "defaultValue": "dbo.source_data"
+      },
+      "min_rows": {
+        "type": "Int",
+        "defaultValue": 1000
+      },
+      "max_lag_hours": {
+        "type": "Int",
+        "defaultValue": 6
+      }
+    },
+    "variables": {
+      "current_watermark": {
+        "type": "String",
+        "defaultValue": "1900-01-01T00:00:00Z"
+      },
+      "row_count_delta": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_eligible": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupWatermark",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 last_watermark, last_run_date, last_row_count FROM ', pipeline().parameters.watermark_table, ' WHERE table_name = ''', pipeline().parameters.source_table, ''' AND environment = ''', pipeline().parameters.env, ''' ORDER BY last_run_date DESC')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_watermark",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "LookupSourceRowCount",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "LookupWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS new_row_count, MAX(modified_date) AS max_modified_date FROM ', pipeline().parameters.source_table, ' WHERE modified_date > ''', activity('LookupWatermark').output.firstRow.last_watermark, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_source",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetCurrentWatermark",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceRowCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "current_watermark",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(activity('LookupSourceRowCount').output.firstRow.max_modified_date, null), activity('LookupWatermark').output.firstRow.last_watermark, string(activity('LookupSourceRowCount').output.firstRow.max_modified_date))"
+          }
+        }
+      },
+      {
+        "name": "CheckRowCountThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetCurrentWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(int(activity('LookupSourceRowCount').output.firstRow.new_row_count), pipeline().parameters.min_rows), greater(int(activity('LookupSourceRowCount').output.firstRow.new_row_count), int(activity('LookupWatermark').output.firstRow.last_row_count)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetEligibleTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "is_eligible",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetRowCountDeltaForCheck",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "row_count_delta",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(int(activity('LookupSourceRowCount').output.firstRow.new_row_count), int(activity('LookupWatermark').output.firstRow.last_row_count)))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckTimeLagCondition",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckRowCountThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('is_eligible'), 'true'), and(greater(int(activity('LookupSourceRowCount').output.firstRow.new_row_count), 0), greater(div(sub(ticks(utcnow()), ticks(activity('LookupWatermark').output.firstRow.last_run_date)), 36000000000), pipeline().parameters.max_lag_hours)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetRowCountDeltaFinal",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "row_count_delta",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('LookupSourceRowCount').output.firstRow.new_row_count)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NotifySkipViaWeb",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.slack.com/services/', pipeline().parameters.env, '/watermark-skip')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"text\": \"Pipeline skipped for ', pipeline().parameters.source_table, '. Row count: ', activity('LookupSourceRowCount').output.firstRow.new_row_count, ', Lag below threshold.\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckFinalEligibility",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckTimeLagCondition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(variables('is_eligible'), 'true'), greater(int(variables('row_count_delta')), 0)), and(not(equals(variables('current_watermark'), '1900-01-01T00:00:00Z')), greater(int(activity('LookupSourceRowCount').output.firstRow.new_row_count), 0)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyIncrementalData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.source_table, ' WHERE modified_date > ''', activity('LookupWatermark').output.firstRow.last_watermark, ''' AND modified_date <= ''', variables('current_watermark'), ''' ORDER BY modified_date ASC')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "id"
+                      },
+                      "sink": {
+                        "name": "id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "modified_date"
+                      },
+                      "sink": {
+                        "name": "modified_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "data_payload"
+                      },
+                      "sink": {
+                        "name": "data_payload",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                },
+                "enableStaging": false,
+                "input_dataset_definitions": [
+                  {
+                    "type": "AzureSqlSource",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_sql",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "output_dataset_definitions": [
+                  {
+                    "type": "AzureDatabricksDeltaLakeSink",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_delta",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogNoAction",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging-api.', pipeline().parameters.env, '.internal/api/log')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\": \"deep_conditional_watermark_management\", \"action\": \"skipped\", \"reason\": \"no_eligible_data\", \"source_table\": \"', pipeline().parameters.source_table, '\", \"watermark\": \"', variables('current_watermark'), '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "UpdateWatermarkTable",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckFinalEligibility",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://watermark-api.', pipeline().parameters.env, '.internal/api/watermark/update')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"table_name\": \"', pipeline().parameters.source_table, '\", \"environment\": \"', pipeline().parameters.env, '\", \"new_watermark\": \"', variables('current_watermark'), '\", \"row_count\": ', variables('row_count_delta'), ', \"run_timestamp\": \"', utcnow(), '\"}'))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalRowCountDelta",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "UpdateWatermarkTable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "row_count_delta",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('LookupSourceRowCount').output.firstRow.new_row_count)"
+          }
+        }
+      },
+      {
+        "name": "RunPostProcessNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetFinalRowCountDelta",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 120
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/post_process_watermark')"
+          },
+          "baseParameters": {
+            "source_table": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.source_table"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "watermark_value": {
+              "type": "Expression",
+              "value": "@variables('current_watermark')"
+            },
+            "rows_processed": {
+              "type": "Expression",
+              "value": "@variables('row_count_delta')"
+            },
+            "max_lag_hours": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.max_lag_hours)"
+            },
+            "run_id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

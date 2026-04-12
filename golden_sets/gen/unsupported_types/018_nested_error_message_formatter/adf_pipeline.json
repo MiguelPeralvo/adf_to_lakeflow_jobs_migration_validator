@@ -1,0 +1,187 @@
+{
+  "name": "nested_error_message_formatter",
+  "properties": {
+    "parameters": {
+      "alert_endpoint": {
+        "type": "String",
+        "defaultValue": "https://hooks.slack.com/services/default"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "pipeline_name": {
+        "type": "String",
+        "defaultValue": "nested_error_message_formatter"
+      },
+      "severity": {
+        "type": "String",
+        "defaultValue": "HIGH"
+      }
+    },
+    "variables": {
+      "error_message": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "formatted_timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceValidation",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count, MAX(updated_at) AS last_updated FROM ', pipeline().parameters.env, '_catalog.validation_log WHERE pipeline_name = ''', pipeline().parameters.pipeline_name, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_validation",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetFormattedTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "formatted_timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(utcNow(), 'yyyy-MM-dd HH:mm:ss.fff')"
+          }
+        }
+      },
+      {
+        "name": "SetErrorMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFormattedTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "error_message",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('[', pipeline().parameters.severity, '] ', concat('Pipeline: ', pipeline().parameters.pipeline_name, ' | Env: ', pipeline().parameters.env, ' | Timestamp: ', variables('formatted_timestamp'), ' | Validation Result: ', concat('RowCount=', string(activity('LookupSourceValidation').output.firstRow.row_count), ', LastUpdated=', string(activity('LookupSourceValidation').output.firstRow.last_updated)), ' | ErrorContext: ', concat('RunId=', pipeline().RunId, ' | TriggeredAt=', formatDateTime(pipeline().TriggerTime, 'yyyy-MM-dd''T''HH:mm:ss'), ' | Status=', if(greater(activity('LookupSourceValidation').output.firstRow.row_count, 0), 'VALID', 'EMPTY_SOURCE'))))"
+          }
+        }
+      },
+      {
+        "name": "CheckSeverityAndNotify",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetErrorMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.severity, 'HIGH'), equals(pipeline().parameters.severity, 'CRITICAL'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendAlertNotification",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:02:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 15
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.alert_endpoint"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"text\": \"', concat('\ud83d\udea8 ADF Alert [', pipeline().parameters.severity, '] - ', pipeline().parameters.env, '\\n', 'Pipeline: ', pipeline().parameters.pipeline_name, '\\n', 'Time: ', variables('formatted_timestamp'), '\\n', 'Message: ', replace(variables('error_message'), '\"', '\\\"'), '\\n', 'RunId: ', pipeline().RunId), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "PostExecutionWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckSeverityAndNotify",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:02:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 10
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.alert_endpoint, '?env=', pipeline().parameters.env)"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().parameters.pipeline_name, '\", \"environment\": \"', pipeline().parameters.env, '\", \"severity\": \"', pipeline().parameters.severity, '\", \"completed_at\": \"', formatDateTime(utcNow(), 'yyyy-MM-dd''T''HH:mm:ss''Z'''), '\", \"error_summary\": \"', concat('Formatted at ', variables('formatted_timestamp'), ' with status for run ', pipeline().RunId, ' in env ', pipeline().parameters.env), '\", \"row_count\": ', string(activity('LookupSourceValidation').output.firstRow.row_count), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "name": "nested_array_union_intersection",
+  "properties": {
+    "parameters": {
+      "array_source_a": {
+        "type": "Array",
+        "defaultValue": [
+          "id1",
+          "id2",
+          "id3"
+        ]
+      },
+      "array_source_b": {
+        "type": "Array",
+        "defaultValue": [
+          "id2",
+          "id3",
+          "id4"
+        ]
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "union_result": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "intersection_result": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "final_combined": {
+        "type": "Array",
+        "defaultValue": []
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeUnionOfArrays",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "union_result",
+          "value": {
+            "type": "Expression",
+            "value": "@union(createArray(pipeline().parameters.array_source_a), createArray(pipeline().parameters.array_source_b))"
+          }
+        }
+      },
+      {
+        "name": "ComputeIntersectionOfArrays",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeUnionOfArrays",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "intersection_result",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(createArray(pipeline().parameters.array_source_a), createArray(pipeline().parameters.array_source_b))"
+          }
+        }
+      },
+      {
+        "name": "CombineNestedResults",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeIntersectionOfArrays",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_combined",
+          "value": {
+            "type": "Expression",
+            "value": "@union(intersection(createArray(pipeline().parameters.array_source_a), createArray(pipeline().parameters.array_source_b)), union(createArray(createArray('static_entry_1')), createArray(createArray(pipeline().parameters.env))))"
+          }
+        }
+      },
+      {
+        "name": "IterateOverCombinedResults",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "CombineNestedResults",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(variables('final_combined')[0], variables('final_combined')[1])"
+          },
+          "activities": [
+            {
+              "name": "LogIterationItem",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "intersection_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@createArray(item())"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyFilteredResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "IterateOverCombinedResults",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ',pipeline().parameters.env,'_source_table WHERE record_id IN (''', join(intersection(createArray(pipeline().parameters.array_source_a), createArray(pipeline().parameters.array_source_b)), ''','''), ''')')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "record_id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_date"
+                },
+                "sink": {
+                  "name": "created_date",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

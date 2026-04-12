@@ -1,0 +1,265 @@
+{
+  "name": "multi_parameter_complex_guard_clauses",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "is_enabled": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "start_date": {
+        "type": "String",
+        "defaultValue": "2024-01-01"
+      },
+      "end_date": {
+        "type": "String",
+        "defaultValue": "2024-12-31"
+      },
+      "threshold": {
+        "type": "String",
+        "defaultValue": "100"
+      },
+      "owner": {
+        "type": "String",
+        "defaultValue": "data_team"
+      }
+    },
+    "variables": {
+      "guard_passed": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "execution_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "InitGuardFlag",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "typeProperties": {
+          "variableName": "guard_passed",
+          "value": {
+            "type": "Expression",
+            "value": "@string('false')"
+          }
+        }
+      },
+      {
+        "name": "GuardClause1_EnvAndEnabled",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "InitGuardFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.is_enabled, 'true'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "GuardClause2_DateRangeValid",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(greater(pipeline().parameters.end_date, pipeline().parameters.start_date), and(not(equals(pipeline().parameters.start_date, '')), not(equals(pipeline().parameters.end_date, ''))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "GuardClause3_ThresholdAndOwner",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@and(greater(int(pipeline().parameters.threshold), 0), and(not(equals(pipeline().parameters.owner, '')), or(equals(pipeline().parameters.owner, 'data_team'), equals(pipeline().parameters.owner, 'platform_team'))))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "GuardClause4_FinalCompositeCheck",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@and(and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.is_enabled, 'true')), and(less(int(pipeline().parameters.threshold), 10000), greater(int(pipeline().parameters.threshold), 0)))"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "SetGuardPassed",
+                                "type": "SetVariable",
+                                "dependsOn": [],
+                                "typeProperties": {
+                                  "variableName": "guard_passed",
+                                  "value": {
+                                    "type": "Expression",
+                                    "value": "@string('true')"
+                                  }
+                                }
+                              },
+                              {
+                                "name": "RunDatabricksNotebook",
+                                "type": "DatabricksNotebook",
+                                "dependsOn": [
+                                  {
+                                    "activity": "SetGuardPassed",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "typeProperties": {
+                                  "notebookPath": "/pipelines/multi_parameter_complex_guard_clauses/main_processing",
+                                  "baseParameters": {
+                                    "env": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.env"
+                                    },
+                                    "start_date": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.start_date"
+                                    },
+                                    "end_date": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.end_date"
+                                    },
+                                    "threshold": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.threshold"
+                                    },
+                                    "owner": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.owner"
+                                    }
+                                  }
+                                },
+                                "linkedServiceName": {
+                                  "referenceName": "ls_databricks",
+                                  "type": "LinkedServiceReference"
+                                }
+                              },
+                              {
+                                "name": "NotifySuccess",
+                                "type": "WebActivity",
+                                "dependsOn": [
+                                  {
+                                    "activity": "RunDatabricksNotebook",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "typeProperties": {
+                                  "url": {
+                                    "type": "Expression",
+                                    "value": "@concat('https://hooks.slack.com/services/notify/', pipeline().parameters.env)"
+                                  },
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json"
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"text\":\"Pipeline multi_parameter_complex_guard_clauses completed successfully in ', pipeline().parameters.env, ' env. Owner: ', pipeline().parameters.owner, ', Threshold: ', pipeline().parameters.threshold, ', DateRange: ', pipeline().parameters.start_date, ' to ', pipeline().parameters.end_date, '\"}'))"
+                                  }
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "FailGuard4",
+                                "type": "WebActivity",
+                                "dependsOn": [],
+                                "typeProperties": {
+                                  "url": "https://hooks.slack.com/services/notify/guard-failure",
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json"
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"text\":\"Guard clause 4 failed: composite threshold check. Threshold=', pipeline().parameters.threshold, '\"}'))"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "FailGuard3",
+                          "type": "WebActivity",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "url": "https://hooks.slack.com/services/notify/guard-failure",
+                            "method": "POST",
+                            "headers": {
+                              "Content-Type": "application/json"
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"text\":\"Guard clause 3 failed: threshold or owner invalid. Owner=', pipeline().parameters.owner, ', Threshold=', pipeline().parameters.threshold, '\"}'))"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "FailGuard2",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": "https://hooks.slack.com/services/notify/guard-failure",
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"text\":\"Guard clause 2 failed: date range invalid. start_date=', pipeline().parameters.start_date, ', end_date=', pipeline().parameters.end_date, '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "FailGuard1",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "typeProperties": {
+                "url": "https://hooks.slack.com/services/notify/guard-failure",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"text\":\"Guard clause 1 failed: env is not prod or pipeline is not enabled. env=', pipeline().parameters.env, ', is_enabled=', pipeline().parameters.is_enabled, '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

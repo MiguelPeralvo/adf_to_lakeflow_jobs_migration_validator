@@ -1,0 +1,190 @@
+{
+  "name": "nested_bool_expression_chains",
+  "properties": {
+    "parameters": {
+      "threshold": {
+        "type": "Int",
+        "defaultValue": 100
+      },
+      "record_count": {
+        "type": "Int",
+        "defaultValue": 500
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "alert_enabled": {
+        "type": "Bool",
+        "defaultValue": true
+      }
+    },
+    "variables": {
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "alert_message": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetProcessingFlag",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@string(and(greater(pipeline().parameters.record_count, pipeline().parameters.threshold), not(equals(pipeline().parameters.env, 'dev'))))"
+          }
+        }
+      },
+      {
+        "name": "CheckPrimaryCondition",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(and(greater(pipeline().parameters.record_count, pipeline().parameters.threshold), not(equals(pipeline().parameters.env, 'dev'))), or(equals(pipeline().parameters.alert_enabled, true), greater(pipeline().parameters.record_count, 1000)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetAlertMessageTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "alert_message",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Primary condition met: record_count=', string(pipeline().parameters.record_count), ' threshold=', string(pipeline().parameters.threshold))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetAlertMessageFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "alert_message",
+                "value": "Primary condition not met - skipping processing"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckNestedBooleanChain",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckPrimaryCondition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(and(greater(pipeline().parameters.record_count, 50), less(pipeline().parameters.record_count, 10000)), and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.alert_enabled, true))), not(and(less(pipeline().parameters.record_count, pipeline().parameters.threshold), equals(pipeline().parameters.env, 'sandbox'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSetVarPassed",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": "nested_check_passed"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerSetVarFailed",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": "nested_check_failed"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckDeepNestedFinalGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckNestedBooleanChain",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(or(and(equals(pipeline().parameters.env, 'dev'), less(pipeline().parameters.record_count, 10)), and(not(equals(pipeline().parameters.alert_enabled, true)), less(pipeline().parameters.record_count, pipeline().parameters.threshold)))), or(and(greater(pipeline().parameters.record_count, pipeline().parameters.threshold), or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))), and(equals(pipeline().parameters.alert_enabled, true), not(and(less(pipeline().parameters.record_count, 25), equals(pipeline().parameters.env, 'dev'))))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendAlert",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.example.com/api/alerts/', pipeline().parameters.env)"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_bool_expression_chains\",\"env\":\"', pipeline().parameters.env, '\",\"record_count\":', string(pipeline().parameters.record_count), ',\"threshold\":', string(pipeline().parameters.threshold), ',\"alert_enabled\":', string(pipeline().parameters.alert_enabled), ',\"processing_flag\":\"', variables('processing_flag'), '\",\"message\":\"', variables('alert_message'), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SkipAlert",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "alert_message",
+                "value": "Final gate not passed - alert suppressed"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

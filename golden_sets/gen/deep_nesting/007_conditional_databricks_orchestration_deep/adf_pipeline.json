@@ -1,0 +1,416 @@
+{
+  "name": "conditional_databricks_orchestration_deep",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "cluster_id": {
+        "type": "String",
+        "defaultValue": "0101-cluster-abc"
+      },
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": "/Shared/etl/main"
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH001"
+      }
+    },
+    "variables": {
+      "selected_notebook": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "execution_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVariable_ResolveNotebook",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "selected_notebook",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.run_mode,'full'),concat(pipeline().parameters.notebook_path,'/full_load'),concat(pipeline().parameters.notebook_path,'/incremental_load'))"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_CheckEnvProd",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_ResolveNotebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.env,'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "IfCondition_ProdRunMode",
+              "type": "IfCondition",
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().parameters.run_mode,'full')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "DatabricksNotebook_ProdFull",
+                    "type": "DatabricksNotebook",
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.notebook_path,'/prod/full_load')"
+                      },
+                      "baseParameters": {
+                        "env": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        },
+                        "batch_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        },
+                        "cluster_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.cluster_id"
+                        },
+                        "run_mode": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.run_mode"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "DatabricksNotebook_ProdIncremental",
+                    "type": "DatabricksNotebook",
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.notebook_path,'/prod/incremental_load')"
+                      },
+                      "baseParameters": {
+                        "env": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        },
+                        "batch_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        },
+                        "cluster_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.cluster_id"
+                        },
+                        "run_mode": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.run_mode"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "IfCondition_NonProdDeepNest",
+              "type": "IfCondition",
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.env,'staging'),equals(pipeline().parameters.env,'dev'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "DatabricksNotebook_NonProdRun",
+                    "type": "DatabricksNotebook",
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.notebook_path,'/',pipeline().parameters.env,'/',if(equals(pipeline().parameters.run_mode,'full'),'full_load','incremental_load'))"
+                      },
+                      "baseParameters": {
+                        "env": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        },
+                        "batch_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        },
+                        "cluster_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.cluster_id"
+                        },
+                        "run_mode": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.run_mode"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "DatabricksNotebook_DefaultFallback",
+                    "type": "DatabricksNotebook",
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.notebook_path,'/sandbox/default_run')"
+                      },
+                      "baseParameters": {
+                        "env": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.env"
+                        },
+                        "batch_id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        }
+                      }
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_PostExecValidation",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_CheckEnvProd",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.run_mode,'full'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "WebActivity_NotifySuccess",
+              "type": "WebActivity",
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.company.com/api/pipelines/',pipeline().parameters.batch_id,'/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"conditional_databricks_orchestration_deep\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"env\":\"',pipeline().parameters.env,'\",\"status\":\"completed\",\"run_mode\":\"',pipeline().parameters.run_mode,'\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "SetVariable_ExecutionFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_PostExecValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "execution_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@string(true)"
+          }
+        }
+      },
+      {
+        "name": "WebActivity_AuditLog",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_ExecutionFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://audit-api.company.com/v1/log",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"conditional_databricks_orchestration_deep\",\"batch_id\":\"',pipeline().parameters.batch_id,'\",\"env\":\"',pipeline().parameters.env,'\",\"notebook_path\":\"',variables('selected_notebook'),'\",\"execution_flag\":\"',variables('execution_flag'),'\",\"timestamp\":\"',utcNow(),'\"}'))"
+          }
+        }
+      },
+      {
+        "name": "Copy_ResultsToDelta",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "WebActivity_AuditLog",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM dbo.pipeline_results WHERE batch_id = ''',pipeline().parameters.batch_id,''' AND env = ''',pipeline().parameters.env,'''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "run_status"
+                },
+                "sink": {
+                  "name": "run_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_at"
+                },
+                "sink": {
+                  "name": "created_at",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_results",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_results",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,252 @@
+{
+  "name": "databricks_chain_with_nested_error_handling",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "notebook_path_1": {
+        "type": "String",
+        "defaultValue": "/Workspace/ETL/notebook_1"
+      },
+      "notebook_path_2": {
+        "type": "String",
+        "defaultValue": "/Workspace/ETL/notebook_2"
+      },
+      "alert_url": {
+        "type": "String",
+        "defaultValue": "https://hooks.slack.com/services/XXXXX"
+      }
+    },
+    "variables": {
+      "error_message": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "pipeline_status": {
+        "type": "String",
+        "defaultValue": "success"
+      }
+    },
+    "activities": [
+      {
+        "name": "RunNotebook1",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "01:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@pipeline().parameters.notebook_path_1"
+          },
+          "baseParameters": {
+            "env": "@pipeline().parameters.env",
+            "run_id": "@pipeline().RunId"
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CheckNotebook1Status",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "RunNotebook1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('RunNotebook1').output.runOutput.status_code, '200')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunNotebook2",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.notebook_path_2"
+                },
+                "baseParameters": {
+                  "env": "@pipeline().parameters.env",
+                  "upstream_output": "@string(activity('RunNotebook1').output.runOutput.record_count)"
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckNotebook2Status",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "RunNotebook2",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('RunNotebook2').output.runOutput.status_code, '200')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CopyProcessedData",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "00:30:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM staging.processed_data WHERE env = ''', pipeline().parameters.env, ''' AND run_id = ''', pipeline().RunId, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink"
+                      },
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "input_dataset_definitions": [
+                      {
+                        "type": "AzureSqlSource",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_sql",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ],
+                    "output_dataset_definitions": [
+                      {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_delta",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetErrorFromNotebook2",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "error_message",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('Notebook2 failed with status_code: ', activity('RunNotebook2').output.runOutput.status_code, ' error: ', activity('RunNotebook2').output.runOutput.error_message)"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetErrorFromNotebook1",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "error_message",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Notebook1 failed with status_code: ', activity('RunNotebook1').output.runOutput.status_code, ' error: ', activity('RunNotebook1').output.runOutput.error_message)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckForErrors",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckNotebook1Status",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('error_message'), ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendAlertNotification",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "00:05:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.alert_url"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline_name\":\"databricks_chain_with_nested_error_handling\",\"run_id\":\"', pipeline().RunId, '\",\"env\":\"', pipeline().parameters.env, '\",\"error_message\":\"', variables('error_message'), '\",\"timestamp\":\"', utcNow(), '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ]
+  }
+}

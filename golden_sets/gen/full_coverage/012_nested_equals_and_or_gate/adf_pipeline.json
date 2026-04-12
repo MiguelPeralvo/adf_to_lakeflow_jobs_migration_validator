@@ -1,0 +1,231 @@
+{
+  "name": "nested_equals_and_or_gate",
+  "properties": {
+    "parameters": {
+      "flag_a": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "flag_b": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "flag_c": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "gate_result": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "copy_enabled": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVariable_EvaluateGate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "gate_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(or(equals(pipeline().parameters.flag_a, 'true'), equals(pipeline().parameters.flag_b, 'true')), not(equals(pipeline().parameters.flag_c, 'false'))), 'PASS', 'FAIL')"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_PrimaryGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_EvaluateGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.flag_a, 'true'), equals(pipeline().parameters.flag_b, 'true')), and(not(equals(pipeline().parameters.env, 'dev')), or(equals(variables('gate_result'), 'PASS'), equals(pipeline().parameters.flag_c, 'true'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSet_PrimaryTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_enabled",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerSet_PrimaryFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_enabled",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_SecondaryValidation",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_PrimaryGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(or(and(equals(pipeline().parameters.flag_a, 'false'), equals(pipeline().parameters.flag_b, 'false')), equals(pipeline().parameters.env, 'sandbox'))), or(equals(variables('gate_result'), 'PASS'), and(equals(pipeline().parameters.flag_c, 'true'), not(equals(pipeline().parameters.env, 'dev')))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSet_SecondaryTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_enabled",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerSet_SecondaryFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "copy_enabled",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVariable_FinalFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_SecondaryValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "copy_enabled",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(variables('gate_result'), 'PASS'), not(or(equals(pipeline().parameters.env, 'dev'), and(equals(pipeline().parameters.flag_a, 'false'), equals(pipeline().parameters.flag_b, 'false'))))), 'true', 'false')"
+          }
+        }
+      },
+      {
+        "name": "Copy_ConditionalExtract",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_FinalFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM dbo.source_table WHERE env = ''', pipeline().parameters.env, ''' AND active = ', if(and(equals(variables('copy_enabled'), 'true'), not(equals(pipeline().parameters.flag_c, 'false'))), '1', '0'))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_env"
+                },
+                "sink": {
+                  "name": "tgt_env",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_flag"
+                },
+                "sink": {
+                  "name": "tgt_flag",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,245 @@
+{
+  "name": "nested_concat_with_replace_expressions",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "source_path": {
+        "type": "String",
+        "defaultValue": "/data/raw/input"
+      },
+      "file_prefix": {
+        "type": "String",
+        "defaultValue": "file_export_2024"
+      }
+    },
+    "variables": {
+      "sanitized_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "full_file_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_query": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "env_label": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetSanitizedPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_path",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(concat(concat('/', pipeline().parameters.env, '/'), replace(pipeline().parameters.source_path, '/data/raw/', concat('/data/', pipeline().parameters.env, '/'))), '///', '/'), '//', '/')"
+          }
+        }
+      },
+      {
+        "name": "SetFullFileName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetSanitizedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "full_file_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(replace(concat(replace(pipeline().parameters.file_prefix, '_', '-'), '_', '-'), ' ', ''), '_', replace(replace(concat(variables('sanitized_path'), '/', concat(pipeline().parameters.env, '_output')), '//', '/'), ' ', '_'), '.parquet')"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvIsProd",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFullFileName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.env, 'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetEnvLabelProd",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "env_label",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('PRODUCTION', '_', replace(replace(concat('[', pipeline().parameters.env, ']_', variables('full_file_name')), '[', '('), ']', ')'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetEnvLabelNonProd",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "env_label",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('NON-PROD', '_', replace(replace(concat(concat(pipeline().parameters.env, '_DEBUG'), '_', replace(variables('full_file_name'), '.parquet', '_debug.parquet')), '__', '_'), '  ', ' '))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvIsProd",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM ', replace(concat(concat('dbo.', replace(replace(pipeline().parameters.file_prefix, '-', '_'), ' ', '_')), '_', pipeline().parameters.env), '__', '_'), ' WHERE env_tag = ''', replace(replace(concat(variables('env_label'), '_', variables('sanitized_path')), '''', ''''''), '/', '_'), '''')"
+          }
+        }
+      },
+      {
+        "name": "CopyToLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@variables('final_query')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_tag"
+                },
+                "sink": {
+                  "name": "environment_tag",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "file_path"
+                },
+                "sink": {
+                  "name": "source_file_path",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

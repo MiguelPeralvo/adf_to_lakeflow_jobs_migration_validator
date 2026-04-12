@@ -1,0 +1,197 @@
+{
+  "name": "deeply_nested_boolean_logic_evaluator",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "is_incremental": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "is_full_refresh": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "bypass_validation": {
+        "type": "Bool",
+        "defaultValue": false
+      }
+    },
+    "variables": {
+      "processing_mode": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "validation_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "not_set"
+      }
+    },
+    "activities": [
+      {
+        "name": "Set_Processing_Mode",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_mode",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.is_incremental, true), not(equals(pipeline().parameters.is_full_refresh, true))), 'incremental', if(and(equals(pipeline().parameters.is_full_refresh, true), not(equals(pipeline().parameters.is_incremental, true))), 'full_refresh', 'conflict'))"
+          }
+        }
+      },
+      {
+        "name": "Set_Validation_Status",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_Processing_Mode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "validation_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(or(equals(pipeline().parameters.bypass_validation, true), and(equals(pipeline().parameters.env, 'dev'), not(equals(pipeline().parameters.is_full_refresh, true)))), 'skipped', 'required')"
+          }
+        }
+      },
+      {
+        "name": "Check_Primary_Condition",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Set_Validation_Status",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), and(not(equals(pipeline().parameters.bypass_validation, true)), or(equals(pipeline().parameters.is_incremental, true), equals(pipeline().parameters.is_full_refresh, true))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Check_Nested_Level2_True",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(and(equals(variables('processing_mode'), 'incremental'), not(equals(variables('validation_status'), 'skipped'))), or(and(equals(pipeline().parameters.env, 'prod'), not(equals(pipeline().parameters.bypass_validation, true))), and(equals(pipeline().parameters.env, 'staging'), equals(pipeline().parameters.is_incremental, true))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "Check_Nested_Level3_Deep",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@and(or(and(equals(pipeline().parameters.env, 'prod'), and(equals(pipeline().parameters.is_incremental, true), not(equals(pipeline().parameters.bypass_validation, true)))), and(equals(pipeline().parameters.env, 'staging'), or(equals(pipeline().parameters.is_full_refresh, true), and(not(equals(pipeline().parameters.bypass_validation, true)), equals(variables('validation_status'), 'required'))))), not(and(equals(variables('processing_mode'), 'conflict'), or(equals(pipeline().parameters.bypass_validation, true), not(equals(pipeline().parameters.is_incremental, true))))))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "Call_Validated_Endpoint",
+                          "type": "WebActivity",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "url": {
+                              "type": "Expression",
+                              "value": "@concat('https://api.', pipeline().parameters.env, '.example.com/v1/process?mode=', variables('processing_mode'), '&validation=', variables('validation_status'))"
+                            },
+                            "method": "POST",
+                            "headers": {
+                              "Content-Type": "application/json"
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"pipeline\":\"deeply_nested_boolean_logic_evaluator\",\"env\":\"', pipeline().parameters.env, '\",\"mode\":\"', variables('processing_mode'), '\",\"validation\":\"', variables('validation_status'), '\",\"is_incremental\":', string(pipeline().parameters.is_incremental), ',\"is_full_refresh\":', string(pipeline().parameters.is_full_refresh), ',\"bypass_validation\":', string(pipeline().parameters.bypass_validation), '}'))"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "Set_Result_Shallow_Fail",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "final_result",
+                            "value": "level3_condition_false"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "Set_Result_Level2_False",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "final_result",
+                      "value": "level2_nested_condition_false"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_Result_Primary_False",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": "primary_condition_false_non_prod_or_bypassed"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set_Final_Result",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Check_Primary_Condition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('final_result'), 'not_set'), 'completed_via_web_activity', variables('final_result'))"
+          }
+        }
+      }
+    ]
+  }
+}

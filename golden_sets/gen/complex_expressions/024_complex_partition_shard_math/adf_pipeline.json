@@ -1,0 +1,376 @@
+{
+  "name": "complex_partition_shard_math",
+  "properties": {
+    "parameters": {
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 1000000
+      },
+      "shard_count": {
+        "type": "Int",
+        "defaultValue": 8
+      },
+      "partition_size": {
+        "type": "Int",
+        "defaultValue": 50000
+      },
+      "replication_factor": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "total_partitions": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "partitions_per_shard": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "remainder_partitions": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "effective_shards": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "shard_list": {
+        "type": "String",
+        "defaultValue": "[]"
+      },
+      "replicated_partition_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "overflow_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "current_shard_assignment": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Compute_Total_Partitions",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "total_partitions",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), if(greater(mod(pipeline().parameters.total_records, pipeline().parameters.partition_size), 0), 1, 0)))"
+          }
+        }
+      },
+      {
+        "name": "Compute_Effective_Shards",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compute_Total_Partitions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_shards",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(pipeline().parameters.shard_count, int(variables('total_partitions'))), int(variables('total_partitions')), pipeline().parameters.shard_count))"
+          }
+        }
+      },
+      {
+        "name": "Compute_Partitions_Per_Shard",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compute_Effective_Shards",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partitions_per_shard",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(int(variables('total_partitions')), int(variables('effective_shards'))))"
+          }
+        }
+      },
+      {
+        "name": "Compute_Remainder_Partitions",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compute_Partitions_Per_Shard",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_partitions",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(int(variables('total_partitions')), int(variables('effective_shards'))))"
+          }
+        }
+      },
+      {
+        "name": "Check_Remainder_Overflow",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Compute_Remainder_Partitions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('remainder_partitions')), div(int(variables('effective_shards')), 2))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set_Overflow_True",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "overflow_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(true)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_Overflow_False",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "overflow_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Iterate_Shards",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Check_Remainder_Overflow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray('shard_0','shard_1','shard_2','shard_3','shard_4','shard_5','shard_6','shard_7')"
+          },
+          "batchCount": 4,
+          "activities": [
+            {
+              "name": "Set_Current_Shard_Assignment",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_shard_assignment",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(item(), ':partitions=', variables('partitions_per_shard'), ',remainder_share=', string(if(less(indexOf(item(), string(int(variables('remainder_partitions')))), 0), 0, 1)), ',repl=', string(pipeline().parameters.replication_factor))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Compute_Replicated_Partition_Count",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Iterate_Shards",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "replicated_partition_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(int(variables('total_partitions')), pipeline().parameters.replication_factor))"
+          }
+        }
+      },
+      {
+        "name": "Compute_Shard_List_Summary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compute_Replicated_Partition_Count",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "shard_list",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"env\":\"', pipeline().parameters.env, '\",\"total_partitions\":', variables('total_partitions'), ',\"effective_shards\":', variables('effective_shards'), ',\"partitions_per_shard\":', variables('partitions_per_shard'), ',\"remainder\":', variables('remainder_partitions'), ',\"replicated_total\":', variables('replicated_partition_count'), ',\"overflow\":', variables('overflow_flag'), ',\"records_per_partition\":', string(pipeline().parameters.partition_size), ',\"total_replicated_records\":', string(mul(mul(int(variables('total_partitions')), pipeline().parameters.replication_factor), pipeline().parameters.partition_size)), '}')"
+          }
+        }
+      },
+      {
+        "name": "Check_Env_For_Notebook",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Compute_Shard_List_Summary",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Run_Shard_Distribution_Notebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/shard_distribution_executor",
+                "baseParameters": {
+                  "shard_config": {
+                    "type": "Expression",
+                    "value": "@variables('shard_list')"
+                  },
+                  "total_partitions": {
+                    "type": "Expression",
+                    "value": "@variables('total_partitions')"
+                  },
+                  "effective_shards": {
+                    "type": "Expression",
+                    "value": "@variables('effective_shards')"
+                  },
+                  "partitions_per_shard": {
+                    "type": "Expression",
+                    "value": "@variables('partitions_per_shard')"
+                  },
+                  "remainder": {
+                    "type": "Expression",
+                    "value": "@variables('remainder_partitions')"
+                  },
+                  "replicated_count": {
+                    "type": "Expression",
+                    "value": "@variables('replicated_partition_count')"
+                  },
+                  "overflow": {
+                    "type": "Expression",
+                    "value": "@variables('overflow_flag')"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "records_per_replicated_shard": {
+                    "type": "Expression",
+                    "value": "@string(mul(add(int(variables('partitions_per_shard')), if(equals(variables('overflow_flag'), 'true'), 1, 0)), mul(pipeline().parameters.partition_size, pipeline().parameters.replication_factor)))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "Run_Final_Notebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Check_Env_For_Notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/finalize_shard_assignment",
+          "baseParameters": {
+            "summary": {
+              "type": "Expression",
+              "value": "@variables('shard_list')"
+            },
+            "max_records_per_shard": {
+              "type": "Expression",
+              "value": "@string(mul(add(int(variables('partitions_per_shard')), if(greater(int(variables('remainder_partitions')), 0), 1, 0)), pipeline().parameters.partition_size))"
+            },
+            "total_replicated_shards": {
+              "type": "Expression",
+              "value": "@string(mul(int(variables('effective_shards')), pipeline().parameters.replication_factor))"
+            },
+            "balanced_score": {
+              "type": "Expression",
+              "value": "@string(div(mul(int(variables('partitions_per_shard')), 100), add(int(variables('total_partitions')), 1)))"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

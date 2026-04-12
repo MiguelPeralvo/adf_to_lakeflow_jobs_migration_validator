@@ -1,0 +1,282 @@
+{
+  "name": "nested_multi_level_coalesce_fallback",
+  "properties": {
+    "parameters": {
+      "primary_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "secondary_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "default_config": {
+        "type": "String",
+        "defaultValue": "fallback_default_config"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_000"
+      }
+    },
+    "variables": {
+      "resolved_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_notebook_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigFromDB",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_value, notebook_path, environment FROM dbo.pipeline_config WHERE batch_id = ''', coalesce(pipeline().parameters.batch_id, 'batch_000'), ''' AND env = ''', coalesce(pipeline().parameters.env, 'dev'), '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetResolvedConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigFromDB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_config",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(coalesce(activity('LookupConfigFromDB').output.firstRow.config_value, pipeline().parameters.primary_config), coalesce(pipeline().parameters.secondary_config, pipeline().parameters.default_config)), coalesce(pipeline().globalParameters.global_default_config, 'hardcoded_fallback_config'))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedEnv",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigFromDB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_env",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(activity('LookupConfigFromDB').output.firstRow.environment, pipeline().parameters.env), coalesce(pipeline().globalParameters.global_default_env, 'dev'))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalNotebookPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetResolvedEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "final_notebook_path",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(coalesce(activity('LookupConfigFromDB').output.firstRow.notebook_path, concat('/pipelines/', variables('resolved_env'), '/', variables('resolved_config'), '/main_notebook')), coalesce(concat('/pipelines/', pipeline().parameters.env, '/', pipeline().parameters.primary_config, '/main_notebook'), concat('/pipelines/', pipeline().parameters.env, '/', pipeline().parameters.default_config, '/main_notebook'))), coalesce(pipeline().globalParameters.global_fallback_notebook_path, '/pipelines/dev/fallback/main_notebook'))"
+          }
+        }
+      },
+      {
+        "name": "CheckConfigValidity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFinalNotebookPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(coalesce(variables('resolved_config'), ''), '')), not(equals(coalesce(variables('final_notebook_path'), ''), '')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunDatabricksNotebookInner",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@variables('final_notebook_path')"
+                },
+                "baseParameters": {
+                  "config_value": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_config')"
+                  },
+                  "environment": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_env')"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@coalesce(coalesce(pipeline().parameters.batch_id, activity('LookupConfigFromDB').output.firstRow.batch_id), coalesce(pipeline().globalParameters.global_default_batch_id, 'batch_unknown'))"
+                  },
+                  "run_mode": {
+                    "type": "Expression",
+                    "value": "@coalesce(coalesce(pipeline().parameters.primary_config, pipeline().parameters.secondary_config), coalesce(pipeline().parameters.default_config, 'standard'))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "FallbackLogLookup",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 0
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('INSERT INTO dbo.pipeline_error_log (batch_id, env, error_msg, logged_at) VALUES (''', coalesce(pipeline().parameters.batch_id, 'unknown'), ''', ''', coalesce(variables('resolved_env'), 'unknown'), ''', ''Config resolution failed - all coalesce levels exhausted'', GETUTCDATE()); SELECT @@ROWCOUNT AS rows_affected')"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_sql_config",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": true
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "ExecuteDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckConfigValidity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(variables('final_notebook_path'), concat('/pipelines/', coalesce(variables('resolved_env'), pipeline().parameters.env), '/post_processing')), coalesce(pipeline().globalParameters.global_post_processing_notebook, '/pipelines/dev/post_processing/default'))"
+          },
+          "baseParameters": {
+            "resolved_config": {
+              "type": "Expression",
+              "value": "@coalesce(variables('resolved_config'), coalesce(pipeline().parameters.default_config, 'none'))"
+            },
+            "resolved_env": {
+              "type": "Expression",
+              "value": "@coalesce(variables('resolved_env'), coalesce(pipeline().parameters.env, 'dev'))"
+            },
+            "batch_id": {
+              "type": "Expression",
+              "value": "@coalesce(pipeline().parameters.batch_id, 'batch_000')"
+            },
+            "pipeline_run_id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            },
+            "execution_phase": {
+              "type": "Expression",
+              "value": "@coalesce(coalesce(pipeline().globalParameters.global_execution_phase, 'post_validation'), 'finalize')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

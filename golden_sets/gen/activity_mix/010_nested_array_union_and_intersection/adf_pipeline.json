@@ -1,0 +1,176 @@
+{
+  "name": "nested_array_union_and_intersection",
+  "properties": {
+    "parameters": {
+      "list_a": {
+        "type": "String",
+        "defaultValue": "apple,banana,cherry"
+      },
+      "list_b": {
+        "type": "String",
+        "defaultValue": "banana,date,elderberry,cherry"
+      },
+      "merge_strategy": {
+        "type": "String",
+        "defaultValue": "union"
+      }
+    },
+    "variables": {
+      "union_result": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "intersection_result": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "merged_output": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_item_holder": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeUnionOfLists",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "union_result",
+          "value": {
+            "type": "Expression",
+            "value": "@union(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))"
+          }
+        }
+      },
+      {
+        "name": "ComputeIntersectionOfLists",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeUnionOfLists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "intersection_result",
+          "value": {
+            "type": "Expression",
+            "value": "@intersection(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))"
+          }
+        }
+      },
+      {
+        "name": "SelectMergeStrategy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeIntersectionOfLists",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.merge_strategy, 'union')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetMergedToUnion",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "merged_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@union(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetMergedToIntersection",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "merged_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@intersection(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IterateOverMergedResults",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SelectMergeStrategy",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(union(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1]))[0], intersection(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))[0])"
+          },
+          "activities": [
+            {
+              "name": "LogCurrentItem",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_item_holder",
+                "value": {
+                  "type": "Expression",
+                  "value": "@item()"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalizeUnionCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IterateOverMergedResults",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_item_holder",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(union(createArray(split(pipeline().parameters.list_a, ',')[0], split(pipeline().parameters.list_a, ',')[1], split(pipeline().parameters.list_a, ',')[2]), createArray(split(pipeline().parameters.list_b, ',')[0], split(pipeline().parameters.list_b, ',')[1], split(pipeline().parameters.list_b, ',')[2], split(pipeline().parameters.list_b, ',')[3]))))"
+          }
+        }
+      }
+    ]
+  }
+}

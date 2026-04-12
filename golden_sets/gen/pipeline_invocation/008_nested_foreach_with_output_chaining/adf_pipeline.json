@@ -1,0 +1,294 @@
+{
+  "name": "nested_foreach_with_output_chaining",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "parent_list": {
+        "type": "Array",
+        "defaultValue": [
+          {
+            "parent_id": "P001"
+          },
+          {
+            "parent_id": "P002"
+          }
+        ]
+      },
+      "child_key": {
+        "type": "String",
+        "defaultValue": "child_id"
+      }
+    },
+    "variables": {
+      "accumulated_output": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "current_child_detail": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupParentEntities",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT parent_id, parent_name, region FROM ', pipeline().parameters.env, '_catalog.parent_entities WHERE active = 1 ORDER BY parent_id')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_parent",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "ForEachParent",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupParentEntities",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('LookupParentEntities').output.value"
+          },
+          "batchCount": 1,
+          "activities": [
+            {
+              "name": "LookupChildrenForParent",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:10:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT c.', pipeline().parameters.child_key, ', c.child_name, c.payload_path, c.record_count FROM ', pipeline().parameters.env, '_catalog.child_entities c WHERE c.parent_id = ''', item().parent_id, ''' AND c.is_enabled = 1 ORDER BY c.', pipeline().parameters.child_key)"
+                  }
+                },
+                "dataset": {
+                  "referenceName": "ds_azure_sql_child",
+                  "type": "DatasetReference"
+                },
+                "firstRowOnly": false
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "ForEachChild",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "LookupChildrenForParent",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "isSequential": false,
+                "items": {
+                  "type": "Expression",
+                  "value": "@activity('LookupChildrenForParent').output.value"
+                },
+                "batchCount": 10,
+                "activities": [
+                  {
+                    "name": "SetVariableChildDetail",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "current_child_detail",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('ParentID=', item().parent_id, '|ChildKey=', item()[pipeline().parameters.child_key], '|ChildName=', item().child_name, '|Region=', activity('LookupChildrenForParent').output.count, '|Env=', pipeline().parameters.env)"
+                      }
+                    }
+                  },
+                  {
+                    "name": "CopyChildDataToDelta",
+                    "type": "Copy",
+                    "dependsOn": [
+                      {
+                        "activity": "SetVariableChildDetail",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 3,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT t.*, ''', item().parent_id, ''' AS parent_id, ''', item()[pipeline().parameters.child_key], ''' AS child_key_val, ''', pipeline().parameters.env, ''' AS environment, GETUTCDATE() AS extract_timestamp FROM ', pipeline().parameters.env, '_catalog.transaction_data t WHERE t.parent_id = ''', item().parent_id, ''' AND t.', pipeline().parameters.child_key, ' = ''', item()[pipeline().parameters.child_key], ''' AND t.payload_path = ''', item().payload_path, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "preCopyScript": {
+                          "type": "Expression",
+                          "value": "@concat('DELETE FROM ', pipeline().parameters.env, '_lakehouse.bronze_transactions WHERE parent_id = ''', item().parent_id, ''' AND child_key_val = ''', item()[pipeline().parameters.child_key], '''')"
+                        }
+                      },
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "parent_id"
+                            },
+                            "sink": {
+                              "name": "parent_id",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "child_key_val"
+                            },
+                            "sink": {
+                              "name": "child_key_val",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "environment"
+                            },
+                            "sink": {
+                              "name": "environment",
+                              "type": "String"
+                            }
+                          },
+                          {
+                            "source": {
+                              "name": "extract_timestamp"
+                            },
+                            "sink": {
+                              "name": "extract_timestamp",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      },
+                      "enableStaging": false
+                    },
+                    "inputs": [
+                      {
+                        "referenceName": "ds_azure_sql_transactions",
+                        "type": "DatasetReference",
+                        "parameters": {
+                          "env_param": {
+                            "type": "Expression",
+                            "value": "@pipeline().parameters.env"
+                          },
+                          "parent_id_param": {
+                            "type": "Expression",
+                            "value": "@item().parent_id"
+                          }
+                        }
+                      }
+                    ],
+                    "outputs": [
+                      {
+                        "referenceName": "ds_delta_bronze_transactions",
+                        "type": "DatasetReference",
+                        "parameters": {
+                          "env_param": {
+                            "type": "Expression",
+                            "value": "@pipeline().parameters.env"
+                          }
+                        }
+                      }
+                    ],
+                    "input_dataset_definitions": [
+                      {
+                        "type": "AzureSqlSource",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_sql",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ],
+                    "output_dataset_definitions": [
+                      {
+                        "type": "AzureDatabricksDeltaLakeSink",
+                        "schema": [],
+                        "linkedServiceName": {
+                          "referenceName": "ls_delta",
+                          "type": "LinkedServiceReference"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

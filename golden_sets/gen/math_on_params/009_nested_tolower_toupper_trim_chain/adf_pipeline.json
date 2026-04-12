@@ -1,0 +1,177 @@
+{
+  "name": "nested_tolower_toupper_trim_chain",
+  "properties": {
+    "parameters": {
+      "raw_input": {
+        "type": "String",
+        "defaultValue": "  Hello World  "
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "DEV"
+      },
+      "normalize_flag": {
+        "type": "String",
+        "defaultValue": "true"
+      }
+    },
+    "variables": {
+      "normalized_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "env_prefix": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetNormalizedValue",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "normalized_value",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toLower(trim(pipeline().parameters.raw_input)), '_', replace(toLower(trim(pipeline().parameters.env)), ' ', '_'))"
+          }
+        }
+      },
+      {
+        "name": "SetEnvPrefix",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetNormalizedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "env_prefix",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toUpper(trim(replace(pipeline().parameters.env, '-', '_'))), '_PREFIX_', toLower(trim(replace(pipeline().parameters.raw_input, ' ', ''))))"
+          }
+        }
+      },
+      {
+        "name": "CheckNormalizeFlag",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetEnvPrefix",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(toLower(trim(pipeline().parameters.normalize_flag)), 'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFinalOutputTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(replace(toLower(trim(variables('normalized_value'))), ' ', '_'), '___', replace(toUpper(trim(variables('env_prefix'))), '_', '-'), '___', toLower(trim(replace(concat(pipeline().parameters.raw_input, pipeline().parameters.env), ' ', ''))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFinalOutputFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_output",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('RAW_', toUpper(trim(replace(pipeline().parameters.raw_input, ' ', '_'))), '_ENV_', toLower(trim(replace(pipeline().parameters.env, '-', '_'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalCombined",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckNormalizeFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_output",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toLower(trim(replace(variables('final_output'), '___', '|'))), '::', toUpper(trim(replace(concat(variables('normalized_value'), variables('env_prefix')), '_', '-'))), '::', toLower(trim(replace(toUpper(trim(pipeline().parameters.raw_input)), ' ', '_'))))"
+          }
+        }
+      },
+      {
+        "name": "LookupValidation",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetFinalCombined",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS record_count FROM dbo.normalized_data WHERE normalized_key = ''', replace(toLower(trim(variables('final_output'))), '''', ''''''), ''' AND env_code = ''', replace(toUpper(trim(pipeline().parameters.env)), '''', ''''''), ''' AND source_input = ''', replace(toLower(trim(replace(pipeline().parameters.raw_input, ' ', '_'))), '''', ''''''), '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_lookup",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

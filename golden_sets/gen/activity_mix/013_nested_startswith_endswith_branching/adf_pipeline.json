@@ -1,0 +1,270 @@
+{
+  "name": "nested_startswith_endswith_branching",
+  "properties": {
+    "parameters": {
+      "file_name": {
+        "type": "String",
+        "defaultValue": "report_sales_2024.csv"
+      },
+      "prefix_filter": {
+        "type": "String",
+        "defaultValue": "report_"
+      },
+      "suffix_filter": {
+        "type": "String",
+        "defaultValue": ".csv"
+      }
+    },
+    "variables": {
+      "match_category": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "resolved_query": {
+        "type": "String",
+        "defaultValue": "SELECT 1"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupFileMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT file_name, file_size, created_date FROM file_registry WHERE file_name = ''', pipeline().parameters.file_name, '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetMatchCategory",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupFileMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "match_category",
+          "value": {
+            "type": "Expression",
+            "value": "@if(startsWith(pipeline().parameters.file_name, pipeline().parameters.prefix_filter), if(endsWith(pipeline().parameters.file_name, pipeline().parameters.suffix_filter), 'full_match', 'prefix_only'), if(endsWith(pipeline().parameters.file_name, pipeline().parameters.suffix_filter), 'suffix_only', 'no_match'))"
+          }
+        }
+      },
+      {
+        "name": "CheckFullOrPrefixMatch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetMatchCategory",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('match_category'), 'full_match'), equals(variables('match_category'), 'prefix_only'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetQueryForMatchedPrefix",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(startsWith(pipeline().parameters.file_name, pipeline().parameters.prefix_filter), if(endsWith(pipeline().parameters.file_name, pipeline().parameters.suffix_filter), concat('SELECT * FROM sales_data WHERE source_file = ''', pipeline().parameters.file_name, ''' AND status = ''active'''), concat('SELECT * FROM sales_data WHERE source_file = ''', pipeline().parameters.file_name, ''' AND status = ''pending''')), concat('SELECT * FROM sales_data WHERE source_file = ''', pipeline().parameters.file_name, ''''))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetQueryForUnmatched",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(startsWith(pipeline().parameters.file_name, 'archive_'), if(endsWith(pipeline().parameters.file_name, '.bak'), 'SELECT * FROM archive_data WHERE archived = 1', 'SELECT * FROM archive_data WHERE archived = 0'), concat('SELECT * FROM fallback_data WHERE file_name = ''', pipeline().parameters.file_name, ''''))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckSuffixOnlyBranch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckFullOrPrefixMatch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('match_category'), 'suffix_only'), greater(length(pipeline().parameters.file_name), 10))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogSuffixOnlyMatch",
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('INSERT INTO audit_log (event_type, file_name, category, logged_at) VALUES (''suffix_match'', ''', pipeline().parameters.file_name, ''', ''', variables('match_category'), ''', GETUTCDATE()); SELECT @@ROWCOUNT AS rows_affected')"
+                  }
+                },
+                "firstRowOnly": true
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "SetFinalResolvedQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckSuffixOnlyBranch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_query",
+          "value": {
+            "type": "Expression",
+            "value": "@if(startsWith(variables('resolved_query'), 'SELECT *'), if(endsWith(variables('match_category'), 'match'), concat(variables('resolved_query'), ' ORDER BY created_date DESC'), concat(variables('resolved_query'), ' ORDER BY file_name ASC')), variables('resolved_query'))"
+          }
+        }
+      },
+      {
+        "name": "CopyMatchedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalResolvedQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@variables('resolved_query')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "file_name"
+                },
+                "sink": {
+                  "name": "source_file_name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "created_date"
+                },
+                "sink": {
+                  "name": "ingestion_date",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

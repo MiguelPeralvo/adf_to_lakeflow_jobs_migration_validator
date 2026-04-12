@@ -1,0 +1,145 @@
+{
+  "name": "nested_abs_difference_check",
+  "properties": {
+    "parameters": {
+      "expected_count": {
+        "type": "Int",
+        "defaultValue": 1000
+      },
+      "actual_count": {
+        "type": "Int",
+        "defaultValue": 950
+      },
+      "tolerance": {
+        "type": "Int",
+        "defaultValue": 100
+      }
+    },
+    "variables": {
+      "abs_difference": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_within_tolerance": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "Calculate_Abs_Difference",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "abs_difference",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.actual_count, pipeline().parameters.expected_count)))"
+          }
+        }
+      },
+      {
+        "name": "Evaluate_Tolerance_Flag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Calculate_Abs_Difference",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_within_tolerance",
+          "value": {
+            "type": "Expression",
+            "value": "@string(lessOrEquals(int(variables('abs_difference')), pipeline().parameters.tolerance))"
+          }
+        }
+      },
+      {
+        "name": "Check_Abs_Difference_Within_Tolerance",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Evaluate_Tolerance_Flag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@lessOrEquals(if(greater(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.actual_count, pipeline().parameters.expected_count)), pipeline().parameters.tolerance)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Notify_Success",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.example.com/api/pipeline-notifications/success",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "{\"status\":\"SUCCESS\",\"message\":\"Absolute difference @{variables('abs_difference')} is within tolerance @{pipeline().parameters.tolerance}\",\"expected\":@{pipeline().parameters.expected_count},\"actual\":@{pipeline().parameters.actual_count},\"abs_difference\":@{variables('abs_difference')},\"tolerance\":@{pipeline().parameters.tolerance}}"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Notify_Failure",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.example.com/api/pipeline-notifications/failure",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "{\"status\":\"FAILURE\",\"message\":\"Absolute difference @{variables('abs_difference')} exceeds tolerance @{pipeline().parameters.tolerance}\",\"expected\":@{pipeline().parameters.expected_count},\"actual\":@{pipeline().parameters.actual_count},\"abs_difference\":@{variables('abs_difference')},\"tolerance\":@{pipeline().parameters.tolerance}}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Post_Final_Audit_Log",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Check_Abs_Difference_Within_Tolerance",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://audit-api.example.com/api/v1/pipeline-runs",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "{\"pipeline\":\"nested_abs_difference_check\",\"runId\":\"@{pipeline().RunId}\",\"expected_count\":@{pipeline().parameters.expected_count},\"actual_count\":@{pipeline().parameters.actual_count},\"abs_difference\":@{variables('abs_difference')},\"tolerance\":@{pipeline().parameters.tolerance},\"within_tolerance\":@{variables('is_within_tolerance')},\"nested_check_result\":@{if(lessOrEquals(if(greater(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.expected_count, pipeline().parameters.actual_count), sub(pipeline().parameters.actual_count, pipeline().parameters.expected_count)), pipeline().parameters.tolerance), true, false)},\"timestamp\":\"@{utcNow()}\"}"
+          }
+        }
+      }
+    ]
+  }
+}

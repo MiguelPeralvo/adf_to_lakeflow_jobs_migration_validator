@@ -1,0 +1,239 @@
+{
+  "name": "conditional_databricks_with_web_callback",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": "/Shared/etl/process_batch"
+      },
+      "callback_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/callback"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      }
+    },
+    "variables": {
+      "notebook_run_status": {
+        "type": "String",
+        "defaultValue": "not_started"
+      },
+      "callback_response_status": {
+        "type": "String",
+        "defaultValue": "unknown"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupBatchConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_id, is_active, record_count FROM dbo.batch_config WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "CheckBatchIsActive",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(activity('LookupBatchConfig').output.firstRow.is_active, 1), greater(activity('LookupBatchConfig').output.firstRow.record_count, 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunDatabricksNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.notebook_path"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "record_count": {
+                    "type": "Expression",
+                    "value": "@string(activity('LookupBatchConfig').output.firstRow.record_count)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_adb_workspace",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "SetNotebookStatus",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunDatabricksNotebook",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "variableName": "notebook_run_status",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('RunDatabricksNotebook').output.runOutput.status)"
+                }
+              }
+            },
+            {
+              "name": "CallbackWebActivity",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "SetNotebookStatus",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.callback_url"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Batch-Id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"environment\":\"', pipeline().parameters.env, '\",\"notebook_status\":\"', variables('notebook_run_status'), '\",\"notebook_path\":\"', pipeline().parameters.notebook_path, '\",\"run_output\":', string(activity('RunDatabricksNotebook').output.runOutput), '}'))"
+                }
+              }
+            },
+            {
+              "name": "CheckCallbackResponse",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CallbackWebActivity",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('CallbackWebActivity').output.status, 'acknowledged')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetCallbackSuccess",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "variableName": "callback_response_status",
+                      "value": "acknowledged"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "RetryCallbackNotification",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.00:05:00",
+                      "retry": 2,
+                      "retryIntervalInSeconds": 15
+                    },
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.callback_url, '/retry')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"retry\":true,\"original_response\":', string(activity('CallbackWebActivity').output), '}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetSkippedStatus",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "notebook_run_status",
+                "value": "skipped_inactive_batch"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

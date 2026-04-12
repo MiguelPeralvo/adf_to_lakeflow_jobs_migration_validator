@@ -1,0 +1,278 @@
+{
+  "name": "nested_multi_variable_cross_reference",
+  "properties": {
+    "parameters": {
+      "base_path": {
+        "type": "String",
+        "defaultValue": "/mnt/data"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "date_partition": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "version": {
+        "type": "String",
+        "defaultValue": "v2"
+      }
+    },
+    "variables": {
+      "var_root_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_env_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_full_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_versioned_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_notebook_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "var_is_production": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "var_final_output_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Set_RootPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_root_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_path, '/', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "Set_EnvPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_RootPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_env_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_root_path'), '/partitions/', pipeline().parameters.date_partition)"
+          }
+        }
+      },
+      {
+        "name": "Set_FullPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_EnvPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_full_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_env_path'), '/output/', pipeline().parameters.version)"
+          }
+        }
+      },
+      {
+        "name": "Set_VersionedPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_FullPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_versioned_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_full_path'), '/delta_tables/', replace(pipeline().parameters.date_partition, '-', '/'))"
+          }
+        }
+      },
+      {
+        "name": "Check_IsProduction",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Set_VersionedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.env, 'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set_ProdFlag_True",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_is_production",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(true)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_ProdFlag_False",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "var_is_production",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set_NotebookPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Check_IsProduction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_notebook_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/Workspace/', pipeline().parameters.env, '/notebooks/', pipeline().parameters.version, '/process_', replace(pipeline().parameters.date_partition, '-', '_'))"
+          }
+        }
+      },
+      {
+        "name": "Set_FinalOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_NotebookPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "var_final_output_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('var_versioned_path'), '/final/', if(equals(variables('var_is_production'), 'true'), 'production_certified', 'non_production'), '/', pipeline().parameters.version, '_', replace(pipeline().parameters.date_partition, '-', ''))"
+          }
+        }
+      },
+      {
+        "name": "Run_DatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set_FinalOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@variables('var_notebook_path')"
+          },
+          "baseParameters": {
+            "root_path": {
+              "type": "Expression",
+              "value": "@variables('var_root_path')"
+            },
+            "env_path": {
+              "type": "Expression",
+              "value": "@variables('var_env_path')"
+            },
+            "full_path": {
+              "type": "Expression",
+              "value": "@variables('var_full_path')"
+            },
+            "versioned_path": {
+              "type": "Expression",
+              "value": "@variables('var_versioned_path')"
+            },
+            "output_path": {
+              "type": "Expression",
+              "value": "@variables('var_final_output_path')"
+            },
+            "is_production": {
+              "type": "Expression",
+              "value": "@variables('var_is_production')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "date_partition": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.date_partition"
+            },
+            "version": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.version"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

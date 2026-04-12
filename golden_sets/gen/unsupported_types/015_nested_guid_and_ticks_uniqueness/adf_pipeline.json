@@ -1,0 +1,130 @@
+{
+  "name": "nested_guid_and_ticks_uniqueness",
+  "properties": {
+    "parameters": {
+      "prefix": {
+        "type": "String",
+        "defaultValue": "run"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B001"
+      }
+    },
+    "variables": {
+      "unique_run_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "unique_batch_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "composite_trace_id": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GenerateUniqueRunId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "unique_run_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.prefix, '-', pipeline().parameters.env, '-', guid(), '-', string(ticks(utcnow())))"
+          }
+        }
+      },
+      {
+        "name": "GenerateUniqueBatchKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GenerateUniqueRunId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "unique_batch_key",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('batch_', pipeline().parameters.batch_id, '_', substring(guid(), 0, 8), '_', concat(pipeline().parameters.env, '_', string(ticks(utcnow()))))"
+          }
+        }
+      },
+      {
+        "name": "GenerateCompositeTraceId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GenerateUniqueBatchKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "composite_trace_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.prefix, '/', pipeline().parameters.env, '/', pipeline().parameters.batch_id, '/', concat(guid(), '-', concat(string(ticks(utcnow())), '-', guid())))"
+          }
+        }
+      },
+      {
+        "name": "ProcessWithUniqueIds",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "GenerateCompositeTraceId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/pipelines/process_batch",
+          "baseParameters": {
+            "run_id": {
+              "type": "Expression",
+              "value": "@variables('unique_run_id')"
+            },
+            "batch_key": {
+              "type": "Expression",
+              "value": "@variables('unique_batch_key')"
+            },
+            "trace_id": {
+              "type": "Expression",
+              "value": "@variables('composite_trace_id')"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "idempotency_key": {
+              "type": "Expression",
+              "value": "@concat(pipeline().parameters.prefix, '_', pipeline().parameters.batch_id, '_', concat(substring(guid(), 0, 12), '_', string(ticks(utcnow()))))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_adb_workspace",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

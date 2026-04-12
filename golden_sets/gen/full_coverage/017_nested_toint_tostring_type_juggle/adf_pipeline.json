@@ -1,0 +1,241 @@
+{
+  "name": "nested_toint_tostring_type_juggle",
+  "properties": {
+    "parameters": {
+      "numeric_input": {
+        "type": "Float",
+        "defaultValue": 42.75
+      },
+      "string_input": {
+        "type": "String",
+        "defaultValue": "123"
+      },
+      "precision": {
+        "type": "Int",
+        "defaultValue": 2
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "converted_int_val": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "float_result": {
+        "type": "String",
+        "defaultValue": "0.0"
+      },
+      "final_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "arithmetic_result": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetConvertedIntVal",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "converted_int_val",
+          "value": {
+            "type": "Expression",
+            "value": "@string(int(string(int(pipeline().parameters.numeric_input))))"
+          }
+        }
+      },
+      {
+        "name": "SetFloatResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetConvertedIntVal",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "float_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(float(string(int(pipeline().parameters.numeric_input))), div(float(pipeline().parameters.string_input), float(mul(int(pipeline().parameters.precision), 10)))))"
+          }
+        }
+      },
+      {
+        "name": "CheckPrecisionThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFloatResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('float_result')), int(string(add(int(pipeline().parameters.string_input), int(pipeline().parameters.numeric_input)))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetLabelTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_label",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('ABOVE_THRESHOLD_', pipeline().parameters.env, '_', string(int(float(variables('float_result')))), '_prec', string(pipeline().parameters.precision))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetLabelFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_label",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('BELOW_THRESHOLD_', pipeline().parameters.env, '_', string(add(int(pipeline().parameters.string_input), int(float(variables('float_result'))))), '_prec', string(pipeline().parameters.precision))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetArithmeticResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckPrecisionThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "arithmetic_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(int(string(int(pipeline().parameters.numeric_input))), int(pipeline().parameters.precision)), int(float(string(float(pipeline().parameters.string_input))))))"
+          }
+        }
+      },
+      {
+        "name": "CopyConvertedResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetArithmeticResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ', string(int(float(variables('arithmetic_result')))), ' AS computed_value, ''', variables('final_label'), ''' AS label, ', string(add(int(pipeline().parameters.string_input), int(string(int(pipeline().parameters.numeric_input))))), ' AS sum_converted, ''', pipeline().parameters.env, ''' AS environment FROM dbo.source_table WHERE precision_level = ', string(pipeline().parameters.precision))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "computed_value"
+                },
+                "sink": {
+                  "name": "computed_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "label"
+                },
+                "sink": {
+                  "name": "label",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "sum_converted"
+                },
+                "sink": {
+                  "name": "sum_converted",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_input",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_output",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

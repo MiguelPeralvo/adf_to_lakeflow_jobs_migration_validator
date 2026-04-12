@@ -1,0 +1,213 @@
+{
+  "total": 175,
+  "evaluated": 107,
+  "errors": 68,
+  "mean_score": 88.6,
+  "min_score": 54.0,
+  "max_score": 100.0,
+  "below_70": 10,
+  "worst_10": [
+    {
+      "name": "nested_base64_encode_decode_chain",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 1.0
+      }
+    },
+    {
+      "name": "nested_ticks_and_datetime_comparison",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "foreach_nested_foreach_conditions",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "nested_base64_encode_decode_chain",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 1.0
+      }
+    },
+    {
+      "name": "nested_ticks_and_date_diff_calc",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "foreach_with_nested_if_and_copy_chain",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "nested_foreach_with_output_chaining",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "nested_dynamic_url_builder",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.0
+      }
+    },
+    {
+      "name": "nested_base64_encode_decode_chain",
+      "score": 54.0,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.0,
+        "expression_coverage": 0.0,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 1.0
+      }
+    },
+    {
+      "name": "complex_coalesce_null_check_nesting",
+      "score": 68.16666666666666,
+      "label": "MANUAL_INTERVENTION",
+      "dims": {
+        "activity_coverage": 0.16666666666666666,
+        "expression_coverage": 0.5,
+        "dependency_preservation": 1.0,
+        "notebook_validity": 1.0,
+        "parameter_completeness": 1.0,
+        "secret_completeness": 1.0,
+        "not_translatable_ratio": 0.8,
+        "control_flow_fidelity": 0.5
+      }
+    }
+  ],
+  "error_samples": [
+    {
+      "name": "nested_coalesce_chain_with_replace",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_split_and_array_indexing",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_substring_within_replace_within_concat",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_startswith_endswith_branching",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_length_and_empty_checks",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_contains_with_array_filtering",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_dynamic_linked_service_ref",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "param_subtraction_with_conditional",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "nested_concat_with_math_result",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    },
+    {
+      "name": "conditional_math_branching",
+      "score": 0.0,
+      "error": "ValueError: Dataset definition or properties missing"
+    }
+  ]
+}

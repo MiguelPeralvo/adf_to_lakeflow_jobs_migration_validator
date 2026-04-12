@@ -1,0 +1,391 @@
+{
+  "name": "multi_branch_condition_tree",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "processing_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      },
+      "tenant_id": {
+        "type": "String",
+        "defaultValue": "tenant_001"
+      }
+    },
+    "variables": {
+      "branch_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "record_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVar_InitBranchPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "branch_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.env,'prod'),greater(length(pipeline().parameters.tenant_id),0)),'prod_path',if(and(equals(pipeline().parameters.env,'staging'),not(equals(pipeline().parameters.processing_mode,'incremental'))),'staging_path','dev_path'))"
+          }
+        }
+      },
+      {
+        "name": "LookupTenantConfig",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetVar_InitBranchPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT tenant_name, is_active, record_limit, last_run_date FROM dbo.tenant_config WHERE tenant_id = ''',pipeline().parameters.tenant_id,''' AND environment = ''',pipeline().parameters.env,'''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "IfCondition_Level1_EnvBranch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "LookupTenantConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.env,'staging')),and(greater(activity('LookupTenantConfig').output.count,0),not(equals(pipeline().parameters.processing_mode,'disabled'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetVar_ProdStagingFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebActivity_NotifySkipped",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.company.com/api/notify/',pipeline().parameters.env,'/skipped')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"multi_branch_condition_tree\",\"env\":\"',pipeline().parameters.env,'\",\"tenant_id\":\"',pipeline().parameters.tenant_id,'\",\"reason\":\"environment_or_config_not_eligible\",\"run_date\":\"',pipeline().parameters.run_date,'\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_Level2_ProcessingMode",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_Level1_EnvBranch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('processing_flag'),'true'),or(and(equals(pipeline().parameters.processing_mode,'full'),greater(activity('LookupTenantConfig').output.count,0)),and(equals(pipeline().parameters.processing_mode,'incremental'),not(equals(pipeline().parameters.run_date,first(activity('LookupTenantConfig').output.value).last_run_date)))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyTenantData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.processing_mode,'full'),concat('SELECT * FROM dbo.transactions WHERE tenant_id = ''',pipeline().parameters.tenant_id,''''),concat('SELECT * FROM dbo.transactions WHERE tenant_id = ''',pipeline().parameters.tenant_id,''' AND modified_date >= ''',pipeline().parameters.run_date,''''))"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "tenant_id"
+                      },
+                      "sink": {
+                        "name": "tenant_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "transaction_date"
+                      },
+                      "sink": {
+                        "name": "transaction_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "amount"
+                      },
+                      "sink": {
+                        "name": "amount",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [],
+              "outputs": [],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetVar_RecordCountZero",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "record_count",
+                "value": "0"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IfCondition_Level3_PostProcessValidation",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_Level2_ProcessingMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(and(equals(variables('processing_flag'),'true'),not(equals(variables('record_count'),'0'))),or(and(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.processing_mode,'full')),and(equals(pipeline().parameters.env,'staging'),greater(length(pipeline().parameters.tenant_id),5))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "DatabricksNotebook_Transform",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.02:00:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 120
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/Shared/pipelines/',pipeline().parameters.env,'/transform_tenant_data')"
+                },
+                "baseParameters": {
+                  "tenant_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.tenant_id"
+                  },
+                  "run_date": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.run_date"
+                  },
+                  "processing_mode": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.processing_mode"
+                  },
+                  "branch_path": {
+                    "type": "Expression",
+                    "value": "@variables('branch_path')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "WebActivity_PostValidationAlert",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://hooks.company.com/api/alerts/post-validation",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"multi_branch_condition_tree\",\"status\":\"post_validation_skipped\",\"env\":\"',pipeline().parameters.env,'\",\"tenant_id\":\"',pipeline().parameters.tenant_id,'\",\"processing_flag\":\"',variables('processing_flag'),'\",\"record_count\":\"',variables('record_count'),'\",\"run_date\":\"',pipeline().parameters.run_date,'\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVar_FinalBranchPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_Level3_PostProcessValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "branch_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('branch_path'),'|final_env=',pipeline().parameters.env,'|mode=',pipeline().parameters.processing_mode,'|flag=',variables('processing_flag'),'|count=',variables('record_count'),'|completed_at=',utcNow())"
+          }
+        }
+      }
+    ]
+  }
+}

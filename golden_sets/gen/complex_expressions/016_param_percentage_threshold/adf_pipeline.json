@@ -1,0 +1,240 @@
+{
+  "name": "param_percentage_threshold",
+  "properties": {
+    "parameters": {
+      "part_value": {
+        "type": "Float",
+        "defaultValue": 25
+      },
+      "whole_value": {
+        "type": "Float",
+        "defaultValue": 100
+      },
+      "percent_threshold": {
+        "type": "Float",
+        "defaultValue": 20
+      }
+    },
+    "variables": {
+      "calculated_percentage": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "threshold_met": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalculatePercentage",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "calculated_percentage",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value))"
+          }
+        }
+      },
+      {
+        "name": "EvaluateThreshold",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalculatePercentage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "threshold_met",
+          "value": {
+            "type": "Expression",
+            "value": "@string(greaterOrEquals(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value), pipeline().parameters.percent_threshold))"
+          }
+        }
+      },
+      {
+        "name": "CheckThresholdCondition",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "EvaluateThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greaterOrEquals(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value), pipeline().parameters.percent_threshold), greater(pipeline().parameters.whole_value, 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogThresholdExceeded",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://monitoring-api.contoso.com/api/alerts/threshold-exceeded",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"param_percentage_threshold\",\"calculated_percentage\":',string(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value)),',\"threshold\":',string(pipeline().parameters.percent_threshold),',\"status\":\"EXCEEDED\",\"part_value\":',string(pipeline().parameters.part_value),',\"whole_value\":',string(pipeline().parameters.whole_value),'}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogThresholdNotMet",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://monitoring-api.contoso.com/api/alerts/threshold-check",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"param_percentage_threshold\",\"calculated_percentage\":',string(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value)),',\"threshold\":',string(pipeline().parameters.percent_threshold),',\"status\":\"BELOW_THRESHOLD\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyFilteredData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckThresholdCondition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT id, category, value, total, CAST((value * 100.0 / NULLIF(total, 0)) AS DECIMAL(10,2)) AS pct FROM dbo.metrics WHERE (value * 100.0 / NULLIF(total, 0)) >= ', string(pipeline().parameters.percent_threshold), ' ORDER BY pct DESC')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "metric_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "category"
+                },
+                "sink": {
+                  "name": "metric_category",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "value"
+                },
+                "sink": {
+                  "name": "metric_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "total"
+                },
+                "sink": {
+                  "name": "metric_total",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "pct"
+                },
+                "sink": {
+                  "name": "calculated_pct",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyFilteredData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://monitoring-api.contoso.com/api/pipelines/completion",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"param_percentage_threshold\",\"status\":\"completed\",\"calculated_percentage\":',string(div(mul(pipeline().parameters.part_value, 100), pipeline().parameters.whole_value)),',\"threshold\":',string(pipeline().parameters.percent_threshold),',\"threshold_met\":',variables('threshold_met'),',\"rows_copied\":',string(activity('CopyFilteredData').output.rowsCopied),'}'))"
+          }
+        }
+      }
+    ]
+  }
+}

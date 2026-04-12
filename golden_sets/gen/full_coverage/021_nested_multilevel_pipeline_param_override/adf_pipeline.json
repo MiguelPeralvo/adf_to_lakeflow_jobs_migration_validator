@@ -1,0 +1,394 @@
+{
+  "name": "nested_multilevel_pipeline_param_override",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "override_level1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "override_level2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "override_level3": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "default_val": {
+        "type": "String",
+        "defaultValue": "fallback_default"
+      }
+    },
+    "variables": {
+      "resolved_level1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_level2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_level3": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_resolved_value": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedLevel1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_level1",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(pipeline().parameters.override_level1)), pipeline().parameters.override_level1, if(equals(pipeline().parameters.env, 'prod'), 'prod_level1_default', if(equals(pipeline().parameters.env, 'staging'), 'staging_level1_default', pipeline().parameters.default_val)))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedLevel2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedLevel1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_level2",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(pipeline().parameters.override_level2)), pipeline().parameters.override_level2, if(equals(variables('resolved_level1'), 'prod_level1_default'), 'prod_level2_cascaded', if(equals(variables('resolved_level1'), 'staging_level1_default'), 'staging_level2_cascaded', if(not(empty(pipeline().parameters.override_level1)), concat(pipeline().parameters.override_level1, '_level2'), pipeline().parameters.default_val))))"
+          }
+        }
+      },
+      {
+        "name": "CheckLevel2Override",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedLevel2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('resolved_level2'), 'prod_level2_cascaded'), equals(variables('resolved_level2'), 'staging_level2_cascaded'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetLevel3FromCascade",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "resolved_level3",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(not(empty(pipeline().parameters.override_level3)), pipeline().parameters.override_level3, if(equals(variables('resolved_level2'), 'prod_level2_cascaded'), 'prod_level3_final', if(equals(variables('resolved_level2'), 'staging_level2_cascaded'), 'staging_level3_final', pipeline().parameters.default_val)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetLevel3FromDefault",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "resolved_level3",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(not(empty(pipeline().parameters.override_level3)), pipeline().parameters.override_level3, if(not(empty(variables('resolved_level2'))), concat(variables('resolved_level2'), '_level3_fallback'), pipeline().parameters.default_val))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalResolvedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckLevel2Override",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_resolved_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(not(empty(variables('resolved_level3'))), not(equals(variables('resolved_level3'), pipeline().parameters.default_val))), variables('resolved_level3'), if(and(not(empty(variables('resolved_level2'))), not(equals(variables('resolved_level2'), pipeline().parameters.default_val))), variables('resolved_level2'), if(and(not(empty(variables('resolved_level1'))), not(equals(variables('resolved_level1'), pipeline().parameters.default_val))), variables('resolved_level1'), pipeline().parameters.default_val)))"
+          }
+        }
+      },
+      {
+        "name": "CheckFinalValueForCopy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFinalResolvedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('final_resolved_value'), pipeline().parameters.default_val))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyWithResolvedParams",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "7.00:00:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', variables('final_resolved_value'), '.data_table WHERE env = ''', pipeline().parameters.env, ''' AND level1 = ''', variables('resolved_level1'), ''' AND level2 = ''', variables('resolved_level2'), ''' AND level3 = ''', variables('resolved_level3'), '''')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_env"
+                      },
+                      "sink": {
+                        "name": "tgt_env",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_level"
+                      },
+                      "sink": {
+                        "name": "tgt_level",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogDefaultFallback",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging-api.internal.com/v1/pipelines/', pipeline().PipelineId, '/log')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_multilevel_pipeline_param_override\",\"env\":\"', pipeline().parameters.env, '\",\"final_value\":\"', variables('final_resolved_value'), '\",\"resolved_level1\":\"', variables('resolved_level1'), '\",\"resolved_level2\":\"', variables('resolved_level2'), '\",\"resolved_level3\":\"', variables('resolved_level3'), '\",\"message\":\"All overrides fell through to default_val. No copy executed.\",\"timestamp\":\"', utcNow(), '\"}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyDataDefault",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckFinalValueForCopy",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT id, name, status, created_at FROM dbo.audit_log WHERE pipeline_run = ''', pipeline().RunId, ''' AND resolved_config = ''', if(not(equals(variables('final_resolved_value'), pipeline().parameters.default_val)), variables('final_resolved_value'), concat('default_', pipeline().parameters.env)), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyDataDefault",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://hooks.internal.com/adf/pipeline-complete",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Name": "nested_multilevel_pipeline_param_override"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"nested_multilevel_pipeline_param_override\",\"run_id\":\"', pipeline().RunId, '\",\"env\":\"', pipeline().parameters.env, '\",\"override_level1\":\"', pipeline().parameters.override_level1, '\",\"override_level2\":\"', pipeline().parameters.override_level2, '\",\"override_level3\":\"', pipeline().parameters.override_level3, '\",\"resolved_level1\":\"', variables('resolved_level1'), '\",\"resolved_level2\":\"', variables('resolved_level2'), '\",\"resolved_level3\":\"', variables('resolved_level3'), '\",\"final_resolved_value\":\"', variables('final_resolved_value'), '\",\"status\":\"Succeeded\",\"completed_at\":\"', utcNow(), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

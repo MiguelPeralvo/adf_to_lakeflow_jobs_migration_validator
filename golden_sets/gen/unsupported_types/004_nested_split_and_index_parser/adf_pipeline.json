@@ -1,0 +1,227 @@
+{
+  "name": "nested_split_and_index_parser",
+  "properties": {
+    "parameters": {
+      "delimited_input": {
+        "type": "String",
+        "defaultValue": "region:us-east|env:prod|tier:standard"
+      },
+      "delimiter": {
+        "type": "String",
+        "defaultValue": "|"
+      },
+      "expected_parts": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "parsed_segments": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "first_key_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "validation_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetParsedSegments",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_segments",
+          "value": {
+            "type": "Expression",
+            "value": "@join(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter), ',')"
+          }
+        }
+      },
+      {
+        "name": "SetFirstKeyValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetParsedSegments",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "first_key_value",
+          "value": {
+            "type": "Expression",
+            "value": "@split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[0], ':')[1]"
+          }
+        }
+      },
+      {
+        "name": "SetValidationFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFirstKeyValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "validation_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@string(greaterOrEquals(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)), pipeline().parameters.expected_parts))"
+          }
+        }
+      },
+      {
+        "name": "CheckPartsAndEnv",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetValidationFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('validation_flag'), 'true'), equals(split(split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[1], ':')[1], '-')[0], pipeline().parameters.env))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunParserNotebookTrue",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/nested_split_parser",
+                "baseParameters": {
+                  "raw_input": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.delimited_input"
+                  },
+                  "segment_count": {
+                    "type": "Expression",
+                    "value": "@string(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)))"
+                  },
+                  "first_value": {
+                    "type": "Expression",
+                    "value": "@variables('first_key_value')"
+                  },
+                  "second_segment_key": {
+                    "type": "Expression",
+                    "value": "@split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[1], ':')[0]"
+                  },
+                  "second_segment_value": {
+                    "type": "Expression",
+                    "value": "@split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[1], ':')[1]"
+                  },
+                  "third_segment_sub_part": {
+                    "type": "Expression",
+                    "value": "@if(greaterOrEquals(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)), 3), split(split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[2], ':')[1], '-')[0], 'N/A')"
+                  },
+                  "environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "validation_passed": {
+                    "type": "Expression",
+                    "value": "@variables('validation_flag')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunParserNotebookFalse",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/nested_split_parser_fallback",
+                "baseParameters": {
+                  "raw_input": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.delimited_input"
+                  },
+                  "error_reason": {
+                    "type": "Expression",
+                    "value": "@concat('Expected ', string(pipeline().parameters.expected_parts), ' parts but found ', string(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter))))"
+                  },
+                  "environment": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalNotebookExecution",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckPartsAndEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/nested_split_summary",
+          "baseParameters": {
+            "all_keys": {
+              "type": "Expression",
+              "value": "@concat(split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[0], ':')[0], ',', split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[1], ':')[0], ',', if(greaterOrEquals(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)), 3), split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[2], ':')[0], 'MISSING'))"
+            },
+            "all_values": {
+              "type": "Expression",
+              "value": "@concat(split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[0], ':')[1], ',', split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[1], ':')[1], ',', if(greaterOrEquals(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)), 3), split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[2], ':')[1], 'MISSING'))"
+            },
+            "total_segments": {
+              "type": "Expression",
+              "value": "@string(length(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)))"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

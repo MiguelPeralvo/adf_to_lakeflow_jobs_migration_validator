@@ -47,14 +47,21 @@ Run the autonomous ratchet loop from the plan. Two parallel tracks:
 
 ### Tier 0: PR Staging — IN PROGRESS
 
-| # | PR | Status | URL |
-|---|-----|--------|-----|
-| 1 | pr/27-0-expression-docs → alpha_1 | **opened** | https://github.com/MiguelPeralvo/wkmigrate/pull/1 |
-| 2 | pr/27-1-expression-parser → alpha_1 | pending | awaiting PR #1 merge |
-| 3 | pr/27-2-datetime-emission → alpha_1 | pending | awaiting PR #2 merge |
-| 4 | pr/27-3-translator-adoption → alpha_1 | pending | awaiting PR #3 merge |
-| 5 | pr/27-4-integration-tests → alpha_1 | pending | awaiting PR #4 merge |
-| 6+ | W-9..W-19 fix follow-ups | pending | awaiting PR #5 merge |
+| # | PR | Status | URL | Review verdict |
+|---|-----|--------|-----|----------------|
+| 1 | pr/27-0-expression-docs → alpha_1 | **MERGED** 336894e | https://github.com/MiguelPeralvo/wkmigrate/pull/1 | MERGE READY (0 P0, 4 P1 non-blocking) |
+| 2 | pr/27-1-expression-parser → alpha_1 | **MERGED** | https://github.com/MiguelPeralvo/wkmigrate/pull/2 | BLOCK overridden — 3 P0 = W-16/W-17/W-18, fixes already on pr/27-4, will land as PR #6-8 follow-ups |
+| 3 | pr/27-2-datetime-emission → alpha_1 | **OPEN** — review running | https://github.com/MiguelPeralvo/wkmigrate/pull/3 | (subagent ad2382e9caa38a904) |
+| 4 | pr/27-3-translator-adoption → alpha_1 | pending | awaiting PR #3 merge | |
+| 5 | pr/27-4-integration-tests → alpha_1 | pending | awaiting PR #4 merge | |
+| 6 | follow-up: W-16 variables best-effort (ad749f9) | pending | awaiting PR #5 merge | |
+| 7 | follow-up: W-17/W-18 firstRow + numeric coercion (3aaa16e) | pending | awaiting PR #5 merge | |
+| 8 | follow-up: W-14/W-15 activity ref + @join (72b7e21, f327e81) | pending | awaiting PR #5 merge | |
+
+**Key infrastructure change:** alpha_1 was reset from `f68f324` (parallel-phase tip) to `72265ba` (merge base) before PR #1 merged. This was the architectural decision from the earlier session: "pr/27-N is canonical, alpha_1 rebuild needed". Backups preserved at:
+- `fork/backup/alpha_1-pre-reset-2026-04-12` (= old `f68f324`)
+- `fork/backup/alpha_1-pre-pr27-3-merge-2026-04-09`
+- `fork/backup/pre-autonomous-2026-04-12`
 
 ### Tier 1: Verify W-17/W-18 fix — IN PROGRESS
 

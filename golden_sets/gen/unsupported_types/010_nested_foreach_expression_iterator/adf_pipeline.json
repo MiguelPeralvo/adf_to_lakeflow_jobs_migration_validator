@@ -1,0 +1,195 @@
+{
+  "name": "nested_foreach_expression_iterator",
+  "properties": {
+    "parameters": {
+      "table_list": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      }
+    },
+    "variables": {
+      "current_table": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, row_count, last_updated, is_active FROM metadata.control_table WHERE schema_name = ''', pipeline().parameters.schema, ''' AND environment = ''', pipeline().parameters.env, ''' AND batch_id = ''', pipeline().parameters.batch_id, ''' ORDER BY table_name')"
+            }
+          },
+          "firstRowOnly": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVarProcessingFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupTableMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(activity('LookupTableMetadata').output.value), 0), 'true', 'false')"
+          }
+        }
+      },
+      {
+        "name": "ForEachTable",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetVarProcessingFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 10,
+          "items": {
+            "type": "Expression",
+            "value": "@if(equals(variables('processing_flag'), 'true'), activity('LookupTableMetadata').output.value, createArray(json('{\"table_name\":\"__skip__\",\"row_count\":0,\"last_updated\":\"1900-01-01\",\"is_active\":0}')))"
+          },
+          "activities": [
+            {
+              "name": "SetCurrentTableContext",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "current_table",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(if(equals(pipeline().parameters.env, 'prod'), concat(pipeline().parameters.schema, '.'), concat(pipeline().parameters.schema, '_', pipeline().parameters.env, '.')), if(and(greater(item().row_count, 0), equals(item().is_active, 1)), item().table_name, concat('skip_', item().table_name)))"
+                }
+              }
+            },
+            {
+              "name": "CheckTableEligibility",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "SetCurrentTableContext",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(equals(item().table_name, '__skip__')), and(equals(item().is_active, 1), greater(item().row_count, 0)))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CopyTableData",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.01:00:00",
+                      "retry": 3,
+                      "retryIntervalInSeconds": 60
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource",
+                        "sql_reader_query": {
+                          "type": "Expression",
+                          "value": "@concat('SELECT * FROM ', if(equals(pipeline().parameters.env, 'prod'), concat('[', pipeline().parameters.schema, '].[', item().table_name, ']'), concat('[', pipeline().parameters.schema, '_', pipeline().parameters.env, '].[', item().table_name, ']')), ' WHERE modified_date >= ''', if(greater(item().row_count, 10000), formatDateTime(adddays(utcnow(), -1), 'yyyy-MM-dd'), formatDateTime(adddays(utcnow(), -7), 'yyyy-MM-dd')), ''' AND batch_id = ''', pipeline().parameters.batch_id, '''')"
+                        }
+                      },
+                      "sink": {
+                        "type": "AzureDatabricksDeltaLakeSink"
+                      },
+                      "translator": {
+                        "type": "TabularTranslator",
+                        "mappings": [
+                          {
+                            "source": {
+                              "name": "src_col"
+                            },
+                            "sink": {
+                              "name": "tgt_col",
+                              "type": "String"
+                            }
+                          }
+                        ]
+                      },
+                      "input_dataset_definitions": [
+                        {
+                          "type": "AzureSqlSource",
+                          "schema": [],
+                          "linkedServiceName": {
+                            "referenceName": "ls_sql",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ],
+                      "output_dataset_definitions": [
+                        {
+                          "type": "AzureDatabricksDeltaLakeSink",
+                          "schema": [],
+                          "linkedServiceName": {
+                            "referenceName": "ls_delta",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

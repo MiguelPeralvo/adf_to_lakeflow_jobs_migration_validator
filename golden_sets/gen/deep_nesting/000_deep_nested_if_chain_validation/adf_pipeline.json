@@ -1,0 +1,268 @@
+{
+  "name": "deep_nested_if_chain_validation",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "eastus"
+      },
+      "feature_flag": {
+        "type": "String",
+        "defaultValue": "enabled"
+      },
+      "debug_mode": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "variables": {
+      "validation_status": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "processing_tier": {
+        "type": "String",
+        "defaultValue": "standard"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupEnvironmentConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_value, is_active FROM environment_config WHERE env = ''', pipeline().parameters.env, ''' AND region = ''', pipeline().parameters.region, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "WebActivityHealthCheck",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "LookupEnvironmentConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:02:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 10
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api-', pipeline().parameters.region, '.validation-service.com/health?env=', pipeline().parameters.env, '&debug=', pipeline().parameters.debug_mode)"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Feature-Flag": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.feature_flag"
+            }
+          }
+        }
+      },
+      {
+        "name": "SetValidationStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "WebActivityHealthCheck",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "validation_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(activity('WebActivityHealthCheck').output.status, 'healthy'), 'passed', 'failed')"
+          }
+        }
+      },
+      {
+        "name": "SetProcessingTier",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetValidationStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_tier",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), 'premium', if(equals(pipeline().parameters.env, 'staging'), 'standard', 'basic'))"
+          }
+        }
+      },
+      {
+        "name": "Level1_CheckEnvironment",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingTier",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Level2_CheckRegion",
+              "type": "IfCondition",
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.region, 'eastus'), equals(pipeline().parameters.region, 'westeurope'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "Level3_CheckFeatureFlag",
+                    "type": "IfCondition",
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@equals(pipeline().parameters.feature_flag, 'enabled')"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "Level4_CheckDebugMode",
+                          "type": "IfCondition",
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@equals(pipeline().parameters.debug_mode, 'true')"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "WebActivityDebugNotification",
+                                "type": "WebActivity",
+                                "typeProperties": {
+                                  "url": {
+                                    "type": "Expression",
+                                    "value": "@concat('https://api-', pipeline().parameters.region, '.validation-service.com/v2/deep-validate?env=', pipeline().parameters.env, '&tier=', variables('processing_tier'), '&debug=true&validation_status=', variables('validation_status'))"
+                                  },
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json"
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"pipeline\":\"deep_nested_if_chain_validation\",\"env\":\"', pipeline().parameters.env, '\",\"region\":\"', pipeline().parameters.region, '\",\"feature_flag\":\"', pipeline().parameters.feature_flag, '\",\"debug_mode\":\"', pipeline().parameters.debug_mode, '\",\"validation_status\":\"', variables('validation_status'), '\",\"processing_tier\":\"', variables('processing_tier'), '\",\"config_count\":', string(activity('LookupEnvironmentConfig').output.count), ',\"level\":\"L4_debug_enabled\",\"timestamp\":\"', utcnow(), '\"}'))"
+                                  }
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "WebActivityProdNotification",
+                                "type": "WebActivity",
+                                "typeProperties": {
+                                  "url": {
+                                    "type": "Expression",
+                                    "value": "@concat('https://api-', pipeline().parameters.region, '.validation-service.com/v2/deep-validate?env=', pipeline().parameters.env, '&tier=', variables('processing_tier'))"
+                                  },
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json"
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"pipeline\":\"deep_nested_if_chain_validation\",\"env\":\"', pipeline().parameters.env, '\",\"region\":\"', pipeline().parameters.region, '\",\"feature_flag\":\"', pipeline().parameters.feature_flag, '\",\"debug_mode\":\"false\",\"validation_status\":\"', variables('validation_status'), '\",\"processing_tier\":\"', variables('processing_tier'), '\",\"config_count\":', string(activity('LookupEnvironmentConfig').output.count), ',\"level\":\"L4_debug_disabled\",\"timestamp\":\"', utcnow(), '\"}'))"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "SetVarFeatureDisabled",
+                          "type": "SetVariable",
+                          "typeProperties": {
+                            "variableName": "validation_status",
+                            "value": "feature_flag_disabled_skipped"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetVarRegionUnsupported",
+                    "type": "SetVariable",
+                    "typeProperties": {
+                      "variableName": "validation_status",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('region_unsupported_', pipeline().parameters.region)"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetVarNonProdSkip",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "validation_status",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('non_critical_env_', pipeline().parameters.env, '_skipped')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

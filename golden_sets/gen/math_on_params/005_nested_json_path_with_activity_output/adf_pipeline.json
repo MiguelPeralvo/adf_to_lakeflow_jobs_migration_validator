@@ -1,0 +1,207 @@
+{
+  "name": "nested_json_path_with_activity_output",
+  "properties": {
+    "parameters": {
+      "lookup_table": {
+        "type": "String",
+        "defaultValue": "config_table"
+      },
+      "schema_name": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "resolved_table_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "row_count_info": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, row_count, notebook_path, is_active FROM ', pipeline().parameters.schema_name, '.', pipeline().parameters.lookup_table, ' WHERE environment = ''', pipeline().parameters.env, ''' ORDER BY priority ASC')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetResolvedTableName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupTableConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_table_name",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupTableConfig').output.value[0].table_name, concat(pipeline().parameters.schema_name, '.', pipeline().parameters.lookup_table, '_fallback'))"
+          }
+        }
+      },
+      {
+        "name": "SetRowCountInfo",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedTableName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "row_count_info",
+          "value": {
+            "type": "Expression",
+            "value": "@string(coalesce(activity('LookupTableConfig').output.value[0].row_count, 0))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfActive",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRowCountInfo",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(toLower(coalesce(string(activity('LookupTableConfig').output.value[0].is_active), 'false')), 'true'), greater(int(variables('row_count_info')), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetNotebookPathInner",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "notebook_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/', pipeline().parameters.env, '/', coalesce(trim(activity('LookupTableConfig').output.value[0].notebook_path), concat('default_', replace(variables('resolved_table_name'), '.', '_'))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "SetNotebookPathFallback",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIfActive",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "notebook_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(empty(variables('notebook_path')), concat('/pipelines/', pipeline().parameters.env, '/fallback_', substring(coalesce(activity('LookupTableConfig').output.value[0].table_name, 'unknown'), 0, min(length(coalesce(activity('LookupTableConfig').output.value[0].table_name, 'unknown')), 50))), variables('notebook_path'))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetNotebookPathFallback",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@variables('notebook_path')"
+          },
+          "baseParameters": {
+            "table_name": {
+              "type": "Expression",
+              "value": "@variables('resolved_table_name')"
+            },
+            "row_count": {
+              "type": "Expression",
+              "value": "@variables('row_count_info')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "schema": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.schema_name"
+            },
+            "source_config": {
+              "type": "Expression",
+              "value": "@string(coalesce(activity('LookupTableConfig').output.value[0], json(concat('{\"table_name\":\"', variables('resolved_table_name'), '\",\"status\":\"fallback\"}'))))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

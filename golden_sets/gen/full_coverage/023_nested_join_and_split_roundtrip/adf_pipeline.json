@@ -1,0 +1,205 @@
+{
+  "name": "nested_join_and_split_roundtrip",
+  "properties": {
+    "parameters": {
+      "input_array": {
+        "type": "Array",
+        "defaultValue": [
+          "alpha",
+          "beta",
+          "gamma",
+          "delta"
+        ]
+      },
+      "join_delimiter": {
+        "type": "String",
+        "defaultValue": "|"
+      },
+      "split_delimiter": {
+        "type": "String",
+        "defaultValue": "|"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "joined_string": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "roundtrip_array_str": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "transformed_joined": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "element_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "JoinInputArray",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "joined_string",
+          "value": {
+            "type": "Expression",
+            "value": "@join(pipeline().parameters.input_array, pipeline().parameters.join_delimiter)"
+          }
+        }
+      },
+      {
+        "name": "TransformJoinedString",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "JoinInputArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "transformed_joined",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(toUpper(variables('joined_string')), concat(pipeline().parameters.join_delimiter, pipeline().parameters.join_delimiter), pipeline().parameters.join_delimiter)"
+          }
+        }
+      },
+      {
+        "name": "SplitBackToArray",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "TransformJoinedString",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "roundtrip_array_str",
+          "value": {
+            "type": "Expression",
+            "value": "@join(split(variables('transformed_joined'), pipeline().parameters.split_delimiter), ',')"
+          }
+        }
+      },
+      {
+        "name": "ComputeElementCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SplitBackToArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "element_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(split(variables('transformed_joined'), pipeline().parameters.split_delimiter)))"
+          }
+        }
+      },
+      {
+        "name": "CheckRoundtripIntegrity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeElementCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(length(split(variables('transformed_joined'), pipeline().parameters.split_delimiter)), length(pipeline().parameters.input_array)), greater(length(split(variables('transformed_joined'), pipeline().parameters.split_delimiter)), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogIntegrityPass",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "element_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(length(split(variables('transformed_joined'), pipeline().parameters.split_delimiter)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogIntegrityFail",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "element_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(-1)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "IterateRoundtripElements",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "CheckRoundtripIntegrity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@split(variables('transformed_joined'), pipeline().parameters.split_delimiter)"
+          },
+          "activities": [
+            {
+              "name": "ProcessElement",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "element_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.env, '_', string(length(item())), '_', item())"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

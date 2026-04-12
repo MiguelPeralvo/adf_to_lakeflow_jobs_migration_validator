@@ -1,0 +1,172 @@
+{
+  "name": "nested_length_substring_expressions",
+  "properties": {
+    "parameters": {
+      "full_path": {
+        "type": "String",
+        "defaultValue": "/mnt/data/raw/sales_2024.csv"
+      },
+      "search_token": {
+        "type": "String",
+        "defaultValue": "/"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "extracted_filename": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "token_position": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "path_suffix": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetTokenPosition",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "token_position",
+          "value": {
+            "type": "Expression",
+            "value": "@string(lastIndexOf(pipeline().parameters.full_path, pipeline().parameters.search_token))"
+          }
+        }
+      },
+      {
+        "name": "ExtractFilename",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetTokenPosition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_filename",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.full_path, add(lastIndexOf(pipeline().parameters.full_path, pipeline().parameters.search_token), length(pipeline().parameters.search_token)), sub(length(pipeline().parameters.full_path), add(lastIndexOf(pipeline().parameters.full_path, pipeline().parameters.search_token), length(pipeline().parameters.search_token))))"
+          }
+        }
+      },
+      {
+        "name": "CheckFilenameNotEmpty",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ExtractFilename",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(length(variables('extracted_filename')), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetPathSuffix",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "path_suffix",
+                "value": {
+                  "type": "Expression",
+                  "value": "@substring(variables('extracted_filename'), 0, sub(length(variables('extracted_filename')), length(substring(variables('extracted_filename'), indexOf(variables('extracted_filename'), '.'), sub(length(variables('extracted_filename')), indexOf(variables('extracted_filename'), '.')))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "SetEnvQualifiedPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckFilenameNotEmpty",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "path_suffix",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.env, '/', substring(pipeline().parameters.full_path, indexOf(pipeline().parameters.full_path, pipeline().parameters.search_token), sub(length(pipeline().parameters.full_path), indexOf(pipeline().parameters.full_path, pipeline().parameters.search_token))))"
+          }
+        }
+      },
+      {
+        "name": "RunProcessingNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetEnvQualifiedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Workspace/pipelines/', pipeline().parameters.env, '/process_file')"
+          },
+          "baseParameters": {
+            "file_name": {
+              "type": "Expression",
+              "value": "@variables('extracted_filename')"
+            },
+            "qualified_path": {
+              "type": "Expression",
+              "value": "@variables('path_suffix')"
+            },
+            "original_path": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.full_path"
+            },
+            "token_index": {
+              "type": "Expression",
+              "value": "@variables('token_position')"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

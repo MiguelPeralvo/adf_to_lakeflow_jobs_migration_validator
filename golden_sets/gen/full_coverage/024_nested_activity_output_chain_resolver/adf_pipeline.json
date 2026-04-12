@@ -1,0 +1,397 @@
+{
+  "name": "nested_activity_output_chain_resolver",
+  "properties": {
+    "parameters": {
+      "source_table": {
+        "type": "String",
+        "defaultValue": "dbo.source_data"
+      },
+      "config_key": {
+        "type": "String",
+        "defaultValue": "default_config"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_id": {
+        "type": "String",
+        "defaultValue": "run-001"
+      },
+      "retry_count": {
+        "type": "String",
+        "defaultValue": "3"
+      }
+    },
+    "variables": {
+      "resolved_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "row_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "should_copy": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "final_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_value, is_active, row_limit, target_schema FROM config_table WHERE config_key = ''', pipeline().parameters.config_key, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetResolvedConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_config",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupConfig').output.firstRow.config_value, if(equals(pipeline().parameters.env, 'prod'), 'prod_default_config', 'dev_default_config'))"
+          }
+        }
+      },
+      {
+        "name": "SetRowCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "row_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(coalesce(activity('LookupConfig').output.firstRow.row_limit, if(equals(pipeline().parameters.env, 'prod'), 100000, 1000)))"
+          }
+        }
+      },
+      {
+        "name": "CheckConfigActive",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetRowCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(coalesce(activity('LookupConfig').output.firstRow.is_active, if(equals(pipeline().parameters.env, 'prod'), true, false)), true)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSetShouldCopyTrue",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "should_copy",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerSetShouldCopyFalse",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "should_copy",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "CheckConfigActive",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS total_rows, MAX(modified_date) AS last_modified FROM ', pipeline().parameters.source_table, ' WHERE processing_env = ''', pipeline().parameters.env, ''' AND config_ref = ''', coalesce(variables('resolved_config'), 'fallback'), '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "final_query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM ', pipeline().parameters.source_table, ' WHERE processing_env = ''', pipeline().parameters.env, ''' AND config_ref = ''', coalesce(variables('resolved_config'), 'fallback'), ''' AND modified_date >= ''', coalesce(string(activity('LookupSourceMetadata').output.firstRow.last_modified), '1900-01-01'), ''' ORDER BY modified_date DESC OFFSET 0 ROWS FETCH NEXT ', if(greater(int(variables('row_count')), int(coalesce(string(activity('LookupSourceMetadata').output.firstRow.total_rows), '0'))), coalesce(string(activity('LookupSourceMetadata').output.firstRow.total_rows), '0'), variables('row_count')), ' ROWS ONLY')"
+          }
+        }
+      },
+      {
+        "name": "CheckShouldCopy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('should_copy'), 'true'), greater(coalesce(activity('LookupSourceMetadata').output.firstRow.total_rows, 0), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLogReady",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_config",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('resolved_config'), '_ready')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerLogSkip",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_config",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('resolved_config'), '_skipped')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckShouldCopy",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(contains(variables('resolved_config'), '_ready'), coalesce(activity('LookupConfig').output.firstRow.target_schema, if(equals(pipeline().parameters.env, 'prod'), 'prod_schema', 'dev_schema')), concat('SKIP_', pipeline().parameters.run_id))"
+          }
+        }
+      },
+      {
+        "name": "CopySourceToDelta",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": {
+            "type": "Expression",
+            "value": "@int(pipeline().parameters.retry_count)"
+          },
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@if(contains(variables('resolved_config'), 'SKIP_'), concat('SELECT TOP 0 * FROM ', pipeline().parameters.source_table), variables('final_query'))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "modified_date"
+                },
+                "sink": {
+                  "name": "load_modified_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "config_ref"
+                },
+                "sink": {
+                  "name": "config_reference",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopySourceToDelta",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/pipelines/', pipeline().parameters.run_id, '/notify')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Run-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.run_id"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_activity_output_chain_resolver\",\"run_id\":\"', pipeline().parameters.run_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"config_key\":\"', pipeline().parameters.config_key, '\",\"resolved_config\":\"', variables('resolved_config'), '\",\"source_table\":\"', pipeline().parameters.source_table, '\",\"rows_available\":', coalesce(string(activity('LookupSourceMetadata').output.firstRow.total_rows), '0'), ',\"row_limit_applied\":', variables('row_count'), ',\"copy_rows_read\":', coalesce(string(activity('CopySourceToDelta').output.rowsRead), '0'), ',\"copy_rows_written\":', coalesce(string(activity('CopySourceToDelta').output.rowsCopied), '0'), ',\"copy_duration_ms\":', coalesce(string(activity('CopySourceToDelta').output.copyDuration), '0'), ',\"should_copy\":\"', variables('should_copy'), '\",\"status\":\"succeeded\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

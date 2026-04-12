@@ -1,0 +1,188 @@
+{
+  "name": "nested_ticks_and_datetime_comparison",
+  "properties": {
+    "parameters": {
+      "start_time": {
+        "type": "String",
+        "defaultValue": "2024-01-01T00:00:00Z"
+      },
+      "end_time": {
+        "type": "String",
+        "defaultValue": "2024-01-02T00:00:00Z"
+      },
+      "threshold_hours": {
+        "type": "String",
+        "defaultValue": "24"
+      }
+    },
+    "variables": {
+      "start_ticks": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "end_ticks": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_within_threshold": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetStartTicks",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "start_ticks",
+          "value": {
+            "type": "Expression",
+            "value": "@string(ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ')))"
+          }
+        }
+      },
+      {
+        "name": "SetEndTicks",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetStartTicks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "end_ticks",
+          "value": {
+            "type": "Expression",
+            "value": "@string(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')))"
+          }
+        }
+      },
+      {
+        "name": "CheckTicksThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetEndTicks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ'))), less(div(sub(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ'))), 36000000000), int(pipeline().parameters.threshold_hours)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetThresholdMet",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_within_threshold",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(greater(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(addHours(pipeline().parameters.start_time, int(pipeline().parameters.threshold_hours)), 'yyyy-MM-ddTHH:mm:ssZ'))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetThresholdNotMet",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_within_threshold",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(less(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetComparisonResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckTicksThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_within_threshold",
+          "value": {
+            "type": "Expression",
+            "value": "@string(and(greater(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ'))), less(ticks(formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ')), ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ')))))"
+          }
+        }
+      },
+      {
+        "name": "NotifyResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetComparisonResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://hooks.example.com/api/notify",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_ticks_and_datetime_comparison\",\"start_ticks\":\"', string(ticks(formatDateTime(pipeline().parameters.start_time, 'yyyy-MM-ddTHH:mm:ssZ'))), '\",\"end_ticks\":\"', string(ticks(formatDateTime(pipeline().parameters.end_time, 'yyyy-MM-ddTHH:mm:ssZ'))), '\",\"is_within_threshold\":', variables('is_within_threshold'), ',\"threshold_hours\":', pipeline().parameters.threshold_hours, ',\"evaluated_at\":\"', formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ'), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

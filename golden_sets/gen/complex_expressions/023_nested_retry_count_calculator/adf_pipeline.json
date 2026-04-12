@@ -1,0 +1,151 @@
+{
+  "name": "nested_retry_count_calculator",
+  "properties": {
+    "parameters": {
+      "max_retries": {
+        "type": "Int",
+        "defaultValue": 5
+      },
+      "backoff_base": {
+        "type": "Int",
+        "defaultValue": 2
+      },
+      "attempt_number": {
+        "type": "Int",
+        "defaultValue": 1
+      }
+    },
+    "variables": {
+      "remaining_retries": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "backoff_interval": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalculateRemainingRetries",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remaining_retries",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number))"
+          }
+        }
+      },
+      {
+        "name": "CalculateBackoffInterval",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalculateRemainingRetries",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "backoff_interval",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1)))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfRetriesRemaining",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CalculateBackoffInterval",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ExecuteRetryWebCall",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://api.example.com/retry?attempt=', string(pipeline().parameters.attempt_number), '&backoff=', string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1))), '&remaining=', string(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number)))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"attempt_number\":', string(pipeline().parameters.attempt_number), ',\"max_retries\":', string(pipeline().parameters.max_retries), ',\"remaining_retries\":', string(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number)), ',\"backoff_interval_seconds\":', string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1))), ',\"total_max_backoff\":', string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.max_retries, 1))), '}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogMaxRetriesExhausted",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example.com/log/retries-exhausted",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"status\":\"retries_exhausted\",\"max_retries\":', string(pipeline().parameters.max_retries), ',\"final_attempt\":', string(pipeline().parameters.attempt_number), ',\"total_backoff_accumulated\":', string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1))), '}'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "NotifyRetryStatus",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckIfRetriesRemaining",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.example.com/notify?retries_left=', string(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number)), '&backoff_ms=', string(mul(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1)), 1000)))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_retry_count_calculator\",\"remaining_retries\":', string(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number)), ',\"computed_backoff_seconds\":', string(mul(mul(pipeline().parameters.backoff_base, pipeline().parameters.backoff_base), sub(pipeline().parameters.attempt_number, 1))), ',\"can_retry\":', string(greater(sub(pipeline().parameters.max_retries, pipeline().parameters.attempt_number), 0)), '}'))"
+          }
+        }
+      }
+    ]
+  }
+}

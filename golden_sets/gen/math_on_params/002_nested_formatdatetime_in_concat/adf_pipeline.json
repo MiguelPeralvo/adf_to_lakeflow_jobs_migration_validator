@@ -1,0 +1,140 @@
+{
+  "name": "nested_formatdatetime_in_concat",
+  "properties": {
+    "parameters": {
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15T10:30:00Z"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east-1"
+      },
+      "output_container": {
+        "type": "String",
+        "defaultValue": "processed-data"
+      }
+    },
+    "variables": {
+      "year_month_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "formatted_output_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_region_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Set_YearMonthPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "year_month_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.output_container, '/', replace(concat(formatDateTime(pipeline().parameters.run_date, 'yyyy'), '/', formatDateTime(pipeline().parameters.run_date, 'MM'), '/', formatDateTime(pipeline().parameters.run_date, 'dd')), '/', '-'), '/raw')"
+          }
+        }
+      },
+      {
+        "name": "Set_SanitizedRegionPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_YearMonthPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_region_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(replace(pipeline().parameters.region, '-', '_'), '/', replace(concat('run_', formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd'), '_', formatDateTime(pipeline().parameters.run_date, 'HHmmss')), ' ', ''))"
+          }
+        }
+      },
+      {
+        "name": "Set_FormattedOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_SanitizedRegionPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "formatted_output_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('abfss://', pipeline().parameters.output_container, '@datalake.dfs.core.windows.net/', replace(concat(variables('sanitized_region_path'), '/', formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-dd'), '/output_', formatDateTime(pipeline().parameters.run_date, 'HHmm')), '--', '-'), '/', replace(concat('partition_', formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd_HHmmss'), '_', pipeline().parameters.region), ' ', '_'))"
+          }
+        }
+      },
+      {
+        "name": "Run_Databricks_Processing",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set_FormattedOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Workspace/pipelines/', replace(pipeline().parameters.region, '-', '_'), '/process_', formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd'))"
+          },
+          "baseParameters": {
+            "output_path": {
+              "type": "Expression",
+              "value": "@variables('formatted_output_path')"
+            },
+            "run_date_formatted": {
+              "type": "Expression",
+              "value": "@concat(formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-dd'), 'T', formatDateTime(pipeline().parameters.run_date, 'HH:mm:ss'), 'Z')"
+            },
+            "year_month_partition": {
+              "type": "Expression",
+              "value": "@variables('year_month_path')"
+            },
+            "region_key": {
+              "type": "Expression",
+              "value": "@replace(concat('region_', pipeline().parameters.region, '_', formatDateTime(pipeline().parameters.run_date, 'yyyyMM')), '-', '_')"
+            },
+            "storage_container": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.output_container"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_adb_workspace",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

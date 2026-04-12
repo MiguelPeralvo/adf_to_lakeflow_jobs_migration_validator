@@ -1,0 +1,141 @@
+{
+  "name": "nested_substring_and_length_truncator",
+  "properties": {
+    "parameters": {
+      "input_string": {
+        "type": "String",
+        "defaultValue": "This is a sample long string for testing truncation logic"
+      },
+      "max_length": {
+        "type": "Int",
+        "defaultValue": 20
+      },
+      "ellipsis_flag": {
+        "type": "Bool",
+        "defaultValue": true
+      }
+    },
+    "variables": {
+      "effective_length": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "needs_truncation": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "truncated_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeEffectiveLength",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_length",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(length(pipeline().parameters.input_string), pipeline().parameters.max_length), pipeline().parameters.max_length, length(pipeline().parameters.input_string)))"
+          }
+        }
+      },
+      {
+        "name": "DetermineIfTruncationNeeded",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeEffectiveLength",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "needs_truncation",
+          "value": {
+            "type": "Expression",
+            "value": "@string(greater(length(pipeline().parameters.input_string), pipeline().parameters.max_length))"
+          }
+        }
+      },
+      {
+        "name": "CheckTruncationAndApply",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DetermineIfTruncationNeeded",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(length(pipeline().parameters.input_string), pipeline().parameters.max_length)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ApplyTruncationWithEllipsis",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "truncated_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(pipeline().parameters.ellipsis_flag, concat(substring(pipeline().parameters.input_string, 0, if(greater(sub(pipeline().parameters.max_length, 3), 0), sub(pipeline().parameters.max_length, 3), 0)), '...'), substring(pipeline().parameters.input_string, 0, if(greater(pipeline().parameters.max_length, length(pipeline().parameters.input_string)), length(pipeline().parameters.input_string), pipeline().parameters.max_length)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "NoTruncationNeeded",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "truncated_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.input_string"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckTruncationAndApply",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_output",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('truncated_result'), ''), substring(pipeline().parameters.input_string, 0, if(greater(length(pipeline().parameters.input_string), pipeline().parameters.max_length), pipeline().parameters.max_length, length(pipeline().parameters.input_string))), variables('truncated_result'))"
+          }
+        }
+      }
+    ]
+  }
+}

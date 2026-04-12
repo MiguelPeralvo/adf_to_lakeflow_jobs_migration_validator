@@ -1,0 +1,174 @@
+{
+  "name": "nested_concat_with_conditional_format",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15T00:00:00Z"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "eastus"
+      }
+    },
+    "variables": {
+      "base_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "formatted_endpoint": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "request_body": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetBasePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "base_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('https://', if(equals(pipeline().parameters.env, 'prod'), 'api', concat('api-', pipeline().parameters.env)), '.contoso.com/', pipeline().parameters.region, '/data/', formatDateTime(pipeline().parameters.run_date, 'yyyy'), '/', formatDateTime(pipeline().parameters.run_date, 'MM'), '/', formatDateTime(pipeline().parameters.run_date, 'dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetFormattedEndpoint",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetBasePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "formatted_endpoint",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('base_path'), '/', concat(if(equals(pipeline().parameters.region, 'eastus'), 'us-east-primary', if(equals(pipeline().parameters.region, 'westeu'), 'eu-west-primary', concat('secondary-', pipeline().parameters.region))), '/ingest/', concat(formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd'), '_', if(equals(pipeline().parameters.env, 'prod'), 'PRODUCTION', if(equals(pipeline().parameters.env, 'staging'), 'STAGING', 'DEVELOPMENT')), '_', pipeline().parameters.region, '_run')))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironmentAndDate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFormattedEndpoint",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), greater(formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd'), '20240101'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetRequestBodyTrue",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "request_body",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('{\"environment\":\"', pipeline().parameters.env, '\",\"run_date\":\"', formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-ddTHH:mm:ssZ'), '\",\"region\":\"', pipeline().parameters.region, '\",\"path\":\"', variables('formatted_endpoint'), '\",\"mode\":\"', if(equals(pipeline().parameters.env, 'prod'), 'full_load', 'incremental'), '\",\"partition_key\":\"', concat(formatDateTime(pipeline().parameters.run_date, 'yyyy'), '_', formatDateTime(pipeline().parameters.run_date, 'MM'), '_', if(equals(pipeline().parameters.region, 'eastus'), 'USE', if(equals(pipeline().parameters.region, 'westeu'), 'EUW', 'OTH'))), '\"}')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetRequestBodyFalse",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "request_body",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('{\"environment\":\"', pipeline().parameters.env, '\",\"run_date\":\"', formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-dd'), '\",\"region\":\"', pipeline().parameters.region, '\",\"path\":\"', variables('base_path'), '\",\"mode\":\"skip\",\"partition_key\":\"default\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalAuditTag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentAndDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "request_body",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('request_body'), '|audit_tag=', concat(if(equals(pipeline().parameters.env, 'prod'), 'P', if(equals(pipeline().parameters.env, 'staging'), 'S', 'D')), '-', formatDateTime(pipeline().parameters.run_date, 'yyyyMMddHHmmss'), '-', pipeline().parameters.region, '-', if(greater(formatDateTime(pipeline().parameters.run_date, 'HH'), '12'), 'PM_BATCH', 'AM_BATCH'), '-', concat(formatDateTime(utcNow(), 'yyyyMMdd'), '_', if(equals(pipeline().parameters.env, 'prod'), concat('PROD_', pipeline().parameters.region), concat('NONPROD_', pipeline().parameters.region)))))"
+          }
+        }
+      },
+      {
+        "name": "InvokeIngestionAPI",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalAuditTag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(variables('formatted_endpoint'), '/', if(equals(pipeline().parameters.env, 'prod'), concat('v2/ingest?region=', pipeline().parameters.region, '&date=', formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-dd'), '&mode=production'), concat('v1/ingest?region=', pipeline().parameters.region, '&date=', formatDateTime(pipeline().parameters.run_date, 'yyyy-MM-dd'), '&mode=', if(equals(pipeline().parameters.env, 'staging'), 'staging-test', 'dev-test'))))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "X-Correlation-Id": {
+              "type": "Expression",
+              "value": "@concat(pipeline().parameters.env, '-', formatDateTime(pipeline().parameters.run_date, 'yyyyMMdd'), '-', pipeline().parameters.region, '-', pipeline().RunId)"
+            },
+            "X-Region": {
+              "type": "Expression",
+              "value": "@concat(if(equals(pipeline().parameters.region, 'eastus'), 'US-EAST', if(equals(pipeline().parameters.region, 'westeu'), 'EU-WEST', concat('OTHER-', toUpper(pipeline().parameters.region)))), '-', formatDateTime(utcNow(), 'yyyyMMddHHmmss'))"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@variables('request_body')"
+          }
+        }
+      }
+    ]
+  }
+}

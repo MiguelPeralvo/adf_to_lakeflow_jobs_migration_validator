@@ -1,0 +1,227 @@
+{
+  "name": "nested_split_and_index_parser",
+  "properties": {
+    "parameters": {
+      "delimited_input": {
+        "type": "String",
+        "defaultValue": "region=us-east|env=prod|table=sales_data"
+      },
+      "delimiter": {
+        "type": "String",
+        "defaultValue": "|"
+      },
+      "index_position": {
+        "type": "Int",
+        "defaultValue": 1
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "parsed_segment": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "parsed_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "parsed_value": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExtractSegmentByIndex",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_segment",
+          "value": {
+            "type": "Expression",
+            "value": "@split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position]"
+          }
+        }
+      },
+      {
+        "name": "ExtractKeyFromSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractSegmentByIndex",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_key",
+          "value": {
+            "type": "Expression",
+            "value": "@split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position], '=')[0]"
+          }
+        }
+      },
+      {
+        "name": "ExtractValueFromSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractKeyFromSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_value",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('resolved_', split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position], '=')[1], '_', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "CheckIfEnvMatches",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ExtractValueFromSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position], '=')[1], pipeline().parameters.env)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogMatchFound",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "parsed_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('MATCH_', variables('parsed_key'), '=', variables('parsed_value'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogNoMatch",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "parsed_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('NO_MATCH_', variables('parsed_key'), '=', variables('parsed_value'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyParsedResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckIfEnvMatches",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM staging.parsed_records WHERE segment_key = ''', split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position], '=')[0], ''' AND segment_value = ''', split(split(pipeline().parameters.delimited_input, pipeline().parameters.delimiter)[pipeline().parameters.index_position], '=')[1], ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "segment_key"
+                },
+                "sink": {
+                  "name": "parsed_key",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "segment_value"
+                },
+                "sink": {
+                  "name": "parsed_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "raw_input"
+                },
+                "sink": {
+                  "name": "original_delimited_string",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

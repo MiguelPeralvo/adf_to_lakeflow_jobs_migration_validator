@@ -1,0 +1,330 @@
+{
+  "name": "nested_contains_and_startswith_filter",
+  "properties": {
+    "parameters": {
+      "filter_prefix": {
+        "type": "String",
+        "defaultValue": "prod_"
+      },
+      "exclude_pattern": {
+        "type": "String",
+        "defaultValue": "_tmp"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      }
+    },
+    "variables": {
+      "filtered_tables": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "is_valid_env": {
+        "type": "Boolean",
+        "defaultValue": false
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupAllTables",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, table_schema, table_type FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = ''', pipeline().parameters.env, '''')"
+            }
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "firstRowOnly": false
+      },
+      {
+        "name": "SetFilteredEnvironmentFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupAllTables",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "is_valid_env",
+          "value": {
+            "type": "Expression",
+            "value": "@or(and(contains(pipeline().parameters.env, 'prod'), startsWith(pipeline().parameters.filter_prefix, 'prod')), and(contains(pipeline().parameters.env, 'staging'), startsWith(pipeline().parameters.filter_prefix, 'stg')))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironmentAndPatterns",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFilteredEnvironmentFlag",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(and(contains(pipeline().parameters.env, 'prod'), startsWith(pipeline().parameters.filter_prefix, 'prod_')), and(contains(pipeline().parameters.env, 'dev'), startsWith(pipeline().parameters.filter_prefix, 'dev_'))), not(contains(pipeline().parameters.exclude_pattern, 'BLOCK_ALL')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetValidatedTables",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "filtered_tables",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('LookupAllTables').output.value"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetEmptyTables",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "filtered_tables",
+                "value": {
+                  "type": "Expression",
+                  "value": "@createArray()"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ForEachFilteredTable",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentAndPatterns",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 10,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(activity('LookupAllTables').output.value)"
+          },
+          "activities": [
+            {
+              "name": "CopyFilteredTableData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@if(and(or(startsWith(item().table_name, pipeline().parameters.filter_prefix), contains(item().table_name, pipeline().parameters.env)), not(contains(item().table_name, pipeline().parameters.exclude_pattern))), concat('SELECT * FROM ', item().table_schema, '.', item().table_name, ' WHERE 1=1'), concat('SELECT TOP 0 * FROM ', item().table_schema, '.', item().table_name))"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "table_name"
+                      },
+                      "sink": {
+                        "name": "tgt_table_name",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "table_schema"
+                      },
+                      "sink": {
+                        "name": "tgt_table_schema",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "table_type"
+                      },
+                      "sink": {
+                        "name": "tgt_table_type",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyAuditSummary",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "ForEachFilteredTable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ''', pipeline().parameters.env, ''' AS environment, ''', pipeline().parameters.filter_prefix, ''' AS applied_prefix, ''', pipeline().parameters.exclude_pattern, ''' AS excluded_pattern, GETDATE() AS audit_timestamp, ', string(length(activity('LookupAllTables').output.value)), ' AS total_tables_found, CASE WHEN ', string(and(or(contains(pipeline().parameters.env, 'prod'), startsWith(pipeline().parameters.filter_prefix, 'prod_')), not(contains(pipeline().parameters.exclude_pattern, 'BLOCK_ALL')))), ' = 1 THEN ''FILTERED'' ELSE ''SKIPPED'' END AS processing_status')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "tgt_environment",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "applied_prefix"
+                },
+                "sink": {
+                  "name": "tgt_applied_prefix",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "excluded_pattern"
+                },
+                "sink": {
+                  "name": "tgt_excluded_pattern",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "audit_timestamp"
+                },
+                "sink": {
+                  "name": "tgt_audit_timestamp",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "total_tables_found"
+                },
+                "sink": {
+                  "name": "tgt_total_tables_found",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "processing_status"
+                },
+                "sink": {
+                  "name": "tgt_processing_status",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

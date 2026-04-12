@@ -1,0 +1,266 @@
+{
+  "name": "nested_json_path_extractor",
+  "properties": {
+    "parameters": {
+      "config_table": {
+        "type": "String",
+        "defaultValue": "dbo.pipeline_config"
+      },
+      "config_key": {
+        "type": "String",
+        "defaultValue": "extract_settings"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "run_id": {
+        "type": "String",
+        "defaultValue": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "variables": {
+      "raw_config_json": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "source_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "notebook_params_json": {
+        "type": "String",
+        "defaultValue": "{}"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigRow",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT config_key, config_json FROM ', pipeline().parameters.config_table, ' WHERE config_key = ''', pipeline().parameters.config_key, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetRawConfigJson",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigRow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "raw_config_json",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('LookupConfigRow').output.firstRow.config_json)"
+          }
+        }
+      },
+      {
+        "name": "SetSourcePath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetRawConfigJson",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "source_path",
+          "value": {
+            "type": "Expression",
+            "value": "@json(variables('raw_config_json')).extraction.sources.primary.connection.path"
+          }
+        }
+      },
+      {
+        "name": "SetNotebookParams",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetSourcePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "notebook_params_json",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(concat('{\"run_id\":\"', pipeline().parameters.run_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"source_path\":\"', variables('source_path'), '\",\"delta_db\":\"', json(variables('raw_config_json')).extraction.targets.delta.database, '\",\"delta_table\":\"', json(variables('raw_config_json')).extraction.targets.delta.table_name, '\",\"write_mode\":\"', json(variables('raw_config_json')).extraction.targets.delta.options.writeMode, '\",\"partition_cols\":\"', json(variables('raw_config_json')).extraction.targets.delta.options.partitionColumns[0], '\",\"max_records\":\"', string(json(variables('raw_config_json')).extraction.sources.primary.limits.maxRecordsPerRun), '\"}')))"
+          }
+        }
+      },
+      {
+        "userProperties": []
+      },
+      {
+        "name": "CheckSourcePathNotEmpty",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetNotebookParams",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(variables('source_path'), '')), greater(length(json(variables('raw_config_json')).extraction.sources.primary.connection.path), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunExtractionNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/', json(variables('raw_config_json')).extraction.notebook.folder, '/', json(variables('raw_config_json')).extraction.notebook.name)"
+                },
+                "baseParameters": {
+                  "run_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.run_id"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "source_path": {
+                    "type": "Expression",
+                    "value": "@variables('source_path')"
+                  },
+                  "delta_db": {
+                    "type": "Expression",
+                    "value": "@json(variables('raw_config_json')).extraction.targets.delta.database"
+                  },
+                  "delta_table": {
+                    "type": "Expression",
+                    "value": "@json(variables('raw_config_json')).extraction.targets.delta.table_name"
+                  },
+                  "write_mode": {
+                    "type": "Expression",
+                    "value": "@json(variables('raw_config_json')).extraction.targets.delta.options.writeMode"
+                  },
+                  "schema_enforcement": {
+                    "type": "Expression",
+                    "value": "@string(json(variables('raw_config_json')).extraction.targets.delta.options.schemaEnforcement)"
+                  },
+                  "max_records": {
+                    "type": "Expression",
+                    "value": "@string(json(variables('raw_config_json')).extraction.sources.primary.limits.maxRecordsPerRun)"
+                  },
+                  "retry_config": {
+                    "type": "Expression",
+                    "value": "@string(json(variables('raw_config_json')).extraction.sources.primary.retryPolicy)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        },
+        "userProperties": []
+      },
+      {
+        "name": "LogExtractionRun",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckSourcePathNotEmpty",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/common/log_pipeline_run')"
+          },
+          "baseParameters": {
+            "run_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.run_id"
+            },
+            "pipeline_name": {
+              "type": "Expression",
+              "value": "@pipeline().Pipeline"
+            },
+            "config_key": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.config_key"
+            },
+            "source_system": {
+              "type": "Expression",
+              "value": "@json(variables('raw_config_json')).extraction.sources.primary.system"
+            },
+            "target_database": {
+              "type": "Expression",
+              "value": "@json(variables('raw_config_json')).extraction.targets.delta.database"
+            },
+            "target_table": {
+              "type": "Expression",
+              "value": "@json(variables('raw_config_json')).extraction.targets.delta.table_name"
+            },
+            "status": {
+              "type": "Expression",
+              "value": "@if(equals(activity('CheckSourcePathNotEmpty').output.status, 'Succeeded'), 'SUCCESS', 'SKIPPED')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

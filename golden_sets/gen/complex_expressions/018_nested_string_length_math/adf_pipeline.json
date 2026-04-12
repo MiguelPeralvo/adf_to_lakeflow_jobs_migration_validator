@@ -1,0 +1,164 @@
+{
+  "name": "nested_string_length_math",
+  "properties": {
+    "parameters": {
+      "input_string": {
+        "type": "String",
+        "defaultValue": "hello_world"
+      },
+      "max_length": {
+        "type": "Int",
+        "defaultValue": 50
+      },
+      "padding_factor": {
+        "type": "Int",
+        "defaultValue": 3
+      }
+    },
+    "variables": {
+      "computed_length": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "padded_length": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "validation_result": {
+        "type": "String",
+        "defaultValue": "UNKNOWN"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeStringLength",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_length",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), length(pipeline().parameters.input_string)))"
+          }
+        }
+      },
+      {
+        "name": "ComputePaddedLength",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeStringLength",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "padded_length",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(length(pipeline().parameters.input_string), sub(pipeline().parameters.padding_factor, 1)), div(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), 2)))"
+          }
+        }
+      },
+      {
+        "name": "CheckLengthWithinMax",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputePaddedLength",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(pipeline().parameters.max_length, add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), length(pipeline().parameters.input_string)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetValidationPass",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "validation_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('PASS: padded_length=', variables('padded_length'), ' is within max_length=', string(pipeline().parameters.max_length))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetValidationFail",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "validation_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('FAIL: computed_total=', string(add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), length(pipeline().parameters.input_string))), ' exceeds max_length=', string(pipeline().parameters.max_length))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalSummary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckLengthWithinMax",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "validation_result",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('InputLen=', string(length(pipeline().parameters.input_string)), '|PaddingFactor=', string(pipeline().parameters.padding_factor), '|ComputedLen=', variables('computed_length'), '|PaddedLen=', variables('padded_length'), '|MaxLen=', string(pipeline().parameters.max_length), '|NestedCalc=', string(sub(pipeline().parameters.max_length, add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), mod(length(pipeline().parameters.input_string), 3)))))"
+          }
+        }
+      },
+      {
+        "name": "ReportValidationResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalSummary",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://validation-api.example.com/report?pipeline=nested_string_length_math&inputLen=', string(length(pipeline().parameters.input_string)), '&computedLen=', variables('computed_length'), '&paddedLen=', variables('padded_length'), '&maxLen=', string(pipeline().parameters.max_length), '&nestedCheck=', string(greater(pipeline().parameters.max_length, add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), length(pipeline().parameters.input_string)))))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"input_string\":\"', pipeline().parameters.input_string, '\",\"raw_length\":', string(length(pipeline().parameters.input_string)), ',\"padded_total\":', variables('computed_length'), ',\"nested_math_result\":', string(sub(mul(length(pipeline().parameters.input_string), add(pipeline().parameters.padding_factor, 1)), div(length(pipeline().parameters.input_string), 2))), ',\"exceeds_max\":', string(not(greater(pipeline().parameters.max_length, add(mul(length(pipeline().parameters.input_string), pipeline().parameters.padding_factor), length(pipeline().parameters.input_string))))), ',\"summary\":\"', variables('validation_result'), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

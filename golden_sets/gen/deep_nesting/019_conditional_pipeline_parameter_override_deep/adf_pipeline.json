@@ -1,0 +1,359 @@
+{
+  "name": "conditional_pipeline_parameter_override_deep",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "override_config": {
+        "type": "String",
+        "defaultValue": "none"
+      },
+      "default_cluster": {
+        "type": "String",
+        "defaultValue": "cluster-standard-01"
+      },
+      "notebook_version": {
+        "type": "String",
+        "defaultValue": "v1.0"
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "standard"
+      }
+    },
+    "variables": {
+      "effective_cluster": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_notebook_version": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_run_mode": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetInitialCluster",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_cluster",
+          "value": {
+            "type": "Expression",
+            "value": "@pipeline().parameters.default_cluster"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironmentOverride",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetInitialCluster",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CheckOverrideConfigForProdStaging",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(equals(pipeline().parameters.override_config, 'none')), not(equals(pipeline().parameters.override_config, '')))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ApplyProdOverrideCluster",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_cluster",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(equals(pipeline().parameters.env, 'prod'), concat('prod-ha-', pipeline().parameters.override_config), concat('staging-', pipeline().parameters.override_config))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "ApplyDefaultProdCluster",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_cluster",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(equals(pipeline().parameters.env, 'prod'), 'prod-ha-cluster-default', 'staging-cluster-default')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "CheckDevOverrideConfig",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().parameters.override_config, 'experimental')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ApplyExperimentalCluster",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_cluster",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('dev-experimental-', pipeline().parameters.default_cluster)"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "KeepDefaultDevCluster",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_cluster",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@pipeline().parameters.default_cluster"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ResolveNotebookVersion",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentOverride",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.run_mode, 'canary'), or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetCanaryNotebookVersion",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_notebook_version",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.notebook_version, '-canary')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "CheckBatchRunMode",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().parameters.run_mode, 'batch')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetBatchNotebookVersion",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_notebook_version",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat(pipeline().parameters.notebook_version, '-batch-optimized')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetStandardNotebookVersion",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "effective_notebook_version",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@pipeline().parameters.notebook_version"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetEffectiveRunMode",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ResolveNotebookVersion",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_run_mode",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.run_mode, 'standard')), 'prod-hardened', if(and(equals(pipeline().parameters.env, 'dev'), not(equals(pipeline().parameters.override_config, 'none'))), concat('dev-override-', pipeline().parameters.run_mode), pipeline().parameters.run_mode))"
+          }
+        }
+      },
+      {
+        "name": "ResolveDeepNestedOverrides",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetEffectiveRunMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(pipeline().parameters.override_config, 'none')), or(equals(variables('effective_run_mode'), 'prod-hardened'), equals(variables('effective_run_mode'), 'canary')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "DeepOverrideClusterFinal",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_cluster",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('effective_cluster'), '-override-', pipeline().parameters.override_config, '-', variables('effective_run_mode'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "KeepResolvedCluster",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_cluster",
+                "value": {
+                  "type": "Expression",
+                  "value": "@variables('effective_cluster')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "ResolveDeepNestedOverrides",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/pipelines/', pipeline().parameters.env, '/processing_notebook_', variables('effective_notebook_version'))"
+          },
+          "baseParameters": {
+            "cluster_id": {
+              "type": "Expression",
+              "value": "@variables('effective_cluster')"
+            },
+            "run_mode": {
+              "type": "Expression",
+              "value": "@variables('effective_run_mode')"
+            },
+            "notebook_version": {
+              "type": "Expression",
+              "value": "@variables('effective_notebook_version')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "override_config": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.override_config"
+            },
+            "pipeline_run_id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

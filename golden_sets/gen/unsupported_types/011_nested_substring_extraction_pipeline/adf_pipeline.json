@@ -1,0 +1,182 @@
+{
+  "name": "nested_substring_extraction_pipeline",
+  "properties": {
+    "parameters": {
+      "file_path": {
+        "type": "String",
+        "defaultValue": "/data/raw/sales_2024_Q1_report.csv"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      },
+      "extraction_pattern": {
+        "type": "String",
+        "defaultValue": "_"
+      }
+    },
+    "variables": {
+      "extracted_filename": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "extracted_extension": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "extracted_middle_segment": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExtractFilename",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_filename",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.file_path, add(lastIndexOf(pipeline().parameters.file_path, '/'), 1), sub(length(pipeline().parameters.file_path), add(lastIndexOf(pipeline().parameters.file_path, '/'), 1)))"
+          }
+        }
+      },
+      {
+        "name": "ExtractExtension",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractFilename",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_extension",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(variables('extracted_filename'), add(lastIndexOf(variables('extracted_filename'), '.'), 1), sub(length(variables('extracted_filename')), add(lastIndexOf(variables('extracted_filename'), '.'), 1)))"
+          }
+        }
+      },
+      {
+        "name": "ExtractMiddleSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractExtension",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_middle_segment",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(variables('extracted_filename'), add(indexOf(variables('extracted_filename'), pipeline().parameters.extraction_pattern), length(pipeline().parameters.extraction_pattern)), sub(sub(indexOf(substring(variables('extracted_filename'), add(indexOf(variables('extracted_filename'), pipeline().parameters.extraction_pattern), length(pipeline().parameters.extraction_pattern)), sub(length(variables('extracted_filename')), add(indexOf(variables('extracted_filename'), pipeline().parameters.extraction_pattern), length(pipeline().parameters.extraction_pattern)))), pipeline().parameters.extraction_pattern), 0), 0))"
+          }
+        }
+      },
+      {
+        "name": "CheckExtractionAndEnv",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ExtractMiddleSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(length(variables('extracted_middle_segment')), 0), equals(pipeline().parameters.env, 'production'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogExtractionSuccess",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "extracted_filename",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('VALIDATED_', substring(variables('extracted_filename'), 0, indexOf(variables('extracted_filename'), '.')))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogExtractionSkipped",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "extracted_filename",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SKIPPED_', variables('extracted_filename'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ProcessExtractedData",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckExtractionAndEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/pipelines/', pipeline().parameters.env, '/process_extracted_segments')"
+          },
+          "baseParameters": {
+            "original_path": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.file_path"
+            },
+            "filename": {
+              "type": "Expression",
+              "value": "@variables('extracted_filename')"
+            },
+            "extension": {
+              "type": "Expression",
+              "value": "@variables('extracted_extension')"
+            },
+            "middle_segment": {
+              "type": "Expression",
+              "value": "@variables('extracted_middle_segment')"
+            },
+            "nested_extraction_result": {
+              "type": "Expression",
+              "value": "@substring(pipeline().parameters.file_path, indexOf(pipeline().parameters.file_path, '/'), sub(lastIndexOf(pipeline().parameters.file_path, '/'), indexOf(pipeline().parameters.file_path, '/')))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

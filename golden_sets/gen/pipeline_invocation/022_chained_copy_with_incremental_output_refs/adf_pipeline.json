@@ -1,0 +1,375 @@
+{
+  "name": "chained_copy_with_incremental_output_refs",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "watermark_table": {
+        "type": "String",
+        "defaultValue": "dbo.watermark"
+      },
+      "source_schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      }
+    },
+    "variables": {
+      "rowsCopiedPhase1": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "rowsCopiedPhase2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "dataWrittenPhase2": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "watermarkValue": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupCurrentWatermark",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT MAX(watermark_value) AS current_watermark FROM ', pipeline().parameters.watermark_table, ' WHERE environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyPhase1_IncrementalExtract",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "LookupCurrentWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', pipeline().parameters.source_schema, '.orders WHERE modified_date > ''', activity('LookupCurrentWatermark').output.firstRow.current_watermark, ''' AND modified_date <= GETUTCDATE() ORDER BY modified_date')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "order_id"
+                },
+                "sink": {
+                  "name": "order_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "modified_date"
+                },
+                "sink": {
+                  "name": "modified_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "amount"
+                },
+                "sink": {
+                  "name": "amount",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyPhase2_DependentExtract",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CopyPhase1_IncrementalExtract",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', pipeline().parameters.source_schema, '.order_details WHERE order_id IN (SELECT order_id FROM ', pipeline().parameters.source_schema, '.orders WHERE modified_date > ''', activity('LookupCurrentWatermark').output.firstRow.current_watermark, ''') AND ', string(activity('CopyPhase1_IncrementalExtract').output.rowsCopied), ' > 0')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "detail_id"
+                },
+                "sink": {
+                  "name": "detail_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "order_id"
+                },
+                "sink": {
+                  "name": "order_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "product_name"
+                },
+                "sink": {
+                  "name": "product_name",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyPhase3_AuditAndArchive",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CopyPhase2_DependentExtract",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ''', pipeline().parameters.env, ''' AS environment, ', string(activity('CopyPhase1_IncrementalExtract').output.rowsCopied), ' AS phase1_rows_copied, ', string(activity('CopyPhase1_IncrementalExtract').output.dataWritten), ' AS phase1_data_written_bytes, ', string(activity('CopyPhase2_DependentExtract').output.rowsCopied), ' AS phase2_rows_copied, ', string(activity('CopyPhase2_DependentExtract').output.dataWritten), ' AS phase2_data_written_bytes, GETUTCDATE() AS audit_timestamp FROM ', pipeline().parameters.source_schema, '.audit_log WHERE 1=1')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "environment"
+                },
+                "sink": {
+                  "name": "environment",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "phase1_rows_copied"
+                },
+                "sink": {
+                  "name": "phase1_rows_copied",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "phase2_rows_copied"
+                },
+                "sink": {
+                  "name": "phase2_rows_copied",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "audit_timestamp"
+                },
+                "sink": {
+                  "name": "audit_timestamp",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "enableStaging": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetWatermarkVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CopyPhase3_AuditAndArchive",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "watermarkValue",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Phase1_Rows:', string(activity('CopyPhase1_IncrementalExtract').output.rowsCopied), '|Phase1_DataWritten:', string(activity('CopyPhase1_IncrementalExtract').output.dataWritten), '|Phase2_Rows:', string(activity('CopyPhase2_DependentExtract').output.rowsCopied), '|Phase2_DataWritten:', string(activity('CopyPhase2_DependentExtract').output.dataWritten), '|Phase3_Rows:', string(activity('CopyPhase3_AuditAndArchive').output.rowsCopied), '|Phase3_DataWritten:', string(activity('CopyPhase3_AuditAndArchive').output.dataWritten))"
+          }
+        }
+      },
+      {
+        "name": "UpdateWatermarkWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetWatermarkVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api-', pipeline().parameters.env, '.contoso.com/watermark/update')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": "@{pipeline().RunId}"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"', pipeline().Pipeline, '\",\"run_id\":\"', pipeline().RunId, '\",\"environment\":\"', pipeline().parameters.env, '\",\"watermark_table\":\"', pipeline().parameters.watermark_table, '\",\"phase1_rows_copied\":', string(activity('CopyPhase1_IncrementalExtract').output.rowsCopied), ',\"phase1_data_written\":', string(activity('CopyPhase1_IncrementalExtract').output.dataWritten), ',\"phase2_rows_copied\":', string(activity('CopyPhase2_DependentExtract').output.rowsCopied), ',\"phase2_data_written\":', string(activity('CopyPhase2_DependentExtract').output.dataWritten), ',\"phase3_rows_copied\":', string(activity('CopyPhase3_AuditAndArchive').output.rowsCopied), ',\"phase3_data_written\":', string(activity('CopyPhase3_AuditAndArchive').output.dataWritten), ',\"combined_watermark\":\"', variables('watermarkValue'), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

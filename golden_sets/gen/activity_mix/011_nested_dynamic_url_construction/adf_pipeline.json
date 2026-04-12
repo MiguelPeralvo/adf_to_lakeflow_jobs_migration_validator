@@ -1,0 +1,189 @@
+{
+  "name": "nested_dynamic_url_construction",
+  "properties": {
+    "parameters": {
+      "base_url": {
+        "type": "String",
+        "defaultValue": "https://api.example.com"
+      },
+      "api_version": {
+        "type": "String",
+        "defaultValue": "2023-01-01"
+      },
+      "resource_id": {
+        "type": "String",
+        "defaultValue": "res%2F12345%2Fdata"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      }
+    },
+    "variables": {
+      "decoded_resource_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "DecodeResourceId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "decoded_resource_id",
+          "value": {
+            "type": "Expression",
+            "value": "@uriComponentToString(pipeline().parameters.resource_id)"
+          }
+        }
+      },
+      {
+        "name": "SanitizePathSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "DecodeResourceId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_path",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(variables('decoded_resource_id'), '/', '-'), ' ', '_')"
+          }
+        }
+      },
+      {
+        "name": "BuildFinalUrl",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizePathSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(replace(pipeline().parameters.base_url, 'https://', concat('https://', pipeline().parameters.env, '.')), '/', variables('sanitized_path'), '?api-version=', pipeline().parameters.api_version, '&format=json&env=', uriComponentToString(replace(pipeline().parameters.env, 'production', 'prod')))"
+          }
+        }
+      },
+      {
+        "name": "CallDynamicApi",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildFinalUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('final_url')"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Api-Version": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.api_version"
+            },
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "X-Resource-Path": {
+              "type": "Expression",
+              "value": "@concat(uriComponentToString(pipeline().parameters.resource_id), '/metadata')"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"resource\":\"', replace(variables('sanitized_path'), '\"', '\\\"'), '\",\"url\":\"', replace(variables('final_url'), '\"', '\\\"'), '\"}'))"
+          },
+          "timeout": "00:05:00"
+        }
+      },
+      {
+        "name": "CheckApiResponseStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CallDynamicApi",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('CallDynamicApi').output.statusCode, 200)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogSuccessUrl",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SUCCESS: ', variables('final_url'), ' | decoded_resource=', uriComponentToString(pipeline().parameters.resource_id), ' | sanitized=', replace(variables('sanitized_path'), '-', '/'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogFailureDetails",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(replace(pipeline().parameters.base_url, 'api.example.com', concat('logging.', pipeline().parameters.env, '.example.com')), '/errors?resource=', uriComponentToString(replace(pipeline().parameters.resource_id, '%2F', '%252F')))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"failed_url\":\"', replace(variables('final_url'), '\"', '\\\"'), '\",\"env\":\"', pipeline().parameters.env, '\",\"resource\":\"', uriComponentToString(pipeline().parameters.resource_id), '\"}'))"
+                },
+                "timeout": "00:02:00"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

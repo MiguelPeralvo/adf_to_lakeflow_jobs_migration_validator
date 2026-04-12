@@ -1,0 +1,196 @@
+{
+  "name": "chained_math_set_variables",
+  "properties": {
+    "parameters": {
+      "seed": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "factor_a": {
+        "type": "Int",
+        "defaultValue": 3
+      },
+      "factor_b": {
+        "type": "Int",
+        "defaultValue": 5
+      },
+      "factor_c": {
+        "type": "Int",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "step1_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "step2_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "step3_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "step4_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "step5_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "Step1_Multiply_Seed_By_FactorA",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "step1_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(pipeline().parameters.seed, pipeline().parameters.factor_a))"
+          }
+        }
+      },
+      {
+        "name": "Step2_Add_FactorB_To_Step1",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Step1_Multiply_Seed_By_FactorA",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "step2_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(int(variables('step1_result')), pipeline().parameters.factor_b))"
+          }
+        }
+      },
+      {
+        "name": "Step3_Multiply_Step2_By_FactorC",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Step2_Add_FactorB_To_Step1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "step3_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(int(variables('step2_result')), pipeline().parameters.factor_c))"
+          }
+        }
+      },
+      {
+        "name": "Step4_Subtract_Seed_From_Step3",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Step3_Multiply_Step2_By_FactorC",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "step4_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(int(variables('step3_result')), pipeline().parameters.seed))"
+          }
+        }
+      },
+      {
+        "name": "Step5_Mod_Step4_By_FactorA",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Step4_Subtract_Seed_From_Step3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "step5_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(int(variables('step4_result')), add(pipeline().parameters.factor_a, 1)))"
+          }
+        }
+      },
+      {
+        "name": "Step6_Final_Add_All_Factors",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Step5_Mod_Step4_By_FactorA",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(add(int(variables('step5_result')), mul(pipeline().parameters.factor_b, pipeline().parameters.factor_c)), pipeline().parameters.seed))"
+          }
+        }
+      },
+      {
+        "name": "Run_Databricks_With_Computed_Result",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Step6_Final_Add_All_Factors",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/math_pipeline/process_result",
+          "baseParameters": {
+            "seed": "@{pipeline().parameters.seed}",
+            "factor_a": "@{pipeline().parameters.factor_a}",
+            "factor_b": "@{pipeline().parameters.factor_b}",
+            "factor_c": "@{pipeline().parameters.factor_c}",
+            "step1_result": "@{variables('step1_result')}",
+            "step2_result": "@{variables('step2_result')}",
+            "step3_result": "@{variables('step3_result')}",
+            "step4_result": "@{variables('step4_result')}",
+            "step5_result": "@{variables('step5_result')}",
+            "final_result": "@{variables('final_result')}"
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,342 @@
+{
+  "name": "complex_foreach_with_nested_conditions",
+  "properties": {
+    "parameters": {
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      },
+      "source_schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "max_retries": {
+        "type": "String",
+        "defaultValue": "3"
+      }
+    },
+    "variables": {
+      "current_table": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "retry_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableList",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, row_count, last_modified FROM ', pipeline().parameters.source_schema, '.pipeline_metadata WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND is_active = 1 ORDER BY priority')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_metadata",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetInitialStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupTableList",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(activity('LookupTableList').output.value), 0), 'ready', 'empty')"
+          }
+        }
+      },
+      {
+        "name": "ForEachTable",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetInitialStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('LookupTableList').output.value"
+          },
+          "activities": [
+            {
+              "name": "CheckEnvironmentCondition",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.env, 'prod'), and(equals(pipeline().parameters.env, 'staging'), greater(int(item().row_count), 0)))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CheckRowCountThreshold",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@and(greater(int(item().row_count), 1000), less(int(pipeline().parameters.max_retries), 5))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "CopyLargeTable",
+                          "type": "Copy",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.01:00:00",
+                            "retry": {
+                              "type": "Expression",
+                              "value": "@int(pipeline().parameters.max_retries)"
+                            },
+                            "retryIntervalInSeconds": 60
+                          },
+                          "typeProperties": {
+                            "source": {
+                              "type": "AzureSqlSource",
+                              "sql_reader_query": {
+                                "type": "Expression",
+                                "value": "@concat('SELECT * FROM ', pipeline().parameters.source_schema, '.', item().table_name, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND modified_date >= DATEADD(day, -7, GETUTCDATE())')"
+                              }
+                            },
+                            "sink": {
+                              "type": "AzureDatabricksDeltaLakeSink"
+                            },
+                            "enableStaging": false,
+                            "translator": {
+                              "type": "TabularTranslator",
+                              "mappings": [
+                                {
+                                  "source": {
+                                    "name": "src_col"
+                                  },
+                                  "sink": {
+                                    "name": "tgt_col",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "batch_id"
+                                  },
+                                  "sink": {
+                                    "name": "batch_id",
+                                    "type": "String"
+                                  }
+                                },
+                                {
+                                  "source": {
+                                    "name": "row_count"
+                                  },
+                                  "sink": {
+                                    "name": "row_count",
+                                    "type": "String"
+                                  }
+                                }
+                              ]
+                            },
+                            "input_dataset_definitions": [
+                              {
+                                "type": "AzureSqlSource",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_sql",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ],
+                            "output_dataset_definitions": [
+                              {
+                                "type": "AzureDatabricksDeltaLakeSink",
+                                "schema": [],
+                                "linkedServiceName": {
+                                  "referenceName": "ls_delta",
+                                  "type": "LinkedServiceReference"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "name": "RunDatabricksTransform",
+                          "type": "DatabricksNotebook",
+                          "dependsOn": [
+                            {
+                              "activity": "CopyLargeTable",
+                              "dependencyConditions": [
+                                "Succeeded"
+                              ]
+                            }
+                          ],
+                          "typeProperties": {
+                            "notebookPath": {
+                              "type": "Expression",
+                              "value": "@concat('/Shared/etl/', pipeline().parameters.env, '/transform_', item().table_name)"
+                            },
+                            "baseParameters": {
+                              "batch_id": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.batch_id"
+                              },
+                              "table_name": {
+                                "type": "Expression",
+                                "value": "@item().table_name"
+                              },
+                              "source_schema": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.source_schema"
+                              },
+                              "row_count": {
+                                "type": "Expression",
+                                "value": "@item().row_count"
+                              }
+                            }
+                          },
+                          "linkedServiceName": {
+                            "referenceName": "ls_databricks",
+                            "type": "LinkedServiceReference"
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "SetRetryForSmallTable",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "variableName": "retry_count",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@string(add(int(pipeline().parameters.max_retries), 1))"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "LogSkippedTable",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://logging-api-', pipeline().parameters.env, '.azurewebsites.net/api/log')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json",
+                        "X-Batch-Id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        }
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"event\":\"table_skipped\",\"table\":\"', item().table_name, '\",\"env\":\"', pipeline().parameters.env, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"reason\":\"environment_filter\",\"row_count\":', item().row_count, ',\"timestamp\":\"', utcnow(), '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "PostProcessingWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ForEachTable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://orchestrator-', pipeline().parameters.env, '.azurewebsites.net/api/batch/', pipeline().parameters.batch_id, '/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"status\":\"completed\",\"table_count\":', length(activity('LookupTableList').output.value), ',\"environment\":\"', pipeline().parameters.env, '\",\"completed_at\":\"', utcnow(), '\"}'))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "PostProcessingWebhook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(activity('PostProcessingWebhook').output.statusCode, 200), 'completed_success', 'completed_with_warnings')"
+          }
+        }
+      }
+    ]
+  }
+}

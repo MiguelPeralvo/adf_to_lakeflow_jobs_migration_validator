@@ -1,0 +1,309 @@
+{
+  "name": "complex_expression_variable_cascade",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "base_path": {
+        "type": "String",
+        "defaultValue": "/data/raw"
+      },
+      "date_offset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "file_format": {
+        "type": "String",
+        "defaultValue": "parquet"
+      }
+    },
+    "variables": {
+      "resolved_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "full_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_output_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedEnv",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_env",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),'production',concat('non-prod-',pipeline().parameters.env))"
+          }
+        }
+      },
+      {
+        "name": "SetFullPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "full_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.base_path,'/',variables('resolved_env'),'/',if(equals(pipeline().parameters.file_format,'parquet'),'parquet_store','generic_store'))"
+          }
+        }
+      },
+      {
+        "name": "SetEffectiveDate",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFullPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_date",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(formatDateTime(adddays(utcnow(),int(pipeline().parameters.date_offset)),'yyyy-MM-dd'),'_',if(equals(variables('resolved_env'),'production'),'PROD','NONPROD'))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetEffectiveDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_output_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('full_path'),'/',variables('effective_date'),'/',if(and(equals(pipeline().parameters.file_format,'parquet'),equals(pipeline().parameters.env,'prod')),concat('optimized_',pipeline().parameters.file_format),concat('standard_',pipeline().parameters.file_format)))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfProduction",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetFinalOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('resolved_env'),'production')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "NotifyProdDeploy",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.prod.internal/notify?path=',encodeUriComponent(variables('final_output_path')))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"env\":\"',variables('resolved_env'),'\",\"date\":\"',variables('effective_date'),'\",\"output\":\"',variables('final_output_path'),'\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckFileFormat",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckIfProduction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.file_format,'parquet'),equals(pipeline().parameters.file_format,'delta'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogSupportedFormat",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://logging.internal/api/log",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"message\":\"Supported format: ',pipeline().parameters.file_format,'\",\"path\":\"',variables('final_output_path'),'\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CopyToTarget",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckFileFormat",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM staging.records WHERE record_date = ''',variables('effective_date'),''' AND env_flag = ''',variables('resolved_env'),'''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "record_date"
+                },
+                "sink": {
+                  "name": "record_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "env_flag"
+                },
+                "sink": {
+                  "name": "env_flag",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "PostCopyCallback",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyToTarget",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.internal/',variables('resolved_env'),'/pipelines/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@variables('resolved_env')"
+            },
+            "X-Run-Date": {
+              "type": "Expression",
+              "value": "@variables('effective_date')"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"complex_expression_variable_cascade\",\"env\":\"',variables('resolved_env'),'\",\"output_path\":\"',variables('final_output_path'),'\",\"effective_date\":\"',variables('effective_date'),'\",\"format\":\"',pipeline().parameters.file_format,'\",\"status\":\"completed\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

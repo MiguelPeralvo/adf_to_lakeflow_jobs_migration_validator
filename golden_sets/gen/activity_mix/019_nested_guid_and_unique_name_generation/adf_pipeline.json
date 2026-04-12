@@ -1,0 +1,130 @@
+{
+  "name": "nested_guid_and_unique_name_generation",
+  "properties": {
+    "parameters": {
+      "resource_prefix": {
+        "type": "String",
+        "defaultValue": "adf"
+      },
+      "max_name_length": {
+        "type": "Int",
+        "defaultValue": 24
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "raw_guid": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "unique_resource_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_name": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GenerateRawGuid",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "raw_guid",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(replace(guid(), '-', ''))"
+          }
+        }
+      },
+      {
+        "name": "BuildUniqueName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GenerateRawGuid",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "unique_resource_name",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(concat(pipeline().parameters.resource_prefix, '-', pipeline().parameters.env, '-', substring(replace(guid(), '-', ''), 0, sub(pipeline().parameters.max_name_length, add(length(pipeline().parameters.resource_prefix), add(length(pipeline().parameters.env), 2))))))"
+          }
+        }
+      },
+      {
+        "name": "TruncateAndFinalize",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildUniqueName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_name",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(length(variables('unique_resource_name')), pipeline().parameters.max_name_length), toLower(substring(variables('unique_resource_name'), 0, pipeline().parameters.max_name_length)), toLower(concat(variables('unique_resource_name'), substring(replace(guid(), '-', ''), 0, sub(pipeline().parameters.max_name_length, length(variables('unique_resource_name')))))))"
+          }
+        }
+      },
+      {
+        "name": "ProvisionResourceNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "TruncateAndFinalize",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/Shared/provisioning/create_resource",
+          "baseParameters": {
+            "resource_name": {
+              "type": "Expression",
+              "value": "@variables('final_name')"
+            },
+            "environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "resource_prefix": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.resource_prefix"
+            },
+            "generated_guid": {
+              "type": "Expression",
+              "value": "@variables('raw_guid')"
+            },
+            "full_trace_id": {
+              "type": "Expression",
+              "value": "@toLower(concat(pipeline().parameters.env, '/', variables('final_name'), '/', substring(replace(guid(), '-', ''), 0, 8)))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

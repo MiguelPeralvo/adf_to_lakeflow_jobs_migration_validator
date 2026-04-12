@@ -1,0 +1,214 @@
+{
+  "name": "deeply_nested_modulo_division",
+  "properties": {
+    "parameters": {
+      "dividend": {
+        "type": "Float",
+        "defaultValue": 1000
+      },
+      "divisor": {
+        "type": "Float",
+        "defaultValue": 7
+      },
+      "mod_base": {
+        "type": "Float",
+        "defaultValue": 3
+      },
+      "fallback_value": {
+        "type": "Float",
+        "defaultValue": 99
+      }
+    },
+    "variables": {
+      "primary_division_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "nested_mod_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_computed_value": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_valid_divisor": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputePrimaryDivision",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "primary_division_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(div(pipeline().parameters.dividend, pipeline().parameters.divisor), add(mod(pipeline().parameters.dividend, pipeline().parameters.mod_base), 1)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeNestedModulo",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePrimaryDivision",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "nested_mod_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(mod(div(mul(pipeline().parameters.dividend, pipeline().parameters.mod_base), add(pipeline().parameters.divisor, 1)), add(pipeline().parameters.mod_base, 2)), add(mod(pipeline().parameters.dividend, pipeline().parameters.divisor), 1)))"
+          }
+        }
+      },
+      {
+        "name": "ComputeFinalValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeNestedModulo",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_computed_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(mod(mul(pipeline().parameters.dividend, div(pipeline().parameters.mod_base, add(pipeline().parameters.divisor, 1))), add(pipeline().parameters.mod_base, 3)), add(mod(pipeline().parameters.dividend, add(pipeline().parameters.divisor, 2)), 1)), float(variables('nested_mod_result'))))"
+          }
+        }
+      },
+      {
+        "name": "CheckDivisorValidity",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeFinalValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(mod(div(pipeline().parameters.dividend, add(pipeline().parameters.divisor, 1)), add(pipeline().parameters.mod_base, 1)), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetValidFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_valid_divisor",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetInvalidFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_valid_divisor",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ApplyFallbackIfNeeded",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckDivisorValidity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_computed_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('is_valid_divisor'), 'true'), string(div(mod(add(float(variables('final_computed_value')), div(pipeline().parameters.dividend, add(pipeline().parameters.divisor, pipeline().parameters.mod_base))), add(pipeline().parameters.mod_base, 5)), add(mod(pipeline().parameters.divisor, add(pipeline().parameters.mod_base, 1)), 1))), string(pipeline().parameters.fallback_value))"
+          }
+        }
+      },
+      {
+        "name": "PostResultToEndpoint",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ApplyFallbackIfNeeded",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.internal.example.com/pipeline/results",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"deeply_nested_modulo_division\",\"primary_div\":\"', variables('primary_division_result'), '\",\"nested_mod\":\"', variables('nested_mod_result'), '\",\"final_value\":\"', variables('final_computed_value'), '\",\"is_valid\":\"', variables('is_valid_divisor'), '\",\"deeply_nested_check\":\"', string(mod(div(mod(div(pipeline().parameters.dividend, add(pipeline().parameters.divisor, 1)), add(pipeline().parameters.mod_base, 2)), add(mod(pipeline().parameters.dividend, pipeline().parameters.mod_base), 1)), add(pipeline().parameters.mod_base, 1))), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

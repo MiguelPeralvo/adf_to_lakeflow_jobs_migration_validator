@@ -1,0 +1,172 @@
+{
+  "name": "param_subtraction_with_conditional",
+  "properties": {
+    "parameters": {
+      "start_value": {
+        "type": "Int",
+        "defaultValue": 100
+      },
+      "decrement": {
+        "type": "Int",
+        "defaultValue": 15
+      },
+      "threshold": {
+        "type": "Int",
+        "defaultValue": 50
+      }
+    },
+    "variables": {
+      "computed_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetComputedResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(pipeline().parameters.start_value, pipeline().parameters.decrement))"
+          }
+        }
+      },
+      {
+        "name": "CheckSubtractionThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetComputedResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(sub(pipeline().parameters.start_value, pipeline().parameters.decrement), pipeline().parameters.threshold), greater(sub(sub(pipeline().parameters.start_value, pipeline().parameters.decrement), pipeline().parameters.decrement), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFlagTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(greater(sub(sub(pipeline().parameters.start_value, pipeline().parameters.decrement), pipeline().parameters.threshold), 0), 'above_threshold', 'at_threshold')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFlagFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(less(sub(pipeline().parameters.start_value, mul(pipeline().parameters.decrement, 2)), pipeline().parameters.threshold), 'below_threshold_deep', 'below_threshold')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetAdjustedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckSubtractionThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(sub(pipeline().parameters.start_value, pipeline().parameters.decrement), pipeline().parameters.threshold), sub(pipeline().parameters.start_value, pipeline().parameters.decrement), sub(pipeline().parameters.threshold, pipeline().parameters.decrement)))"
+          }
+        }
+      },
+      {
+        "name": "CopyFilteredData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetAdjustedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM sales_data WHERE amount > ', string(sub(pipeline().parameters.start_value, pipeline().parameters.decrement)), ' AND amount >= ', string(sub(sub(pipeline().parameters.start_value, pipeline().parameters.decrement), pipeline().parameters.threshold)))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

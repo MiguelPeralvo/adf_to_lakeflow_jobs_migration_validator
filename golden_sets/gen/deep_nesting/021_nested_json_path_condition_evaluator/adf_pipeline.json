@@ -1,0 +1,388 @@
+{
+  "name": "nested_json_path_condition_evaluator",
+  "properties": {
+    "parameters": {
+      "api_endpoint": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/v2/status"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "production"
+      },
+      "json_root_path": {
+        "type": "String",
+        "defaultValue": "$.data.results"
+      },
+      "expected_status": {
+        "type": "String",
+        "defaultValue": "SUCCESS"
+      }
+    },
+    "variables": {
+      "api_response_body": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "nested_status_value": {
+        "type": "String",
+        "defaultValue": "UNKNOWN"
+      },
+      "final_processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "CallApiEndpoint",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_endpoint, '/', pipeline().parameters.env, '/health?root=', pipeline().parameters.json_root_path)"
+          },
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        }
+      },
+      {
+        "name": "SetApiResponseBody",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CallApiEndpoint",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "api_response_body",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('CallApiEndpoint').output.response.data.results[0].status.details.code)"
+          }
+        }
+      },
+      {
+        "name": "CheckTopLevelStatus",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetApiResponseBody",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('CallApiEndpoint').output.response.data.results[0].status.details.code, pipeline().parameters.expected_status)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetNestedStatusSuccess",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "nested_status_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('VALID_', activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.level)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetNestedStatusFailure",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "nested_status_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('INVALID_', coalesce(activity('CallApiEndpoint').output.response.data.results[0].status.details.errorInfo.category, 'UNKNOWN_CATEGORY'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "EvaluateEnvironmentAndDepth",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckTopLevelStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(pipeline().parameters.env, 'production'), or(equals(variables('nested_status_value'), concat('VALID_', activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.level)), greater(int(coalesce(activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.retryCount, '0')), 0)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetFlagForProcessing",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_processing_flag",
+                "value": "true"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFlagSkipProcessing",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "final_processing_flag",
+                "value": "false"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckFinalProcessingDecision",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "EvaluateEnvironmentAndDepth",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('final_processing_flag'), 'true'), not(equals(activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.schema.version, 'deprecated')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLogSuccess",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_endpoint, '/log')"
+                },
+                "method": "POST",
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_json_path_condition_evaluator\",\"env\":\"', pipeline().parameters.env, '\",\"nestedPath\":\"', activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.schema.version, '\",\"decision\":\"PROCEED\"}'))"
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "InnerLogSkip",
+              "type": "WebActivity",
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_endpoint, '/log')"
+                },
+                "method": "POST",
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_json_path_condition_evaluator\",\"env\":\"', pipeline().parameters.env, '\",\"decision\":\"SKIP\",\"reason\":\"', variables('nested_status_value'), '\"}'))"
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckFinalProcessingDecision",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "nested_status_value",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('FINAL_', variables('nested_status_value'), '_ENV_', pipeline().parameters.env, '_SCHEMA_', coalesce(activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.schema.version, 'N/A'))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksTransformation",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetFinalVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/pipelines/', pipeline().parameters.env, '/transformations/nested_json_processor')"
+          },
+          "baseParameters": {
+            "api_response_status": {
+              "type": "Expression",
+              "value": "@variables('nested_status_value')"
+            },
+            "json_root_path": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.json_root_path"
+            },
+            "processing_flag": {
+              "type": "Expression",
+              "value": "@variables('final_processing_flag')"
+            },
+            "source_endpoint": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.api_endpoint"
+            },
+            "nested_schema_version": {
+              "type": "Expression",
+              "value": "@coalesce(activity('CallApiEndpoint').output.response.data.results[0].status.details.metadata.validation.schema.version, 'unknown')"
+            }
+          }
+        }
+      },
+      {
+        "name": "CopyProcessedResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "RunDatabricksTransformation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT r.id, r.payload, r.nested_path, r.status_code, r.schema_version, r.processed_at FROM dbo.api_response_staging r WHERE r.environment = ''', pipeline().parameters.env, ''' AND r.root_path = ''', pipeline().parameters.json_root_path, ''' AND r.status_code = ''', pipeline().parameters.expected_status, ''' AND r.processing_flag = ''', variables('final_processing_flag'), ''' ORDER BY r.processed_at DESC')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "payload"
+                },
+                "sink": {
+                  "name": "json_payload",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "nested_path"
+                },
+                "sink": {
+                  "name": "json_nested_path",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "status_code"
+                },
+                "sink": {
+                  "name": "response_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "schema_version"
+                },
+                "sink": {
+                  "name": "schema_ver",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "processed_at"
+                },
+                "sink": {
+                  "name": "processing_timestamp",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

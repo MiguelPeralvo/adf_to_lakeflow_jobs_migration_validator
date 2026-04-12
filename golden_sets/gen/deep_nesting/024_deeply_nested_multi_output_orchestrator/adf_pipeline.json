@@ -1,0 +1,339 @@
+{
+  "name": "deeply_nested_multi_output_orchestrator",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B-00001"
+      },
+      "correlation_id": {
+        "type": "String",
+        "defaultValue": "CORR-0001"
+      },
+      "source_system": {
+        "type": "String",
+        "defaultValue": "ERP"
+      },
+      "target_system": {
+        "type": "String",
+        "defaultValue": "DeltaLake"
+      },
+      "sla_minutes": {
+        "type": "Int",
+        "defaultValue": 30
+      }
+    },
+    "variables": {
+      "lookup_status": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupBatchMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_status, record_count, priority, sla_target_minutes FROM dbo.batch_control WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND source_system = ''', pipeline().parameters.source_system, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_batch_control",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetLookupStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "lookup_status",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('LookupBatchMetadata').output.firstRow.batch_status"
+          }
+        }
+      },
+      {
+        "name": "IfBatchIsReady_Level1",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetLookupStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('lookup_status'), 'READY'), greater(activity('LookupBatchMetadata').output.firstRow.record_count, 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "IfSlaCompliant_Level2",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(less(int(activity('LookupBatchMetadata').output.firstRow.sla_target_minutes), pipeline().parameters.sla_minutes), equals(pipeline().parameters.source_system, 'ERP'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "IfHighPriority_Level3",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@and(equals(activity('LookupBatchMetadata').output.firstRow.priority, 'HIGH'), or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "IfTargetIsDelta_Level4",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@and(and(equals(pipeline().parameters.target_system, 'DeltaLake'), greater(activity('LookupBatchMetadata').output.firstRow.record_count, 100)), and(not(equals(variables('lookup_status'), 'FAILED')), equals(variables('processing_flag'), 'false')))"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "RunDatabricksTransform",
+                                "type": "DatabricksNotebook",
+                                "dependsOn": [],
+                                "policy": {
+                                  "timeout": "0.01:00:00",
+                                  "retry": 1,
+                                  "retryIntervalInSeconds": 60
+                                },
+                                "typeProperties": {
+                                  "notebookPath": {
+                                    "type": "Expression",
+                                    "value": "@concat('/Shared/pipelines/', pipeline().parameters.env, '/transform_', pipeline().parameters.source_system, '_to_', pipeline().parameters.target_system)"
+                                  },
+                                  "baseParameters": {
+                                    "batch_id": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.batch_id"
+                                    },
+                                    "correlation_id": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.correlation_id"
+                                    },
+                                    "record_count": {
+                                      "type": "Expression",
+                                      "value": "@string(activity('LookupBatchMetadata').output.firstRow.record_count)"
+                                    },
+                                    "env": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.env"
+                                    }
+                                  }
+                                },
+                                "linkedServiceName": {
+                                  "referenceName": "ls_databricks",
+                                  "type": "LinkedServiceReference"
+                                }
+                              },
+                              {
+                                "name": "CopyToTarget",
+                                "type": "Copy",
+                                "dependsOn": [
+                                  {
+                                    "activity": "RunDatabricksTransform",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "policy": {
+                                  "timeout": "0.00:30:00",
+                                  "retry": 2,
+                                  "retryIntervalInSeconds": 30
+                                },
+                                "typeProperties": {
+                                  "source": {
+                                    "type": "AzureSqlSource",
+                                    "sql_reader_query": {
+                                      "type": "Expression",
+                                      "value": "@concat('SELECT * FROM dbo.staging_', pipeline().parameters.source_system, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND status = ''TRANSFORMED'' AND record_count > 0')"
+                                    }
+                                  },
+                                  "sink": {
+                                    "type": "AzureDatabricksDeltaLakeSink"
+                                  },
+                                  "translator": {
+                                    "type": "TabularTranslator",
+                                    "mappings": [
+                                      {
+                                        "source": {
+                                          "name": "src_col"
+                                        },
+                                        "sink": {
+                                          "name": "tgt_col",
+                                          "type": "String"
+                                        }
+                                      },
+                                      {
+                                        "source": {
+                                          "name": "batch_id"
+                                        },
+                                        "sink": {
+                                          "name": "batch_id",
+                                          "type": "String"
+                                        }
+                                      },
+                                      {
+                                        "source": {
+                                          "name": "record_data"
+                                        },
+                                        "sink": {
+                                          "name": "record_payload",
+                                          "type": "String"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "enableStaging": false
+                                },
+                                "inputs": [
+                                  {
+                                    "referenceName": "ds_sql_staging",
+                                    "type": "DatasetReference"
+                                  }
+                                ],
+                                "outputs": [
+                                  {
+                                    "referenceName": "ds_delta_target",
+                                    "type": "DatasetReference"
+                                  }
+                                ],
+                                "input_dataset_definitions": [
+                                  {
+                                    "type": "AzureSqlSource",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_sql",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ],
+                                "output_dataset_definitions": [
+                                  {
+                                    "type": "AzureDatabricksDeltaLakeSink",
+                                    "schema": [],
+                                    "linkedServiceName": {
+                                      "referenceName": "ls_delta",
+                                      "type": "LinkedServiceReference"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "name": "NotifySlaSuccess",
+                                "type": "WebActivity",
+                                "dependsOn": [
+                                  {
+                                    "activity": "CopyToTarget",
+                                    "dependencyConditions": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                ],
+                                "policy": {
+                                  "timeout": "0.00:05:00",
+                                  "retry": 3,
+                                  "retryIntervalInSeconds": 10
+                                },
+                                "typeProperties": {
+                                  "url": {
+                                    "type": "Expression",
+                                    "value": "@concat('https://api.monitoring.internal/', pipeline().parameters.env, '/sla/notify')"
+                                  },
+                                  "method": "POST",
+                                  "headers": {
+                                    "Content-Type": "application/json",
+                                    "X-Correlation-Id": {
+                                      "type": "Expression",
+                                      "value": "@pipeline().parameters.correlation_id"
+                                    }
+                                  },
+                                  "body": {
+                                    "type": "Expression",
+                                    "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"correlation_id\":\"', pipeline().parameters.correlation_id, '\",\"source_system\":\"', pipeline().parameters.source_system, '\",\"target_system\":\"', pipeline().parameters.target_system, '\",\"status\":\"SUCCESS\",\"record_count\":', string(activity('LookupBatchMetadata').output.firstRow.record_count), ',\"sla_minutes\":', string(pipeline().parameters.sla_minutes), ',\"env\":\"', pipeline().parameters.env, '\",\"lookup_status\":\"', variables('lookup_status'), '\"}'))"
+                                  }
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "SetProcessingFlagSkipped",
+                                "type": "SetVariable",
+                                "dependsOn": [],
+                                "typeProperties": {
+                                  "variableName": "processing_flag",
+                                  "value": {
+                                    "type": "Expression",
+                                    "value": "@string(and(equals(pipeline().parameters.target_system, 'DeltaLake'), not(equals(variables('lookup_status'), 'FAILED'))))"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": []
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      }
+    ]
+  }
+}

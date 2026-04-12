@@ -1,0 +1,231 @@
+{
+  "name": "deeply_nested_date_offset_math",
+  "properties": {
+    "parameters": {
+      "days_offset": {
+        "type": "Int",
+        "defaultValue": 7
+      },
+      "hours_offset": {
+        "type": "Int",
+        "defaultValue": 12
+      },
+      "minutes_offset": {
+        "type": "Int",
+        "defaultValue": 30
+      },
+      "timezone_shift": {
+        "type": "Int",
+        "defaultValue": -5
+      }
+    },
+    "variables": {
+      "total_minutes_offset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "total_hours_with_tz": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "computed_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "is_future_date": {
+        "type": "String",
+        "defaultValue": "false"
+      },
+      "final_utc_offset": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "lookup_date": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcTotalMinutesOffset",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "total_minutes_offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset))"
+          }
+        }
+      },
+      {
+        "name": "CalcTotalHoursWithTimezone",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcTotalMinutesOffset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "total_hours_with_tz",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset), 60), pipeline().parameters.timezone_shift))"
+          }
+        }
+      },
+      {
+        "name": "ComputeTargetDate",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcTotalHoursWithTimezone",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addminutes(addminutes(utcnow(), add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset)), mul(pipeline().parameters.timezone_shift, 60)), 'yyyy-MM-dd HH:mm:ss')"
+          }
+        }
+      },
+      {
+        "name": "CalcFinalUtcOffset",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeTargetDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_utc_offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(add(div(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset), 60), pipeline().parameters.timezone_shift), 60), mod(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset), 60)))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfFutureDate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CalcFinalUtcOffset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetIsFutureTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_future_date",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(true)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetIsFutureFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_future_date",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetLookupDate",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIfFutureDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "lookup_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addminutes(addminutes(utcnow(), add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset)), mul(pipeline().parameters.timezone_shift, 60)), 'yyyy-MM-dd')"
+          }
+        }
+      },
+      {
+        "name": "LookupDateRecords",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetLookupDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS record_count, ''', variables('computed_date'), ''' AS target_datetime, ', string(add(add(mul(mul(pipeline().parameters.days_offset, 24), 60), mul(pipeline().parameters.hours_offset, 60)), pipeline().parameters.minutes_offset)), ' AS total_offset_minutes, ', variables('total_hours_with_tz'), ' AS total_hours_with_tz, ''', variables('lookup_date'), ''' AS lookup_date FROM dbo.date_audit_log WHERE event_date = ''', variables('lookup_date'), '''')"
+            }
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "firstRowOnly": false
+        }
+      }
+    ]
+  }
+}

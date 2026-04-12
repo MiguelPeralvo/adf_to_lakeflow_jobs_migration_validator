@@ -1,0 +1,165 @@
+{
+  "name": "nested_range_and_foreach_expression",
+  "properties": {
+    "parameters": {
+      "start_index": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "count": {
+        "type": "Int",
+        "defaultValue": 5
+      },
+      "batch_prefix": {
+        "type": "String",
+        "defaultValue": "batch"
+      }
+    },
+    "variables": {
+      "range_array": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_batch_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processing_summary": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetRangeArray",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "range_array",
+          "value": {
+            "type": "Expression",
+            "value": "@range(pipeline().parameters.start_index, pipeline().parameters.count)"
+          }
+        }
+      },
+      {
+        "name": "SetBatchPrefix",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetRangeArray",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_batch_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.batch_prefix, '_run_', string(pipeline().parameters.start_index), '_to_', string(add(pipeline().parameters.start_index, pipeline().parameters.count)))"
+          }
+        }
+      },
+      {
+        "name": "ForEachRangeIndex",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetBatchPrefix",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@variables('range_array')"
+          },
+          "activities": [
+            {
+              "name": "SetIterationVariable",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_batch_name",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('current_batch_name'), '/', 'partition_', string(item()), '_idx_', string(sub(item(), pipeline().parameters.start_index)))"
+                }
+              }
+            },
+            {
+              "name": "RunDatabricksNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "SetIterationVariable",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/processing/', pipeline().parameters.batch_prefix, '/process_partition')"
+                },
+                "baseParameters": {
+                  "partition_index": {
+                    "type": "Expression",
+                    "value": "@string(item())"
+                  },
+                  "batch_name": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.batch_prefix, '_', string(item()))"
+                  },
+                  "output_path": {
+                    "type": "Expression",
+                    "value": "@concat('/mnt/output/', pipeline().parameters.batch_prefix, '/partition_', string(sub(item(), pipeline().parameters.start_index)), '/', string(item()))"
+                  },
+                  "nested_label": {
+                    "type": "Expression",
+                    "value": "@concat('batch[', string(sub(item(), pipeline().parameters.start_index)), ']_of_', string(pipeline().parameters.count), '_starting_', string(pipeline().parameters.start_index))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetProcessingSummary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachRangeIndex",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_summary",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Completed processing ', string(pipeline().parameters.count), ' partitions for prefix [', pipeline().parameters.batch_prefix, '] ranging from index ', string(pipeline().parameters.start_index), ' to ', string(add(pipeline().parameters.start_index, sub(pipeline().parameters.count, 1))))"
+          }
+        }
+      }
+    ]
+  }
+}

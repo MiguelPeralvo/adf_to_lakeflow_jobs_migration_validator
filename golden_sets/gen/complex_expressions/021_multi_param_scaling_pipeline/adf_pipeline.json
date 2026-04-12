@@ -1,0 +1,189 @@
+{
+  "name": "multi_param_scaling_pipeline",
+  "properties": {
+    "parameters": {
+      "base_scale": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "env_factor": {
+        "type": "Float",
+        "defaultValue": 1.5
+      },
+      "region_factor": {
+        "type": "Float",
+        "defaultValue": 2.0
+      },
+      "min_scale": {
+        "type": "Int",
+        "defaultValue": 5
+      }
+    },
+    "variables": {
+      "env_scaled_value": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "region_adjusted_value": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "final_scale_value": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "is_above_minimum": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeEnvScaled",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "env_scaled_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(pipeline().parameters.base_scale, pipeline().parameters.env_factor))"
+          }
+        }
+      },
+      {
+        "name": "ComputeRegionAdjusted",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeEnvScaled",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "region_adjusted_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(float(variables('env_scaled_value')), pipeline().parameters.region_factor), pipeline().parameters.min_scale))"
+          }
+        }
+      },
+      {
+        "name": "ComputeFinalScale",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeRegionAdjusted",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_scale_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(mul(pipeline().parameters.base_scale, pipeline().parameters.env_factor), pipeline().parameters.region_factor), mul(pipeline().parameters.min_scale, pipeline().parameters.env_factor)))"
+          }
+        }
+      },
+      {
+        "name": "CheckAboveMinimum",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ComputeFinalScale",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(float(variables('final_scale_value')), add(mul(pipeline().parameters.min_scale, pipeline().parameters.region_factor), pipeline().parameters.base_scale))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetAboveMinTrue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_above_minimum",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(true)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetAboveMinFalse",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_above_minimum",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(false)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetScaleSummary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckAboveMinimum",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_scale_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(mul(add(float(variables('region_adjusted_value')), mul(pipeline().parameters.base_scale, pipeline().parameters.env_factor)), pipeline().parameters.region_factor), pipeline().parameters.min_scale))"
+          }
+        }
+      },
+      {
+        "name": "NotifyScalingResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetScaleSummary",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://scaling-api.contoso.com/api/v1/notify",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "{\"pipeline\":\"multi_param_scaling_pipeline\",\"base_scale\":@{pipeline().parameters.base_scale},\"env_factor\":@{pipeline().parameters.env_factor},\"region_factor\":@{pipeline().parameters.region_factor},\"min_scale\":@{pipeline().parameters.min_scale},\"computed_final_scale\":@{variables('final_scale_value')},\"nested_computation\":@{string(add(mul(mul(pipeline().parameters.base_scale, pipeline().parameters.env_factor), pipeline().parameters.region_factor), mul(pipeline().parameters.min_scale, add(pipeline().parameters.env_factor, pipeline().parameters.region_factor))))},\"above_minimum\":@{variables('is_above_minimum')}}"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,387 @@
+{
+  "name": "nested_pipeline_parameter_propagation",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "B001"
+      },
+      "source_system": {
+        "type": "String",
+        "defaultValue": "ERP"
+      },
+      "target_system": {
+        "type": "String",
+        "defaultValue": "DWH"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "retry_count": {
+        "type": "String",
+        "defaultValue": "3"
+      }
+    },
+    "variables": {
+      "v_qualified_source": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "v_transfer_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "v_runtime_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "v_final_query_context": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVar_QualifiedSource",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "v_qualified_source",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toUpper(pipeline().parameters.env), '_', replace(pipeline().parameters.source_system, ' ', '_'), '_', pipeline().parameters.run_date)"
+          }
+        }
+      },
+      {
+        "name": "SetVar_TransferKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_QualifiedSource",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "v_transfer_key",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('v_qualified_source'), '|TO|', toUpper(pipeline().parameters.env), '_', pipeline().parameters.target_system, '_BATCH_', pipeline().parameters.batch_id)"
+          }
+        }
+      },
+      {
+        "name": "SetVar_RuntimeConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_TransferKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "v_runtime_config",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"transfer_key\":\"', variables('v_transfer_key'), '\",\"env\":\"', pipeline().parameters.env, '\",\"retry\":', pipeline().parameters.retry_count, ',\"source_qualified\":\"', variables('v_qualified_source'), '\"}')"
+          }
+        }
+      },
+      {
+        "name": "SetVar_FinalQueryContext",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVar_RuntimeConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "v_final_query_context",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM ', toLower(pipeline().parameters.source_system), '.transactions WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND run_date = ''', pipeline().parameters.run_date, ''' AND environment = ''', toLower(variables('v_qualified_source')), '''')"
+          }
+        }
+      },
+      {
+        "name": "Lookup_ValidateSourceConfig",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "SetVar_FinalQueryContext",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": {
+            "type": "Expression",
+            "value": "@int(pipeline().parameters.retry_count)"
+          },
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS record_count, ''', variables('v_transfer_key'), ''' AS transfer_key FROM ', toLower(pipeline().parameters.source_system), '.audit_log WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND run_date = ''', pipeline().parameters.run_date, ''' AND env = ''', toLower(pipeline().parameters.env), '''')"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "IfCondition_CheckRecordsExist",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Lookup_ValidateSourceConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(activity('Lookup_ValidateSourceConfig').output.firstRow.record_count, 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Copy_TransferData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": {
+                  "type": "Expression",
+                  "value": "@int(pipeline().parameters.retry_count)"
+                },
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@variables('v_final_query_context')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "batch_id"
+                      },
+                      "sink": {
+                        "name": "batch_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "run_date"
+                      },
+                      "sink": {
+                        "name": "run_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "amount"
+                      },
+                      "sink": {
+                        "name": "amount",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [
+                {
+                  "referenceName": "ds_sql_source",
+                  "type": "DatasetReference"
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_delta_sink",
+                  "type": "DatasetReference"
+                }
+              ],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Web_LogNoRecords",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging-api-', toLower(pipeline().parameters.env), '.contoso.com/api/v1/audit/no-records')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Transfer-Key": {
+                    "type": "Expression",
+                    "value": "@variables('v_transfer_key')"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"transfer_key\":\"', variables('v_transfer_key'), '\",\"qualified_source\":\"', variables('v_qualified_source'), '\",\"runtime_config\":', variables('v_runtime_config'), ',\"message\":\"No records found for batch ', pipeline().parameters.batch_id, ' on ', pipeline().parameters.run_date, ' in env ', pipeline().parameters.env, '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivity_NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_CheckRecordsExist",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": {
+            "type": "Expression",
+            "value": "@int(pipeline().parameters.retry_count)"
+          },
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://orchestration-api-', toLower(pipeline().parameters.env), '.contoso.com/api/v2/pipelines/', pipeline().RunId, '/complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "X-Source-System": {
+              "type": "Expression",
+              "value": "@variables('v_qualified_source')"
+            },
+            "X-Transfer-Key": {
+              "type": "Expression",
+              "value": "@variables('v_transfer_key')"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"pipeline_run_id\":\"', pipeline().RunId, '\",\"transfer_key\":\"', variables('v_transfer_key'), '\",\"qualified_source\":\"', variables('v_qualified_source'), '\",\"runtime_config\":', variables('v_runtime_config'), ',\"env\":\"', pipeline().parameters.env, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"source_system\":\"', pipeline().parameters.source_system, '\",\"target_system\":\"', pipeline().parameters.target_system, '\",\"run_date\":\"', pipeline().parameters.run_date, '\",\"status\":\"completed\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "name": "complex_regex_like_expression_nesting",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "file_pattern": {
+        "type": "String",
+        "defaultValue": "data_export_2024.csv"
+      },
+      "source_container": {
+        "type": "String",
+        "defaultValue": "raw-ingestion"
+      },
+      "target_container": {
+        "type": "String",
+        "defaultValue": "curated-output"
+      }
+    },
+    "variables": {
+      "matched_pattern": {
+        "type": "String",
+        "defaultValue": "none"
+      },
+      "is_valid_file": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetVariable_DetectPattern",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "matched_pattern",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(startsWith(pipeline().parameters.file_pattern, 'data_'), endsWith(pipeline().parameters.file_pattern, '.csv')), 'csv_data_file', if(and(startsWith(pipeline().parameters.file_pattern, 'data_'), endsWith(pipeline().parameters.file_pattern, '.parquet')), 'parquet_data_file', if(and(contains(pipeline().parameters.file_pattern, 'export'), or(endsWith(pipeline().parameters.file_pattern, '.json'), endsWith(pipeline().parameters.file_pattern, '.csv'))), 'export_file', 'unknown_pattern')))"
+          }
+        }
+      },
+      {
+        "name": "SetVariable_ValidateFile",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_DetectPattern",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_valid_file",
+          "value": {
+            "type": "Expression",
+            "value": "@string(and(or(startsWith(pipeline().parameters.file_pattern, 'data_'), startsWith(pipeline().parameters.file_pattern, 'report_')), and(not(contains(pipeline().parameters.file_pattern, '..')), not(contains(pipeline().parameters.file_pattern, ' ')), or(endsWith(pipeline().parameters.file_pattern, '.csv'), endsWith(pipeline().parameters.file_pattern, '.parquet'), endsWith(pipeline().parameters.file_pattern, '.json')))))"
+          }
+        }
+      },
+      {
+        "name": "IfCondition_CheckEnvAndPattern",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVariable_ValidateFile",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), and(startsWith(pipeline().parameters.file_pattern, 'data_'), or(endsWith(pipeline().parameters.file_pattern, '.csv'), endsWith(pipeline().parameters.file_pattern, '.parquet')), not(contains(pipeline().parameters.file_pattern, 'temp'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLog_EnvPatternMatch",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://hooks.logging.io/adf/', pipeline().parameters.env, '/pattern-matched')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"', pipeline().Pipeline, '\",\"pattern\":\"', variables('matched_pattern'), '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "IfCondition_DeepNestedContainerValidation",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_CheckEnvAndPattern",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(and(or(startsWith(pipeline().parameters.source_container, 'raw'), startsWith(pipeline().parameters.source_container, 'staging')), not(contains(pipeline().parameters.source_container, 'archive')), not(endsWith(pipeline().parameters.source_container, '-deleted'))), and(or(startsWith(pipeline().parameters.target_container, 'curated'), startsWith(pipeline().parameters.target_container, 'processed')), contains(pipeline().parameters.target_container, 'output'), not(contains(pipeline().parameters.target_container, 'temp'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerLog_ContainerValid",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_valid_file",
+                "value": "container_validated"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "IfCondition_FinalPatternGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_DeepNestedContainerValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('matched_pattern'), 'csv_data_file'), and(contains(pipeline().parameters.file_pattern, 'export'), and(startsWith(pipeline().parameters.file_pattern, 'data_export'), endsWith(pipeline().parameters.file_pattern, '.csv'), not(contains(pipeline().parameters.file_pattern, 'draft'))), or(equals(pipeline().parameters.env, 'prod'), and(equals(pipeline().parameters.env, 'staging'), startsWith(pipeline().parameters.source_container, 'staging')))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerCopy_Passthrough",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_valid_file",
+                "value": "ready_to_copy"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CopyData_MatchedFiles",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "IfCondition_FinalPatternGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM file_registry WHERE container = ''', pipeline().parameters.source_container, ''' AND file_name LIKE ''', replace(replace(pipeline().parameters.file_pattern, '_', '%_'), '.csv', '%.csv'), ''' AND environment = ''', pipeline().parameters.env, ''' AND status = ''active''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "file_name"
+                },
+                "sink": {
+                  "name": "file_name",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "container"
+                },
+                "sink": {
+                  "name": "container",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "load_ts"
+                },
+                "sink": {
+                  "name": "load_timestamp",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [],
+        "outputs": [],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "WebActivity_NotifyCompletion",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CopyData_MatchedFiles",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.notify.io/adf/', pipeline().parameters.env, '/pipeline-complete')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"', pipeline().Pipeline, '\",\"matched_pattern\":\"', variables('matched_pattern'), '\",\"is_valid\":\"', variables('is_valid_file'), '\",\"source\":\"', pipeline().parameters.source_container, '\",\"target\":\"', pipeline().parameters.target_container, '\",\"file_pattern\":\"', pipeline().parameters.file_pattern, '\",\"env\":\"', pipeline().parameters.env, '\",\"run_id\":\"', pipeline().RunId, '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

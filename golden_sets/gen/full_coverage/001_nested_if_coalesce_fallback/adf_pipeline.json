@@ -1,0 +1,250 @@
+{
+  "name": "nested_if_coalesce_fallback",
+  "properties": {
+    "parameters": {
+      "primary_source": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "fallback_source": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "default_value": {
+        "type": "String",
+        "defaultValue": "default_table"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "resolved_source": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "query_override": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedSource",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_source",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(coalesce(pipeline().parameters.primary_source, ''))), coalesce(pipeline().parameters.primary_source, ''), if(not(empty(coalesce(pipeline().parameters.fallback_source, ''))), coalesce(pipeline().parameters.fallback_source, ''), coalesce(pipeline().parameters.default_value, 'fallback_default_table')))"
+          }
+        }
+      },
+      {
+        "name": "SetEffectiveEnv",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedSource",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_env",
+          "value": {
+            "type": "Expression",
+            "value": "@if(not(empty(coalesce(pipeline().parameters.env, ''))), coalesce(pipeline().parameters.env, 'dev'), 'dev')"
+          }
+        }
+      },
+      {
+        "name": "CheckPrimarySourceAvailable",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetEffectiveEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(empty(coalesce(pipeline().parameters.primary_source, ''))), equals(variables('effective_env'), 'prod'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetQueryForProd",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "query_override",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT * FROM ', coalesce(pipeline().parameters.primary_source, variables('resolved_source')), ' WHERE env = ''prod''')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetQueryForNonProd",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "query_override",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT * FROM ', if(not(empty(coalesce(pipeline().parameters.fallback_source, ''))), coalesce(pipeline().parameters.fallback_source, ''), coalesce(pipeline().parameters.default_value, 'fallback_default_table')), ' WHERE env = ''', coalesce(pipeline().parameters.env, 'dev'), '''')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckFallbackChainResolution",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckPrimarySourceAvailable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(variables('resolved_source'), coalesce(pipeline().parameters.default_value, 'fallback_default_table')), equals(variables('query_override'), ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "OverrideWithDefault",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "query_override",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT * FROM ', if(not(empty(coalesce(pipeline().parameters.default_value, ''))), coalesce(pipeline().parameters.default_value, 'fallback_default_table'), if(not(empty(coalesce(pipeline().parameters.fallback_source, ''))), coalesce(pipeline().parameters.fallback_source, 'fallback_default_table'), 'fallback_default_table')), ' WHERE 1=1')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "SetFinalQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckFallbackChainResolution",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "query_override",
+          "value": {
+            "type": "Expression",
+            "value": "@if(empty(coalesce(variables('query_override'), '')), concat('SELECT * FROM ', coalesce(variables('resolved_source'), coalesce(pipeline().parameters.default_value, 'fallback_default_table'))), coalesce(variables('query_override'), concat('SELECT * FROM ', coalesce(variables('resolved_source'), 'fallback_default_table'))))"
+          }
+        }
+      },
+      {
+        "name": "CopyResolvedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@if(not(empty(coalesce(variables('query_override'), ''))), coalesce(variables('query_override'), concat('SELECT * FROM ', coalesce(variables('resolved_source'), pipeline().parameters.default_value))), if(not(empty(coalesce(variables('resolved_source'), ''))), concat('SELECT TOP 1000 * FROM ', coalesce(variables('resolved_source'), 'fallback_default_table'), ' WHERE env = ''', coalesce(variables('effective_env'), 'dev'), ''''  ), concat('SELECT TOP 1000 * FROM ', coalesce(pipeline().parameters.default_value, 'fallback_default_table'))))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_env"
+                },
+                "sink": {
+                  "name": "tgt_env",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_id"
+                },
+                "sink": {
+                  "name": "tgt_id",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

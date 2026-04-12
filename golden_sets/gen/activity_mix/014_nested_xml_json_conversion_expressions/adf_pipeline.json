@@ -1,0 +1,164 @@
+{
+  "name": "nested_xml_json_conversion_expressions",
+  "properties": {
+    "parameters": {
+      "payload_type": {
+        "type": "String",
+        "defaultValue": "xml"
+      },
+      "root_element": {
+        "type": "String",
+        "defaultValue": "catalog"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "raw_payload": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "converted_json": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "extracted_value": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "FetchPayloadFromAPI",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.',pipeline().parameters.env,'.example.com/payloads/',pipeline().parameters.payload_type,'/latest')"
+          },
+          "method": "GET",
+          "headers": {
+            "Accept": "application/xml",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        }
+      },
+      {
+        "name": "SetRawPayload",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FetchPayloadFromAPI",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "raw_payload",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.payload_type,'xml'),string(xml(concat('<',pipeline().parameters.root_element,'>',activity('FetchPayloadFromAPI').output.Response,'</',pipeline().parameters.root_element,'>'))),string(activity('FetchPayloadFromAPI').output.Response))"
+          }
+        }
+      },
+      {
+        "name": "ConvertAndExtract",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetRawPayload",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "converted_json",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(concat('{\"',pipeline().parameters.root_element,'\":{\"items\":',replace(replace(string(xml(concat('<root><item>',variables('raw_payload'),'</item></root>'))),'<?xml version=\"1.0\" encoding=\"utf-8\"?>',''),'<root>',''),'}}')))"
+          }
+        }
+      },
+      {
+        "userProperties": []
+      },
+      {
+        "name": "CheckPayloadType",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ConvertAndExtract",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.payload_type,'xml')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ParseXmlToJsonNested",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "extracted_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(json(string(json(concat('{\"parsed\":{\"env\":\"',pipeline().parameters.env,'\",\"root\":\"',pipeline().parameters.root_element,'\",\"value\":\"',replace(replace(string(xml(concat('<',pipeline().parameters.root_element,'><node>',variables('raw_payload'),'</node></',pipeline().parameters.root_element,'>'))),'<?xml version=\"1.0\" encoding=\"utf-8\"?>',''),'\\','\\'),'\"}}')))['parsed'])"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "PassthroughJson",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "extracted_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(json(concat('{\"passthrough\":{\"env\":\"',pipeline().parameters.env,'\",\"payload\":',coalesce(variables('converted_json'),'\"null\"'),'}}')))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckPayloadType",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "extracted_value",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(concat('{\"pipeline_result\":{\"environment\":\"',pipeline().parameters.env,'\",\"payload_type\":\"',pipeline().parameters.payload_type,'\",\"root_element\":\"',pipeline().parameters.root_element,'\",\"converted_length\":',string(length(variables('converted_json'))),',\"extracted_data\":',if(equals(variables('extracted_value'),''),'null',string(json(variables('extracted_value')))),',\"xml_reconversion_check\":\"',string(xml(concat('<check><env>',pipeline().parameters.env,'</env><type>',pipeline().parameters.payload_type,'</type></check>'))),'\"}}')))"
+          }
+        },
+        "userProperties": []
+      }
+    ]
+  }
+}

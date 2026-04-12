@@ -1,0 +1,126 @@
+{
+  "name": "nested_replace_chain_sanitization",
+  "properties": {
+    "parameters": {
+      "raw_table_name": {
+        "type": "String",
+        "defaultValue": "My Table--Name"
+      },
+      "raw_schema": {
+        "type": "String",
+        "defaultValue": "dbo.Raw Schema"
+      },
+      "special_chars": {
+        "type": "String",
+        "defaultValue": "@#$%"
+      }
+    },
+    "variables": {
+      "sanitized_table_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_schema": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "fully_qualified_name": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SanitizeTableName",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_table_name",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(replace(replace(replace(replace(replace(pipeline().parameters.raw_table_name, ' ', '_'), '-', '_'), '@', ''), '#', ''), '$', '')))"
+          }
+        }
+      },
+      {
+        "name": "SanitizeSchemaName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizeTableName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_schema",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(replace(replace(replace(replace(replace(replace(pipeline().parameters.raw_schema, ' ', '_'), '.', '_'), '@', ''), '#', ''), '$', ''), '%', '')))"
+          }
+        }
+      },
+      {
+        "name": "BuildFullyQualifiedName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizeSchemaName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "fully_qualified_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('sanitized_schema'), '.', toLower(trim(replace(replace(replace(replace(replace(replace(replace(variables('sanitized_table_name'), '(', ''), ')', ''), '&', '_and_'), '+', '_plus_'), '!', ''), '~', ''), pipeline().parameters.special_chars, ''))))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksProcessing",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "BuildFullyQualifiedName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/ingest/sanitized_table_loader",
+          "baseParameters": {
+            "target_table": {
+              "type": "Expression",
+              "value": "@variables('fully_qualified_name')"
+            },
+            "sanitized_table_name": {
+              "type": "Expression",
+              "value": "@variables('sanitized_table_name')"
+            },
+            "sanitized_schema": {
+              "type": "Expression",
+              "value": "@variables('sanitized_schema')"
+            },
+            "original_table_name": {
+              "type": "Expression",
+              "value": "@toLower(trim(replace(replace(replace(pipeline().parameters.raw_table_name, ' ', '_'), '-', '_'), pipeline().parameters.special_chars, '')))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

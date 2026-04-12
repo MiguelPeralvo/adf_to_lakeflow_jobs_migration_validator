@@ -1,0 +1,214 @@
+{
+  "name": "nested_coalesce_math_fallback",
+  "properties": {
+    "parameters": {
+      "primary_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "secondary_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "default_multiplier": {
+        "type": "String",
+        "defaultValue": "2"
+      }
+    },
+    "variables": {
+      "resolved_value": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "multiplier_safe": {
+        "type": "String",
+        "defaultValue": "1"
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "ResolveCoalesceValue",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(not(empty(pipeline().parameters.primary_value)),not(equals(pipeline().parameters.primary_value,'0'))),pipeline().parameters.primary_value,if(and(not(empty(pipeline().parameters.secondary_value)),not(equals(pipeline().parameters.secondary_value,'0'))),pipeline().parameters.secondary_value,'100'))"
+          }
+        }
+      },
+      {
+        "name": "ResolveMultiplierSafe",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ResolveCoalesceValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "multiplier_safe",
+          "value": {
+            "type": "Expression",
+            "value": "@if(or(empty(pipeline().parameters.default_multiplier),equals(pipeline().parameters.default_multiplier,'0')),'1',pipeline().parameters.default_multiplier)"
+          }
+        }
+      },
+      {
+        "name": "CheckResolvedValuePositive",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ResolveMultiplierSafe",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(int(variables('resolved_value')),0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ComputeFinalInsideIf",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(mul(int(variables('resolved_value')),int(variables('multiplier_safe'))))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFallbackInsideIf",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(mul(100,int(variables('multiplier_safe'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalResultAfterCheck",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckResolvedValuePositive",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('final_result'),'0'),string(mul(int(if(or(empty(pipeline().parameters.primary_value),equals(pipeline().parameters.primary_value,'0')),if(or(empty(pipeline().parameters.secondary_value),equals(pipeline().parameters.secondary_value,'0')),'100',pipeline().parameters.secondary_value),pipeline().parameters.primary_value)),int(if(or(empty(pipeline().parameters.default_multiplier),equals(pipeline().parameters.default_multiplier,'0')),'1',pipeline().parameters.default_multiplier)))),variables('final_result'))"
+          }
+        }
+      },
+      {
+        "name": "CopyWithCoalescedQuery",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetFinalResultAfterCheck",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM sales_data WHERE amount >= ',variables('final_result'),' AND multiplier = ',if(or(empty(pipeline().parameters.default_multiplier),equals(pipeline().parameters.default_multiplier,'0')),'1',pipeline().parameters.default_multiplier),' ORDER BY id')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "amount"
+                },
+                "sink": {
+                  "name": "amount_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "id"
+                },
+                "sink": {
+                  "name": "record_id",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "name": "nested_dayofweek_scheduling_logic",
+  "properties": {
+    "parameters": {
+      "schedule_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15"
+      },
+      "weekend_behavior": {
+        "type": "String",
+        "defaultValue": "skip"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "day_of_week_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "is_weekday": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetDayOfWeekLabel",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "day_of_week_label",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(dayOfWeek(pipeline().parameters.schedule_date),0),'Sunday',if(equals(dayOfWeek(pipeline().parameters.schedule_date),6),'Saturday',if(equals(dayOfWeek(pipeline().parameters.schedule_date),1),'Monday',if(equals(dayOfWeek(pipeline().parameters.schedule_date),2),'Tuesday',if(equals(dayOfWeek(pipeline().parameters.schedule_date),3),'Wednesday',if(equals(dayOfWeek(pipeline().parameters.schedule_date),4),'Thursday','Friday'))))))"
+          }
+        }
+      },
+      {
+        "name": "SetIsWeekday",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetDayOfWeekLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "is_weekday",
+          "value": {
+            "type": "Expression",
+            "value": "@if(and(not(equals(dayOfWeek(pipeline().parameters.schedule_date),0)),not(equals(dayOfWeek(pipeline().parameters.schedule_date),6))),'true','false')"
+          }
+        }
+      },
+      {
+        "name": "CheckIfWeekday",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetIsWeekday",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('is_weekday'),'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunWeekdayNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/',pipeline().parameters.env,'/weekday_processing')"
+                },
+                "baseParameters": {
+                  "schedule_date": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.schedule_date"
+                  },
+                  "day_label": {
+                    "type": "Expression",
+                    "value": "@variables('day_of_week_label')"
+                  },
+                  "run_mode": "weekday_full"
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogWeekendSkip",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "day_of_week_label",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('WEEKEND_DETECTED:',variables('day_of_week_label'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CheckWeekendOverride",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckIfWeekday",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(equals(variables('is_weekday'),'false'),equals(pipeline().parameters.weekend_behavior,'run'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunWeekendOverrideNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.06:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat('/pipelines/',pipeline().parameters.env,'/weekend_override_processing')"
+                },
+                "baseParameters": {
+                  "schedule_date": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.schedule_date"
+                  },
+                  "day_label": {
+                    "type": "Expression",
+                    "value": "@variables('day_of_week_label')"
+                  },
+                  "is_saturday": {
+                    "type": "Expression",
+                    "value": "@if(equals(dayOfWeek(pipeline().parameters.schedule_date),6),'true','false')"
+                  },
+                  "is_sunday": {
+                    "type": "Expression",
+                    "value": "@if(equals(dayOfWeek(pipeline().parameters.schedule_date),0),'true','false')"
+                  },
+                  "run_mode": "weekend_override"
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "RunFinalNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckWeekendOverride",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/pipelines/',pipeline().parameters.env,'/finalize_scheduling')"
+          },
+          "baseParameters": {
+            "schedule_date": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.schedule_date"
+            },
+            "day_of_week_number": {
+              "type": "Expression",
+              "value": "@string(dayOfWeek(pipeline().parameters.schedule_date))"
+            },
+            "day_label": {
+              "type": "Expression",
+              "value": "@variables('day_of_week_label')"
+            },
+            "was_weekday": {
+              "type": "Expression",
+              "value": "@variables('is_weekday')"
+            },
+            "weekend_behavior": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.weekend_behavior"
+            },
+            "effective_run_type": {
+              "type": "Expression",
+              "value": "@if(equals(variables('is_weekday'),'true'),'weekday_full',if(equals(pipeline().parameters.weekend_behavior,'run'),'weekend_override','weekend_skipped'))"
+            },
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

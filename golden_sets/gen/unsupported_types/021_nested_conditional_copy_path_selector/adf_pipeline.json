@@ -1,0 +1,454 @@
+{
+  "name": "nested_conditional_copy_path_selector",
+  "properties": {
+    "parameters": {
+      "data_category": {
+        "type": "String",
+        "defaultValue": "finance"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east"
+      },
+      "is_incremental": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "partition_key": {
+        "type": "String",
+        "defaultValue": "date"
+      }
+    },
+    "variables": {
+      "source_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sink_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT source_path, sink_path, query_template, load_type FROM pipeline_config WHERE category = ''', pipeline().parameters.data_category, ''' AND env = ''', pipeline().parameters.env, ''' AND region = ''', pipeline().parameters.region, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetSourcePath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "source_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), if(equals(pipeline().parameters.region, 'us-east'), concat('abfss://prod-useast@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/', pipeline().parameters.partition_key), if(equals(pipeline().parameters.region, 'eu-west'), concat('abfss://prod-euwest@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/', pipeline().parameters.partition_key), concat('abfss://prod-global@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/', pipeline().parameters.partition_key))), if(equals(pipeline().parameters.env, 'staging'), if(equals(pipeline().parameters.region, 'us-east'), concat('abfss://staging-useast@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/raw'), concat('abfss://staging-other@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/raw')), concat('abfss://dev@datalake.dfs.core.windows.net/', pipeline().parameters.data_category, '/sandbox')))"
+          }
+        }
+      },
+      {
+        "name": "SetSinkPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetSourcePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "sink_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), if(equals(pipeline().parameters.data_category, 'finance'), if(equals(pipeline().parameters.region, 'us-east'), '/mnt/delta/prod/finance/us_east/curated', if(equals(pipeline().parameters.region, 'eu-west'), '/mnt/delta/prod/finance/eu_west/curated', '/mnt/delta/prod/finance/global/curated')), if(equals(pipeline().parameters.data_category, 'sales'), concat('/mnt/delta/prod/sales/', pipeline().parameters.region, '/curated'), concat('/mnt/delta/prod/', pipeline().parameters.data_category, '/', pipeline().parameters.region, '/general'))), if(equals(pipeline().parameters.env, 'staging'), concat('/mnt/delta/staging/', pipeline().parameters.data_category, '/', pipeline().parameters.region), concat('/mnt/delta/dev/', pipeline().parameters.data_category, '/sandbox')))"
+          }
+        }
+      },
+      {
+        "name": "CheckIfIncremental",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetSinkPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.is_incremental, 'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetIncrementalQuery",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.data_category, 'finance'), if(equals(pipeline().parameters.env, 'prod'), concat('SELECT * FROM ', pipeline().parameters.data_category, '.transactions WHERE partition_key = ''', pipeline().parameters.partition_key, ''' AND modified_date >= DATEADD(day, -1, GETDATE()) AND region = ''', pipeline().parameters.region, ''''), concat('SELECT TOP 10000 * FROM ', pipeline().parameters.data_category, '.transactions WHERE partition_key = ''', pipeline().parameters.partition_key, '''')), if(equals(pipeline().parameters.data_category, 'sales'), concat('SELECT * FROM ', pipeline().parameters.data_category, '.orders WHERE partition_key = ''', pipeline().parameters.partition_key, ''' AND updated_at >= DATEADD(hour, -6, GETDATE())'), concat('SELECT * FROM ', pipeline().parameters.data_category, '.data WHERE partition_key = ''', pipeline().parameters.partition_key, '''')))"
+                }
+              },
+              "dependsOn": []
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFullLoadQuery",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "resolved_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.data_category, 'finance'), if(equals(pipeline().parameters.env, 'prod'), concat('SELECT * FROM finance.transactions WHERE region = ''', pipeline().parameters.region, ''''), 'SELECT * FROM finance.transactions'), if(equals(pipeline().parameters.data_category, 'sales'), concat('SELECT * FROM sales.orders WHERE region = ''', pipeline().parameters.region, ''''), concat('SELECT * FROM ', pipeline().parameters.data_category, '.data')))"
+                }
+              },
+              "dependsOn": []
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetResolvedQueryFinal",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckIfIncremental",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_query",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(variables('resolved_query'), ''), concat('SELECT * FROM ', pipeline().parameters.data_category, '.fallback_table WHERE 1=1'), variables('resolved_query'))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvForCopyStrategy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedQueryFinal",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyToDeltaProdStaging",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_query')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "preCopyScript": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.is_incremental, 'true'), '', concat('TRUNCATE TABLE delta.`', variables('sink_path'), '`'))"
+                  }
+                },
+                "enableStaging": true,
+                "parallelCopies": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.env, 'prod'), 16, 8)"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "id"
+                      },
+                      "sink": {
+                        "name": "id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "partition_key"
+                      },
+                      "sink": {
+                        "name": "partition_key",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "region"
+                      },
+                      "sink": {
+                        "name": "region",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "modified_date"
+                      },
+                      "sink": {
+                        "name": "modified_date",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [
+                {
+                  "referenceName": "ds_azure_sql_source",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "schema_name": {
+                      "type": "Expression",
+                      "value": "@pipeline().parameters.data_category"
+                    },
+                    "table_name": {
+                      "type": "Expression",
+                      "value": "@if(equals(pipeline().parameters.data_category, 'finance'), 'transactions', if(equals(pipeline().parameters.data_category, 'sales'), 'orders', 'data'))"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_delta_lake_sink",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "delta_path": {
+                      "type": "Expression",
+                      "value": "@variables('sink_path')"
+                    }
+                  }
+                }
+              ],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "CopyToDeltaDev",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:30:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT TOP 50000 * FROM (', variables('resolved_query'), ') AS dev_subset')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "preCopyScript": {
+                    "type": "Expression",
+                    "value": "@concat('TRUNCATE TABLE delta.`', variables('sink_path'), '`')"
+                  }
+                },
+                "enableStaging": false,
+                "parallelCopies": 4,
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "id"
+                      },
+                      "sink": {
+                        "name": "id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "partition_key"
+                      },
+                      "sink": {
+                        "name": "partition_key",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "region"
+                      },
+                      "sink": {
+                        "name": "region",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "modified_date"
+                      },
+                      "sink": {
+                        "name": "modified_date",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "inputs": [
+                {
+                  "referenceName": "ds_azure_sql_source",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "schema_name": {
+                      "type": "Expression",
+                      "value": "@pipeline().parameters.data_category"
+                    },
+                    "table_name": "data"
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_delta_lake_sink",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "delta_path": {
+                      "type": "Expression",
+                      "value": "@variables('sink_path')"
+                    }
+                  }
+                }
+              ],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

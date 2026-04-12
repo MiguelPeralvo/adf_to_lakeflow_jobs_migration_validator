@@ -1,0 +1,174 @@
+{
+  "name": "nested_split_and_array_indexing",
+  "properties": {
+    "parameters": {
+      "input_path": {
+        "type": "String",
+        "defaultValue": "folder/subfolder/myfile.csv"
+      },
+      "delimiter": {
+        "type": "String",
+        "defaultValue": "/"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "file_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "processed_segment": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExtractFileName",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "file_name",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[2])"
+          }
+        }
+      },
+      {
+        "name": "BuildProcessedSegment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractFileName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processed_segment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[0]), '_', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[1]))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironment",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "BuildProcessedSegment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(toLower(pipeline().parameters.env), 'prod')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetProdUrl",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('https://prod.api.contoso.com/', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[0]), '/', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[2]))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetDevUrl",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('https://dev.api.contoso.com/', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[0]), '/', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[2]))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('final_url'), '?segment=', variables('processed_segment'), '&file=', toLower(split(variables('file_name'), '.')[0]))"
+          }
+        }
+      },
+      {
+        "name": "CallIngestApi",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('final_url')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@toLower(pipeline().parameters.env)"
+            },
+            "X-Source-Folder": {
+              "type": "Expression",
+              "value": "@concat(toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[0]), '/', toLower(split(pipeline().parameters.input_path, pipeline().parameters.delimiter)[1]))"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"fileName\":\"', variables('file_name'), '\",\"segment\":\"', variables('processed_segment'), '\",\"env\":\"', toLower(pipeline().parameters.env), '\"}'))"
+          },
+          "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      }
+    ]
+  }
+}

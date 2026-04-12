@@ -1,0 +1,197 @@
+{
+  "name": "nested_coalesce_chain_with_replace",
+  "properties": {
+    "parameters": {
+      "source_schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "fallback_value": {
+        "type": "String",
+        "defaultValue": "unknown"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "variables": {
+      "resolved_schema": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "normalized_table_name": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TABLE_NAME, TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''', coalesce(coalesce(toLower(replace(pipeline().parameters.source_schema, ' ', '')), toLower(pipeline().parameters.fallback_value)), 'dbo'), ''' AND TABLE_CATALOG = ''main'' ORDER BY TABLE_NAME')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_lookup",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetResolvedSchema",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_schema",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(toLower(replace(coalesce(activity('LookupSourceMetadata').output.value[0].TABLE_SCHEMA, pipeline().parameters.source_schema), '_', '')), toLower(replace(pipeline().parameters.fallback_value, '-', '_'))), coalesce(toLower(replace(pipeline().parameters.source_schema, ' ', '_')), 'dbo'))"
+          }
+        }
+      },
+      {
+        "name": "SetNormalizedTableName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedSchema",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "normalized_table_name",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(coalesce(toLower(replace(coalesce(activity('LookupSourceMetadata').output.value[0].TABLE_NAME, pipeline().parameters.fallback_value), ' ', '_')), toLower(replace(coalesce(variables('resolved_schema'), pipeline().parameters.fallback_value), '-', '_'))), coalesce(toLower(replace(pipeline().parameters.fallback_value, ' ', '')), concat('default_table_batch_', pipeline().parameters.batch_id)))"
+          }
+        }
+      },
+      {
+        "name": "CopyToDataLake",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetNormalizedTableName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 3,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', coalesce(coalesce(toLower(replace(variables('resolved_schema'), '-', '_')), toLower(replace(pipeline().parameters.source_schema, ' ', ''))), 'dbo'), '.', coalesce(coalesce(toLower(replace(variables('normalized_table_name'), ' ', '_')), toLower(replace(pipeline().parameters.fallback_value, '-', '_'))), 'default_table'), ' WHERE batch_id = ''', coalesce(replace(pipeline().parameters.batch_id, ' ', ''), '0'), '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "enableStaging": false,
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "schema_name"
+                },
+                "sink": {
+                  "name": "schema_name",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_sql_source",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_sink",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

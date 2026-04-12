@@ -1,0 +1,180 @@
+{
+  "name": "nested_concat_with_math_result",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "1001"
+      },
+      "partition_count": {
+        "type": "String",
+        "defaultValue": "8"
+      }
+    },
+    "variables": {
+      "computedPath": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "partitionLabel": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "queryFragment": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetComputedPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computedPath",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/data/', pipeline().parameters.env, '/batch_', pipeline().parameters.batch_id, '/partitions_', string(mul(int(pipeline().parameters.partition_count), 2)), '/output_', string(add(int(pipeline().parameters.batch_id), mul(int(pipeline().parameters.partition_count), 10))))"
+          }
+        }
+      },
+      {
+        "name": "SetPartitionLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partitionLabel",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('partition_', string(mod(add(int(pipeline().parameters.batch_id), int(pipeline().parameters.partition_count)), 5)), '_of_', string(div(mul(int(pipeline().parameters.partition_count), int(pipeline().parameters.partition_count)), 2)), '_env_', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "SetQueryFragment",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetPartitionLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "queryFragment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT * FROM ', pipeline().parameters.env, '_catalog.batch_', pipeline().parameters.batch_id, ' WHERE partition_id BETWEEN ', string(sub(int(pipeline().parameters.partition_count), 1)), ' AND ', string(add(mul(int(pipeline().parameters.partition_count), 3), int(pipeline().parameters.batch_id))))"
+          }
+        }
+      },
+      {
+        "name": "NotifyBatchStart",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetQueryFragment",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api.', pipeline().parameters.env, '.example.com/notify/batch/', pipeline().parameters.batch_id, '/partitions/', string(mul(int(pipeline().parameters.partition_count), 4)), '/offset/', string(add(int(pipeline().parameters.batch_id), sub(int(pipeline().parameters.partition_count), 1))))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Label": {
+              "type": "Expression",
+              "value": "@concat(variables('partitionLabel'), '_run_', string(add(int(pipeline().parameters.batch_id), 1)))"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"path\":\"', variables('computedPath'), '\",\"label\":\"', variables('partitionLabel'), '\",\"totalSlices\":', string(mul(int(pipeline().parameters.partition_count), int(pipeline().parameters.partition_count))), ',\"batchOffset\":', string(add(int(pipeline().parameters.batch_id), mul(int(pipeline().parameters.partition_count), 5))), '}')"
+          }
+        }
+      },
+      {
+        "name": "CopyBatchData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "NotifyBatchStart",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT src_col, batch_id, partition_id FROM ', pipeline().parameters.env, '_schema.data_table WHERE batch_id = ', pipeline().parameters.batch_id, ' AND partition_id <= ', string(mul(int(pipeline().parameters.partition_count), 3)), ' AND row_offset < ', string(add(int(pipeline().parameters.batch_id), mul(int(pipeline().parameters.partition_count), 100))))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [],
+        "outputs": [],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

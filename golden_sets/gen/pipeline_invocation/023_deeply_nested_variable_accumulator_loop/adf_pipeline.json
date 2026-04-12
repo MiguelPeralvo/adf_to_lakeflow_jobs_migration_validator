@@ -1,0 +1,286 @@
+{
+  "name": "deeply_nested_variable_accumulator_loop",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "item_list": {
+        "type": "Array",
+        "defaultValue": [
+          "item1",
+          "item2",
+          "item3"
+        ]
+      },
+      "accumulator_init": {
+        "type": "String",
+        "defaultValue": "[]"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      }
+    },
+    "variables": {
+      "accumulator": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "temp_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "InitializeAccumulator",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "accumulator",
+          "value": {
+            "type": "Expression",
+            "value": "@json(pipeline().parameters.accumulator_init)"
+          }
+        }
+      },
+      {
+        "name": "LookupBatchMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "InitializeAccumulator",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT batch_id, status, record_count, threshold_value FROM dbo.batch_metadata WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND environment = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "ForEachItem",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(pipeline().parameters.item_list[0], pipeline().parameters.item_list[1], pipeline().parameters.item_list[2])"
+          },
+          "batchCount": 1,
+          "activities": [
+            {
+              "name": "LookupItemDetails",
+              "type": "Lookup",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.00:05:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 15
+              },
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT item_name, item_value, item_category, is_active, priority_score FROM dbo.items WHERE item_name = ''', item(), ''' AND batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+                  }
+                },
+                "firstRowOnly": true
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "CheckItemIsActive",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "LookupItemDetails",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('LookupItemDetails').output.firstRow.is_active, true)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CheckPriorityThreshold",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@greater(int(activity('LookupItemDetails').output.firstRow.priority_score), int(activity('LookupBatchMetadata').output.value[0].threshold_value))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "NotifyHighPriority",
+                          "type": "WebActivity",
+                          "dependsOn": [],
+                          "policy": {
+                            "timeout": "0.00:05:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 30
+                          },
+                          "userProperties": [],
+                          "typeProperties": {
+                            "url": {
+                              "type": "Expression",
+                              "value": "@concat('https://', pipeline().parameters.env, '-api.contoso.com/v2/notifications/high-priority')"
+                            },
+                            "method": "POST",
+                            "headers": {
+                              "Content-Type": "application/json",
+                              "X-Batch-Id": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.batch_id"
+                              }
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"item\":\"', item(), '\",\"priority_score\":', activity('LookupItemDetails').output.firstRow.priority_score, ',\"category\":\"', activity('LookupItemDetails').output.firstRow.item_category, '\",\"accumulated_count\":', string(length(variables('accumulator'))), ',\"environment\":\"', pipeline().parameters.env, '\"}'))"
+                            },
+                            "authentication": {
+                              "type": "MSI",
+                              "resource": "https://management.azure.com/"
+                            }
+                          }
+                        },
+                        {
+                          "name": "AccumulateHighPriorityResult",
+                          "type": "SetVariable",
+                          "dependsOn": [
+                            {
+                              "activity": "NotifyHighPriority",
+                              "dependencyConditions": [
+                                "Succeeded"
+                              ]
+                            }
+                          ],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "accumulator",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@union(variables('accumulator'), createArray(json(concat('{\"item\":\"', item(), '\",\"priority\":\"high\",\"score\":', activity('LookupItemDetails').output.firstRow.priority_score, ',\"category\":\"', activity('LookupItemDetails').output.firstRow.item_category, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\",\"accumulated_total\":', string(add(length(variables('accumulator')), 1)), '}'))))"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "AccumulateNormalPriorityResult",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "accumulator",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@union(variables('accumulator'), createArray(json(concat('{\"item\":\"', item(), '\",\"priority\":\"normal\",\"score\":', activity('LookupItemDetails').output.firstRow.priority_score, ',\"category\":\"', activity('LookupItemDetails').output.firstRow.item_category, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\",\"accumulated_total\":', string(add(length(variables('accumulator')), 1)), '}'))))"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "AccumulateInactiveResult",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "accumulator",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@union(variables('accumulator'), createArray(json(concat('{\"item\":\"', item(), '\",\"priority\":\"skipped\",\"reason\":\"inactive\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"timestamp\":\"', utcNow(), '\",\"accumulated_total\":', string(add(length(variables('accumulator')), 1)), '}'))))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalAccumulatorSnapshot",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachItem",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(concat('{\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"environment\":\"', pipeline().parameters.env, '\",\"total_accumulated\":', string(length(variables('accumulator'))), ',\"results\":', string(variables('accumulator')), ',\"completed_at\":\"', utcNow(), '\"}')))"
+          }
+        }
+      }
+    ]
+  }
+}

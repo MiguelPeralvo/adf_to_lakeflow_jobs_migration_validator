@@ -1,0 +1,209 @@
+{
+  "name": "nested_foreach_dynamic_range",
+  "properties": {
+    "parameters": {
+      "start_index": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "end_index": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "step_size": {
+        "type": "Int",
+        "defaultValue": 2
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "dynamic_range": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_offset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "iteration_label": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetDynamicRange",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_range",
+          "value": {
+            "type": "Expression",
+            "value": "@range(pipeline().parameters.start_index, sub(pipeline().parameters.end_index, pipeline().parameters.start_index))"
+          }
+        }
+      },
+      {
+        "name": "SetCurrentOffset",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetDynamicRange",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(pipeline().parameters.start_index)"
+          }
+        }
+      },
+      {
+        "name": "SetIterationLabel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetCurrentOffset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "iteration_label",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('range_', string(pipeline().parameters.start_index), '_to_', string(pipeline().parameters.end_index), '_step_', string(pipeline().parameters.step_size), '_env_', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "ForEachDynamicBatch",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetIterationLabel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(range(pipeline().parameters.start_index, div(sub(pipeline().parameters.end_index, pipeline().parameters.start_index), pipeline().parameters.step_size)))"
+          },
+          "activities": [
+            {
+              "name": "CopyBatchData",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.env, '_schema.source_table WHERE row_id BETWEEN ', string(mul(item(), pipeline().parameters.step_size)), ' AND ', string(sub(mul(add(item(), 1), pipeline().parameters.step_size), 1)), ' ORDER BY row_id')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "row_id"
+                      },
+                      "sink": {
+                        "name": "row_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "data_value"
+                      },
+                      "sink": {
+                        "name": "data_value",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "SetBatchId",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CopyBatchData",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "batch_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('batch_', string(item()), '_offset_', string(mul(item(), pipeline().parameters.step_size)), '_range_', string(length(range(mul(item(), pipeline().parameters.step_size), pipeline().parameters.step_size))))"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

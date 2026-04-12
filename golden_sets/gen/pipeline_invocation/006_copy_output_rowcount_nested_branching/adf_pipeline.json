@@ -1,0 +1,312 @@
+{
+  "name": "copy_output_rowcount_nested_branching",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "source_dataset": {
+        "type": "String",
+        "defaultValue": "dbo.source_table"
+      },
+      "threshold": {
+        "type": "Int",
+        "defaultValue": 1000
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      }
+    },
+    "variables": {
+      "rowsCopiedCount": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "processingStatus": {
+        "type": "String",
+        "defaultValue": "UNKNOWN"
+      }
+    },
+    "activities": [
+      {
+        "name": "CopySourceData",
+        "type": "Copy",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', pipeline().parameters.source_dataset, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_id"
+                },
+                "sink": {
+                  "name": "tgt_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_batch"
+                },
+                "sink": {
+                  "name": "tgt_batch",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetRowsCopiedVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CopySourceData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "rowsCopiedCount",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('CopySourceData').output.rowsCopied)"
+          }
+        }
+      },
+      {
+        "name": "CheckRowCountAboveThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetRowsCopiedVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(activity('CopySourceData').output.rowsCopied, pipeline().parameters.threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CheckRowsReadMatchesCopied",
+              "type": "IfCondition",
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('CopySourceData').output.rowsRead, activity('CopySourceData').output.rowsCopied)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "NotifySuccessHighVolume",
+                    "type": "WebActivity",
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.api.', pipeline().parameters.env, '.company.com/adf/notify')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json",
+                        "X-Batch-Id": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.batch_id"
+                        }
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"copy_output_rowcount_nested_branching\",\"status\":\"SUCCESS_HIGH_VOLUME\",\"rowsCopied\":', string(activity('CopySourceData').output.rowsCopied), ',\"rowsRead\":', string(activity('CopySourceData').output.rowsRead), ',\"threshold\":', string(pipeline().parameters.threshold), ',\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\"}'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "NotifyDataLossWarning",
+                    "type": "WebActivity",
+                    "typeProperties": {
+                      "url": {
+                        "type": "Expression",
+                        "value": "@concat('https://hooks.api.', pipeline().parameters.env, '.company.com/adf/alert')"
+                      },
+                      "method": "POST",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "body": {
+                        "type": "Expression",
+                        "value": "@json(concat('{\"pipeline\":\"copy_output_rowcount_nested_branching\",\"status\":\"DATA_LOSS_WARNING\",\"rowsCopied\":', string(activity('CopySourceData').output.rowsCopied), ',\"rowsRead\":', string(activity('CopySourceData').output.rowsRead), ',\"discrepancy\":', string(sub(activity('CopySourceData').output.rowsRead, activity('CopySourceData').output.rowsCopied)), ',\"batch_id\":\"', pipeline().parameters.batch_id, '\"}'))"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetStatusBelowThreshold",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "processingStatus",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('BELOW_THRESHOLD: rowsCopied=', string(activity('CopySourceData').output.rowsCopied), ' threshold=', string(pipeline().parameters.threshold))"
+                }
+              }
+            },
+            {
+              "name": "CopyToArchiveLowVolume",
+              "type": "Copy",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.source_dataset, ' WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, ''' ORDER BY created_date DESC')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "src_id"
+                      },
+                      "sink": {
+                        "name": "tgt_id",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                {
+                  "activity": "SetStatusBelowThreshold",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalStatusNotification",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckRowCountAboveThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.api.', pipeline().parameters.env, '.company.com/adf/final-status')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Batch-Id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"copy_output_rowcount_nested_branching\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"totalRowsCopied\":', string(activity('CopySourceData').output.rowsCopied), ',\"totalRowsRead\":', string(activity('CopySourceData').output.rowsRead), ',\"thresholdUsed\":', string(pipeline().parameters.threshold), ',\"processingStatus\":\"', variables('processingStatus'), '\",\"completedAt\":\"', utcnow(), '\"}'))"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "name": "nested_math_expression_partitioner",
+  "properties": {
+    "parameters": {
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 1000000
+      },
+      "partition_count": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "batch_001"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "partition_size": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "partition_remainder": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "partition_ranges": {
+        "type": "Array",
+        "defaultValue": []
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputePartitionSize",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_size",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count))"
+          }
+        }
+      },
+      {
+        "name": "ComputePartitionRemainder",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePartitionSize",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_remainder",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count))"
+          }
+        }
+      },
+      {
+        "name": "BuildPartitionRanges",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePartitionRemainder",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_ranges",
+          "value": {
+            "type": "Expression",
+            "value": "@createArray(json(concat('{\"idx\":0,\"offset\":', string(add(mul(0, div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), mod(mul(0, 1), add(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count), 1)))), ',\"limit\":', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), '}')), json(concat('{\"idx\":1,\"offset\":', string(add(mul(1, div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), mod(mul(1, 1), add(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count), 1)))), ',\"limit\":', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), '}')), json(concat('{\"idx\":2,\"offset\":', string(add(mul(2, div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), mod(mul(2, 1), add(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count), 1)))), ',\"limit\":', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), '}')), json(concat('{\"idx\":3,\"offset\":', string(add(mul(3, div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), mod(mul(3, 1), add(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count), 1)))), ',\"limit\":', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), '}')), json(concat('{\"idx\":4,\"offset\":', string(add(mul(4, div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), mod(mul(4, 1), add(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count), 1)))), ',\"limit\":', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), '}')))"
+          }
+        }
+      },
+      {
+        "name": "ForEachPartition",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "BuildPartitionRanges",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 5,
+          "items": {
+            "type": "Expression",
+            "value": "@variables('partition_ranges')"
+          },
+          "activities": [
+            {
+              "name": "CopyPartitionData",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.env, '_data.records WHERE batch_id = ''', pipeline().parameters.batch_id, ''' ORDER BY id OFFSET ', string(item().offset), ' ROWS FETCH NEXT ', string(add(item().limit, mod(add(item().idx, 1), add(div(pipeline().parameters.total_records, mul(pipeline().parameters.partition_count, 1)), 1)))), ' ROWS ONLY')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "id"
+                      },
+                      "sink": {
+                        "name": "record_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "batch_id"
+                      },
+                      "sink": {
+                        "name": "batch_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "payload"
+                      },
+                      "sink": {
+                        "name": "payload_data",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "created_at"
+                      },
+                      "sink": {
+                        "name": "created_timestamp",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                }
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "LogCompletionMetrics",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "ForEachPartition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ''', pipeline().parameters.batch_id, ''' AS batch_id, ', string(pipeline().parameters.total_records), ' AS total_records, ', string(pipeline().parameters.partition_count), ' AS partition_count, ', string(div(pipeline().parameters.total_records, pipeline().parameters.partition_count)), ' AS partition_size, ', string(mod(pipeline().parameters.total_records, pipeline().parameters.partition_count)), ' AS remainder, ', string(add(mul(div(pipeline().parameters.total_records, pipeline().parameters.partition_count), pipeline().parameters.partition_count), mod(pipeline().parameters.total_records, pipeline().parameters.partition_count))), ' AS verified_total, ''', pipeline().parameters.env, ''' AS environment')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "batch_id"
+                },
+                "sink": {
+                  "name": "batch_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "total_records"
+                },
+                "sink": {
+                  "name": "total_records",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "partition_count"
+                },
+                "sink": {
+                  "name": "partition_count",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "verified_total"
+                },
+                "sink": {
+                  "name": "verified_total",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

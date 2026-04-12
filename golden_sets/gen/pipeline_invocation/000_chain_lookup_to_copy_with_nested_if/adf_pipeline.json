@@ -1,0 +1,239 @@
+{
+  "name": "chain_lookup_to_copy_with_nested_if",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "source_table": {
+        "type": "String",
+        "defaultValue": "dbo.orders"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "variables": {
+      "row_count": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "processing_flag": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupSourceMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT COUNT(*) AS row_count, MAX(batch_id) AS latest_batch FROM ', pipeline().parameters.source_table, ' WHERE batch_id >= ', pipeline().parameters.batch_id)"
+            }
+          },
+          "firstRowOnly": true
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetRowCountVariable",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupSourceMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "row_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('LookupSourceMetadata').output.firstRow.row_count)"
+          }
+        }
+      },
+      {
+        "name": "NotifyBatchStart",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetRowCountVariable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 15
+        },
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/pipelines/notify')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"chain_lookup_to_copy_with_nested_if\",\"env\":\"', pipeline().parameters.env, '\",\"batch_id\":\"', pipeline().parameters.batch_id, '\",\"row_count\":', variables('row_count'), ',\"source_table\":\"', pipeline().parameters.source_table, '\"}'))"
+          }
+        }
+      },
+      {
+        "name": "CheckRowCountAndBatch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "NotifyBatchStart",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(int(variables('row_count')), 0), and(not(equals(pipeline().parameters.batch_id, '0')), or(equals(pipeline().parameters.env, 'prod'), and(equals(pipeline().parameters.env, 'dev'), greater(int(activity('LookupSourceMetadata').output.firstRow.row_count), 10)))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopySourceToDelta",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.source_table, ' WHERE batch_id >= ', pipeline().parameters.batch_id)"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink"
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "batch_id"
+                      },
+                      "sink": {
+                        "name": "batch_id",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "created_date"
+                      },
+                      "sink": {
+                        "name": "created_date",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                },
+                "enableStaging": false
+              },
+              "input_dataset_definitions": [
+                {
+                  "type": "AzureSqlSource",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_sql",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ],
+              "output_dataset_definitions": [
+                {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "schema": [],
+                  "linkedServiceName": {
+                    "referenceName": "ls_delta",
+                    "type": "LinkedServiceReference"
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetProcessingFlagSkipped",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "processing_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(and(equals(int(variables('row_count')), 0), not(equals(pipeline().parameters.env, 'prod'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalProcessingFlag",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckRowCountAndBatch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processing_flag",
+          "value": {
+            "type": "Expression",
+            "value": "@if(greater(int(variables('row_count')), 0), 'true', 'false')"
+          }
+        }
+      }
+    ]
+  }
+}

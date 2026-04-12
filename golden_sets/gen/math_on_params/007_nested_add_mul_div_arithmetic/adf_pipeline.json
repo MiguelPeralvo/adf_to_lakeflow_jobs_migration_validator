@@ -1,0 +1,227 @@
+{
+  "name": "nested_add_mul_div_arithmetic",
+  "properties": {
+    "parameters": {
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 1000000
+      },
+      "partition_size": {
+        "type": "Int",
+        "defaultValue": 10000
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      }
+    },
+    "variables": {
+      "num_partitions": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "remainder_records": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "adjusted_partition_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcNumPartitions",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "num_partitions",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.partition_size))"
+          }
+        }
+      },
+      {
+        "name": "CalcRemainderRecords",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcNumPartitions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder_records",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.partition_size))"
+          }
+        }
+      },
+      {
+        "name": "CalcAdjustedPartitionCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcRemainderRecords",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "adjusted_partition_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), if(greater(mod(pipeline().parameters.total_records, pipeline().parameters.partition_size), 0), 1, 0)))"
+          }
+        }
+      },
+      {
+        "name": "CheckPartitionOverflow",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CalcAdjustedPartitionCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(mod(pipeline().parameters.total_records, pipeline().parameters.partition_size), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunPartitionedNotebookWithRemainder",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/partitioned_processing",
+                "baseParameters": {
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "total_records": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.total_records)"
+                  },
+                  "partition_size": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.partition_size)"
+                  },
+                  "num_partitions": {
+                    "type": "Expression",
+                    "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), 1))"
+                  },
+                  "remainder": {
+                    "type": "Expression",
+                    "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.partition_size))"
+                  },
+                  "records_per_worker": {
+                    "type": "Expression",
+                    "value": "@string(div(mul(pipeline().parameters.total_records, 100), add(mul(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), pipeline().parameters.partition_size), mod(pipeline().parameters.total_records, pipeline().parameters.partition_size))))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunPartitionedNotebookExact",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/partitioned_processing",
+                "baseParameters": {
+                  "batch_id": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.batch_id"
+                  },
+                  "total_records": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.total_records)"
+                  },
+                  "partition_size": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.partition_size)"
+                  },
+                  "num_partitions": {
+                    "type": "Expression",
+                    "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.partition_size))"
+                  },
+                  "remainder": {
+                    "type": "Expression",
+                    "value": "0"
+                  },
+                  "records_per_worker": {
+                    "type": "Expression",
+                    "value": "@string(div(mul(pipeline().parameters.partition_size, add(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), 0)), div(pipeline().parameters.total_records, pipeline().parameters.partition_size)))"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunFinalAggregationNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckPartitionOverflow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/final_aggregation",
+          "baseParameters": {
+            "batch_id": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.batch_id"
+            },
+            "total_partitions": {
+              "type": "Expression",
+              "value": "@variables('adjusted_partition_count')"
+            },
+            "total_records": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.total_records)"
+            },
+            "checksum": {
+              "type": "Expression",
+              "value": "@string(add(mul(div(pipeline().parameters.total_records, pipeline().parameters.partition_size), pipeline().parameters.partition_size), mod(pipeline().parameters.total_records, pipeline().parameters.partition_size)))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

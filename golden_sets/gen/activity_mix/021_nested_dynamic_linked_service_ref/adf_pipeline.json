@@ -1,0 +1,238 @@
+{
+  "name": "nested_dynamic_linked_service_ref",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "data_source_type": {
+        "type": "String",
+        "defaultValue": "AzureSql"
+      },
+      "server_name": {
+        "type": "String",
+        "defaultValue": "myserver"
+      },
+      "database_name": {
+        "type": "String",
+        "defaultValue": "mydb"
+      }
+    },
+    "variables": {
+      "dynamic_linked_service_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "dynamic_dataset_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "connection_string_fragment": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildLinkedServiceName",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_linked_service_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('ls_', pipeline().parameters.data_source_type, '_', pipeline().parameters.env, '_', replace(pipeline().parameters.server_name, '.', '_'), '_', pipeline().parameters.database_name)"
+          }
+        }
+      },
+      {
+        "name": "BuildDatasetName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildLinkedServiceName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_dataset_name",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('ds_', toLower(pipeline().parameters.data_source_type), '_', pipeline().parameters.database_name, '_', pipeline().parameters.env)"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvironmentAndSource",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "BuildDatasetName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), equals(pipeline().parameters.data_source_type, 'AzureSql'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetConnectionFragmentProd",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "connection_string_fragment",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Server=tcp:', pipeline().parameters.server_name, '.database.windows.net,1433;Initial Catalog=', pipeline().parameters.database_name, ';Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetConnectionFragmentNonProd",
+              "type": "SetVariable",
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "connection_string_fragment",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Server=tcp:', pipeline().parameters.server_name, '-', pipeline().parameters.env, '.database.windows.net,1433;Initial Catalog=', pipeline().parameters.database_name, '_', pipeline().parameters.env, ';Encrypt=True;')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "BuildFinalConnectionString",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentAndSource",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "connection_string_fragment",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('connection_string_fragment'), ';ApplicationIntent=ReadOnly;App=ADF_', pipeline().parameters.env, '_', pipeline().RunId)"
+          }
+        }
+      },
+      {
+        "name": "CopyWithDynamicReferences",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "BuildFinalConnectionString",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM [', pipeline().parameters.database_name, '].[dbo].[source_table_', pipeline().parameters.env, '] WHERE active = 1')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_id"
+                },
+                "sink": {
+                  "name": "tgt_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_timestamp"
+                },
+                "sink": {
+                  "name": "tgt_timestamp",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": {
+                  "type": "Expression",
+                  "value": "@concat('ls_', pipeline().parameters.data_source_type, '_', pipeline().parameters.env, '_', replace(pipeline().parameters.server_name, '.', '_'), '_', pipeline().parameters.database_name)"
+                },
+                "type": "LinkedServiceReference",
+                "parameters": {
+                  "serverName": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.server_name, if(equals(pipeline().parameters.env, 'prod'), '', concat('-', pipeline().parameters.env)), '.database.windows.net')"
+                  },
+                  "databaseName": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.env, 'prod'), pipeline().parameters.database_name, concat(pipeline().parameters.database_name, '_', pipeline().parameters.env))"
+                  }
+                }
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": {
+                  "type": "Expression",
+                  "value": "@concat('ls_delta_', pipeline().parameters.env, '_', pipeline().parameters.database_name)"
+                },
+                "type": "LinkedServiceReference",
+                "parameters": {
+                  "deltaTablePath": {
+                    "type": "Expression",
+                    "value": "@concat('/mnt/', pipeline().parameters.env, '/delta/', pipeline().parameters.database_name, '/source_table_', pipeline().parameters.env)"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

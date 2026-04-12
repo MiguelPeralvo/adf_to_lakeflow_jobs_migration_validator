@@ -1,0 +1,118 @@
+{
+  "name": "nested_base64_encode_decode_chain",
+  "properties": {
+    "parameters": {
+      "raw_secret": {
+        "type": "String",
+        "defaultValue": "my_secret_value_123"
+      },
+      "encoding_flag": {
+        "type": "String",
+        "defaultValue": "true"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "encoded_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "decoded_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_result": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetEncodedValue",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.encoding_flag, 'true'), concat('encoded_', pipeline().parameters.env, '_', base64(concat(pipeline().parameters.raw_secret, '_', pipeline().parameters.env))), concat('raw_', pipeline().parameters.env, '_', pipeline().parameters.raw_secret))"
+          }
+        }
+      },
+      {
+        "name": "SetDecodedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetEncodedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "decoded_value",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.encoding_flag, 'true'), concat('decoded_', pipeline().parameters.env, '_', base64ToString(base64(concat(pipeline().parameters.raw_secret, '_', pipeline().parameters.env)))), concat('passthrough_', pipeline().parameters.env, '_', base64ToString(base64(pipeline().parameters.raw_secret))))"
+          }
+        }
+      },
+      {
+        "name": "SetFinalResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetDecodedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_result",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('env=', pipeline().parameters.env, '|encoded=', variables('encoded_value'), '|decoded=', variables('decoded_value'), '|roundtrip_check=', if(equals(base64ToString(base64(concat(pipeline().parameters.raw_secret, '_', pipeline().parameters.env))), concat(pipeline().parameters.raw_secret, '_', pipeline().parameters.env)), 'PASS', 'FAIL'), '|nested_encode=', base64(concat(base64(pipeline().parameters.raw_secret), '_', base64(pipeline().parameters.env))))"
+          }
+        }
+      },
+      {
+        "name": "PostResultToWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SetFinalResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://hooks.example.com/api/', pipeline().parameters.env, '/base64-results')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": "@{pipeline().RunId}",
+            "X-Environment": "@{pipeline().parameters.env}"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline_name\":\"nested_base64_encode_decode_chain\",\"env\":\"', pipeline().parameters.env, '\",\"encoding_flag\":\"', pipeline().parameters.encoding_flag, '\",\"original_secret_b64\":\"', if(equals(pipeline().parameters.encoding_flag, 'true'), base64(pipeline().parameters.raw_secret), 'encoding_disabled'), '\",\"roundtrip_decoded\":\"', if(equals(pipeline().parameters.encoding_flag, 'true'), base64ToString(base64(pipeline().parameters.raw_secret)), pipeline().parameters.raw_secret), '\",\"nested_b64\":\"', base64(concat(base64(pipeline().parameters.raw_secret), '_', pipeline().parameters.env)), '\",\"nested_decoded\":\"', base64ToString(base64(concat(base64(pipeline().parameters.raw_secret), '_', pipeline().parameters.env))), '\",\"final_result\":\"', variables('final_result'), '\",\"run_id\":\"', pipeline().RunId, '\"}'))"
+          },
+          "timeout": "00:01:00"
+        }
+      }
+    ]
+  }
+}

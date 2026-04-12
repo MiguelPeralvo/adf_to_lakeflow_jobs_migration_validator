@@ -1,0 +1,266 @@
+{
+  "name": "copy_to_lookup_to_foreach_deep_nest",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "source_path": {
+        "type": "String",
+        "defaultValue": "/data/source"
+      },
+      "dest_path": {
+        "type": "String",
+        "defaultValue": "/data/dest"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH_001"
+      }
+    },
+    "variables": {
+      "processedCount": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "currentStatus": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "CopySourceData",
+        "type": "Copy",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "7.00:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM staging.records WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND env = ''', pipeline().parameters.env, ''' AND source_path = ''', pipeline().parameters.source_path, '''')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_id"
+                },
+                "sink": {
+                  "name": "tgt_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_status"
+                },
+                "sink": {
+                  "name": "tgt_status",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "LookupBatchMetadata",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "CopySourceData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT record_id, record_status, priority_flag, dest_table FROM control.batch_metadata WHERE batch_id = ''', pipeline().parameters.batch_id, ''' AND rows_copied = ', string(activity('CopySourceData').output.rowsCopied), ' AND env = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_control",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "ForEachRecord",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupBatchMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 10,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('LookupBatchMetadata').output.value"
+          },
+          "activities": [
+            {
+              "name": "CheckRecordStatus",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(equals(item().record_status, 'ACTIVE'), greater(activity('CopySourceData').output.rowsCopied, 0))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "CheckPriorityFlag",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@or(equals(item().priority_flag, 'HIGH'), greater(activity('CopySourceData').output.dataWritten, 1024))"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "SetProcessedCount",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "typeProperties": {
+                            "variableName": "currentStatus",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@concat('PROCESSED_HIGH_', item().record_id, '_rows_', string(activity('CopySourceData').output.rowsCopied), '_batch_', pipeline().parameters.batch_id)"
+                            }
+                          }
+                        },
+                        {
+                          "name": "NotifyHighPriority",
+                          "type": "WebActivity",
+                          "dependsOn": [
+                            {
+                              "activity": "SetProcessedCount",
+                              "dependencyConditions": [
+                                "Succeeded"
+                              ]
+                            }
+                          ],
+                          "policy": {
+                            "timeout": "0.00:10:00",
+                            "retry": 3,
+                            "retryIntervalInSeconds": 15
+                          },
+                          "typeProperties": {
+                            "url": {
+                              "type": "Expression",
+                              "value": "@concat('https://api.', pipeline().parameters.env, '.example.com/notify/', pipeline().parameters.batch_id, '/record/', item().record_id)"
+                            },
+                            "method": "POST",
+                            "headers": {
+                              "Content-Type": "application/json",
+                              "X-Batch-Id": {
+                                "type": "Expression",
+                                "value": "@pipeline().parameters.batch_id"
+                              }
+                            },
+                            "body": {
+                              "type": "Expression",
+                              "value": "@json(concat('{\"record_id\":\"', item().record_id, '\",\"status\":\"', item().record_status, '\",\"priority\":\"', item().priority_flag, '\",\"rows_copied\":', string(activity('CopySourceData').output.rowsCopied), ',\"dest_path\":\"', pipeline().parameters.dest_path, '\",\"dest_table\":\"', item().dest_table, '\",\"lookup_count\":', string(length(activity('LookupBatchMetadata').output.value)), ',\"env\":\"', pipeline().parameters.env, '\"}'))"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": []
+                    }
+                  }
+                ],
+                "ifFalseActivities": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalProcessedCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachRecord",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "processedCount",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(activity('LookupBatchMetadata').output.value))"
+          }
+        }
+      }
+    ]
+  }
+}

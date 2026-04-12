@@ -1,0 +1,185 @@
+{
+  "name": "math_param_url_builder",
+  "properties": {
+    "parameters": {
+      "api_base": {
+        "type": "String",
+        "defaultValue": "https://api.example.com/v1/records"
+      },
+      "page_index": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "items_per_page": {
+        "type": "Int",
+        "defaultValue": 50
+      }
+    },
+    "variables": {
+      "computed_offset": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "computed_page": {
+        "type": "String",
+        "defaultValue": "1"
+      },
+      "request_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeOffset",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_offset",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mul(pipeline().parameters.page_index, pipeline().parameters.items_per_page))"
+          }
+        }
+      },
+      {
+        "name": "ComputePageNumber",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeOffset",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_page",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(pipeline().parameters.page_index, 1))"
+          }
+        }
+      },
+      {
+        "name": "BuildRequestUrl",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputePageNumber",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "request_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.api_base, '?page=', string(add(pipeline().parameters.page_index, 1)), '&offset=', string(mul(pipeline().parameters.page_index, pipeline().parameters.items_per_page)), '&limit=', string(pipeline().parameters.items_per_page), '&skip=', string(mul(add(pipeline().parameters.page_index, 1), pipeline().parameters.items_per_page)))"
+          }
+        }
+      },
+      {
+        "name": "FetchPageData",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildRequestUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('request_url')"
+          },
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json",
+            "X-Page-Number": {
+              "type": "Expression",
+              "value": "@variables('computed_page')"
+            },
+            "X-Offset": {
+              "type": "Expression",
+              "value": "@variables('computed_offset')"
+            }
+          },
+          "disableCertValidation": false
+        }
+      },
+      {
+        "name": "CheckIfMorePages",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "FetchPageData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(activity('FetchPageData').output.total_count, mul(add(pipeline().parameters.page_index, 1), pipeline().parameters.items_per_page))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "LogMorePagesAvailable",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_base, '/log?message=more_pages_available&next_offset=', string(mul(add(pipeline().parameters.page_index, 1), pipeline().parameters.items_per_page)), '&next_page=', string(add(pipeline().parameters.page_index, 2)))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"next_page\":', string(add(pipeline().parameters.page_index, 2)), ',\"next_offset\":', string(mul(add(pipeline().parameters.page_index, 1), pipeline().parameters.items_per_page)), ',\"total_count\":', string(activity('FetchPageData').output.total_count), '}'))"
+                },
+                "disableCertValidation": false
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogLastPage",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.api_base, '/log?message=last_page_reached&final_page=', string(add(pipeline().parameters.page_index, 1)))"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"final_page\":', string(add(pipeline().parameters.page_index, 1)), ',\"total_fetched\":', string(mul(add(pipeline().parameters.page_index, 1), pipeline().parameters.items_per_page)), '}'))"
+                },
+                "disableCertValidation": false
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

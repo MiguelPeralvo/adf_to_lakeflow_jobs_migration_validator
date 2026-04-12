@@ -1,0 +1,263 @@
+{
+  "name": "nested_range_and_array_manipulation",
+  "properties": {
+    "parameters": {
+      "start_index": {
+        "type": "Int",
+        "defaultValue": 0
+      },
+      "batch_size": {
+        "type": "Int",
+        "defaultValue": 10
+      },
+      "total_count": {
+        "type": "Int",
+        "defaultValue": 100
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "batch_windows": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_batch": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "processing_status": {
+        "type": "String",
+        "defaultValue": "pending"
+      }
+    },
+    "activities": [
+      {
+        "name": "SetBatchWindows",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "batch_windows",
+          "value": {
+            "type": "Expression",
+            "value": "@createArray(skip(range(pipeline().parameters.start_index, pipeline().parameters.total_count), 0))"
+          }
+        }
+      },
+      {
+        "name": "SetCurrentBatchSlice",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetBatchWindows",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_batch",
+          "value": {
+            "type": "Expression",
+            "value": "@take(skip(createArray(range(pipeline().parameters.start_index, pipeline().parameters.total_count)), 0), pipeline().parameters.batch_size)"
+          }
+        }
+      },
+      {
+        "name": "ForEachBatchWindow",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "SetCurrentBatchSlice",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 5,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(take(skip(range(pipeline().parameters.start_index, pipeline().parameters.total_count), pipeline().parameters.start_index), pipeline().parameters.batch_size))"
+          },
+          "activities": [
+            {
+              "name": "ProcessBatchItem",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/batch_processor",
+                "baseParameters": {
+                  "batch_item": {
+                    "type": "Expression",
+                    "value": "@string(item())"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "batch_size": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.batch_size)"
+                  },
+                  "start_index": {
+                    "type": "Expression",
+                    "value": "@string(pipeline().parameters.start_index)"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetProcessingStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ForEachBatchWindow",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "processing_status",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(length(take(skip(createArray(range(pipeline().parameters.start_index, pipeline().parameters.total_count)), mul(pipeline().parameters.start_index, 1)), pipeline().parameters.batch_size)), pipeline().parameters.batch_size), 'complete_batch', 'partial_batch')"
+          }
+        }
+      },
+      {
+        "name": "CheckIfMoreBatches",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetProcessingStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(pipeline().parameters.total_count, add(pipeline().parameters.start_index, pipeline().parameters.batch_size))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunNextBatchNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/next_batch_trigger",
+                "baseParameters": {
+                  "next_start_index": {
+                    "type": "Expression",
+                    "value": "@string(add(pipeline().parameters.start_index, pipeline().parameters.batch_size))"
+                  },
+                  "remaining_count": {
+                    "type": "Expression",
+                    "value": "@string(sub(pipeline().parameters.total_count, add(pipeline().parameters.start_index, pipeline().parameters.batch_size)))"
+                  },
+                  "batch_window_array": {
+                    "type": "Expression",
+                    "value": "@string(createArray(take(skip(range(add(pipeline().parameters.start_index, pipeline().parameters.batch_size), sub(pipeline().parameters.total_count, add(pipeline().parameters.start_index, pipeline().parameters.batch_size))), 0), pipeline().parameters.batch_size))"
+                  },
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFinalStatus",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "processing_status",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('all_batches_complete_total_', string(pipeline().parameters.total_count))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "FinalNotebookAudit",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckIfMoreBatches",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/audit_log",
+          "baseParameters": {
+            "pipeline_name": {
+              "type": "Expression",
+              "value": "@pipeline().Pipeline"
+            },
+            "run_id": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            },
+            "status": {
+              "type": "Expression",
+              "value": "@variables('processing_status')"
+            },
+            "total_count": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.total_count)"
+            },
+            "batch_size": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.batch_size)"
+            },
+            "start_index": {
+              "type": "Expression",
+              "value": "@string(pipeline().parameters.start_index)"
+            },
+            "computed_windows": {
+              "type": "Expression",
+              "value": "@string(createArray(take(skip(range(pipeline().parameters.start_index, pipeline().parameters.total_count), 0), pipeline().parameters.batch_size)))"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

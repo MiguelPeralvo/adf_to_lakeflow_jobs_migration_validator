@@ -1,0 +1,223 @@
+{
+  "name": "nested_json_path_with_activity_output",
+  "properties": {
+    "parameters": {
+      "lookup_table": {
+        "type": "String",
+        "defaultValue": "dbo.config_table"
+      },
+      "key_column": {
+        "type": "String",
+        "defaultValue": "config_key"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "lookup_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "notebook_param": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupConfigData",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT TOP 1 * FROM ', pipeline().parameters.lookup_table, ' WHERE ', pipeline().parameters.key_column, ' = ''', pipeline().parameters.env, '''')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_azure_sql_config",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      },
+      {
+        "name": "SetVarLookupResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupConfigData",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "lookup_result",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupConfigData').output?.firstRow?.config_value, coalesce(activity('LookupConfigData').output?.value[0]?.config_value, 'default_fallback'))"
+          }
+        }
+      },
+      {
+        "name": "SetVarResolvedPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVarLookupResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_path",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(activity('LookupConfigData').output?.firstRow?.nested_config?.path?.target_database, coalesce(activity('LookupConfigData').output?.value[0]?.nested_config?.path?.target_database, concat('/mnt/', pipeline().parameters.env, '/default_db')))"
+          }
+        }
+      },
+      {
+        "name": "CheckLookupHasResults",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVarResolvedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(equals(coalesce(activity('LookupConfigData').output?.count, 0), 0)), not(equals(variables('lookup_result'), 'default_fallback')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetNotebookParamFromLookup",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "notebook_param",
+                "value": {
+                  "type": "Expression",
+                  "value": "@coalesce(activity('LookupConfigData').output?.firstRow?.nested_config?.notebook_params?.run_mode, coalesce(activity('LookupConfigData').output?.value[0]?.nested_config?.notebook_params?.run_mode, 'full_refresh'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetNotebookParamDefault",
+              "type": "SetVariable",
+              "typeProperties": {
+                "variableName": "notebook_param",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('incremental_', pipeline().parameters.env)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVarFinalNotebookParam",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckLookupHasResults",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "notebook_param",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(variables('notebook_param'), coalesce(activity('LookupConfigData').output?.firstRow?.nested_config?.notebook_params?.fallback_mode, 'safe_mode'))"
+          }
+        }
+      },
+      {
+        "name": "RunDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetVarFinalNotebookParam",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@concat('/Repos/', pipeline().parameters.env, '/etl-pipelines/notebooks/process_data')"
+          },
+          "baseParameters": {
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "target_database": {
+              "type": "Expression",
+              "value": "@coalesce(variables('resolved_path'), concat('/mnt/', pipeline().parameters.env, '/fallback_db'))"
+            },
+            "run_mode": {
+              "type": "Expression",
+              "value": "@coalesce(variables('notebook_param'), 'safe_mode')"
+            },
+            "source_table": {
+              "type": "Expression",
+              "value": "@coalesce(activity('LookupConfigData').output?.firstRow?.nested_config?.source?.table_name, coalesce(activity('LookupConfigData').output?.value[0]?.nested_config?.source?.table_name, pipeline().parameters.lookup_table))"
+            },
+            "key_column": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.key_column"
+            },
+            "watermark_value": {
+              "type": "Expression",
+              "value": "@coalesce(activity('LookupConfigData').output?.firstRow?.nested_config?.watermark?.last_value, '1900-01-01T00:00:00Z')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

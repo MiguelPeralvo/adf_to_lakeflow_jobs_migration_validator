@@ -1,0 +1,310 @@
+{
+  "name": "nested_min_max_simulation",
+  "properties": {
+    "parameters": {
+      "val_x": {
+        "type": "Float",
+        "defaultValue": 10
+      },
+      "val_y": {
+        "type": "Float",
+        "defaultValue": 25
+      },
+      "val_z": {
+        "type": "Float",
+        "defaultValue": 15
+      }
+    },
+    "variables": {
+      "min_xy": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "min_xyz": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "max_xyz": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "Compare_X_Y_For_Min",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@less(pipeline().parameters.val_x, pipeline().parameters.val_y)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set_MinXY_To_X",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "min_xy",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(pipeline().parameters.val_x)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_MinXY_To_Y",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "min_xy",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(pipeline().parameters.val_y)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set_Initial_Max",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compare_X_Y_For_Min",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "max_xyz",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(pipeline().parameters.val_x, pipeline().parameters.val_y), pipeline().parameters.val_x, pipeline().parameters.val_y))"
+          }
+        }
+      },
+      {
+        "name": "Compare_MinXY_Z_For_MinXYZ",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Set_Initial_Max",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@less(float(variables('min_xy')), pipeline().parameters.val_z)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set_MinXYZ_From_MinXY",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "min_xyz",
+                "value": {
+                  "type": "Expression",
+                  "value": "@variables('min_xy')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Set_MinXYZ_From_Z",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "min_xyz",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(pipeline().parameters.val_z)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Compare_Max_With_Z",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Compare_MinXY_Z_For_MinXYZ",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(pipeline().parameters.val_z, float(variables('max_xyz')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Update_Max_To_Z",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "max_xyz",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(pipeline().parameters.val_z)"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Keep_Max_Unchanged",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "max_xyz",
+                "value": {
+                  "type": "Expression",
+                  "value": "@variables('max_xyz')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Set_Final_Summary",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Compare_Max_With_Z",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "min_xy",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('min=', variables('min_xyz'), '|max=', variables('max_xyz'))"
+          }
+        }
+      },
+      {
+        "name": "Copy_MinMax_Results",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Set_Final_Summary",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ', variables('min_xyz'), ' AS computed_min, ', variables('max_xyz'), ' AS computed_max, ', string(pipeline().parameters.val_x), ' AS val_x, ', string(pipeline().parameters.val_y), ' AS val_y, ', string(pipeline().parameters.val_z), ' AS val_z')"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "computed_min"
+                },
+                "sink": {
+                  "name": "min_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "computed_max"
+                },
+                "sink": {
+                  "name": "max_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "val_x"
+                },
+                "sink": {
+                  "name": "param_x",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "val_y"
+                },
+                "sink": {
+                  "name": "param_y",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "val_z"
+                },
+                "sink": {
+                  "name": "param_z",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

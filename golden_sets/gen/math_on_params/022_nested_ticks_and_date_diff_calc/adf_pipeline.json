@@ -1,0 +1,165 @@
+{
+  "name": "nested_ticks_and_date_diff_calc",
+  "properties": {
+    "parameters": {
+      "start_time": {
+        "type": "String",
+        "defaultValue": "2024-01-01T00:00:00Z"
+      },
+      "sla_minutes": {
+        "type": "Int",
+        "defaultValue": 60
+      },
+      "alert_endpoint": {
+        "type": "String",
+        "defaultValue": "https://hooks.example.com/alert"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "elapsed_ticks": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "elapsed_minutes": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "sla_breached": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcElapsedTicks",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "elapsed_ticks",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)))"
+          }
+        }
+      },
+      {
+        "name": "CalcElapsedMinutes",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcElapsedTicks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "elapsed_minutes",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60))"
+          }
+        }
+      },
+      {
+        "name": "DetermineSLABreach",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcElapsedMinutes",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sla_breached",
+          "value": {
+            "type": "Expression",
+            "value": "@string(if(greater(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60),pipeline().parameters.sla_minutes),true,false))"
+          }
+        }
+      },
+      {
+        "name": "CheckSLAAndAlert",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DetermineSLABreach",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60),pipeline().parameters.sla_minutes)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SendSLABreachAlert",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@pipeline().parameters.alert_endpoint"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@json(concat('{\"pipeline\":\"nested_ticks_and_date_diff_calc\",\"env\":\"',pipeline().parameters.env,'\",\"sla_minutes\":',string(pipeline().parameters.sla_minutes),',\"elapsed_minutes\":',string(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60)),',\"elapsed_ticks\":',string(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time))),',\"breached\":true,\"severity\":\"',if(greater(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60),mul(pipeline().parameters.sla_minutes,2)),'critical','warning'),'\",\"timestamp\":\"',utcNow(),'\"}'))"
+                },
+                "connectVia": null,
+                "linkedServiceName": null
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "PostCompletionStatus",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckSLAAndAlert",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.alert_endpoint,'?status=completed')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"pipeline\":\"nested_ticks_and_date_diff_calc\",\"env\":\"',pipeline().parameters.env,'\",\"status\":\"completed\",\"sla_breached\":',variables('sla_breached'),',\"start_time\":\"',pipeline().parameters.start_time,'\",\"end_time\":\"',utcNow(),'\",\"total_elapsed_minutes\":',string(div(div(sub(ticks(utcNow()),ticks(pipeline().parameters.start_time)),10000000),60)),',\"sla_limit_minutes\":',string(pipeline().parameters.sla_minutes),',\"ticks_at_completion\":',string(ticks(utcNow())),'}'))"
+          },
+          "connectVia": null,
+          "linkedServiceName": null
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,386 @@
+{
+  "name": "nested_databricks_param_builder",
+  "properties": {
+    "parameters": {
+      "notebook_path": {
+        "type": "String",
+        "defaultValue": "/notebooks/etl_main"
+      },
+      "cluster_size": {
+        "type": "String",
+        "defaultValue": "Standard_DS3_v2"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "input_path": {
+        "type": "String",
+        "defaultValue": "abfss://raw@storage.dfs.core.windows.net/data"
+      },
+      "output_path": {
+        "type": "String",
+        "defaultValue": "abfss://curated@storage.dfs.core.windows.net/output"
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "resolved_cluster_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_input_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_output_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "notebook_params_json": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "run_timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetRunTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "run_timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@utcNow('yyyyMMdd_HHmmss')"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedClusterConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetRunTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_cluster_config",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), if(equals(pipeline().parameters.run_mode, 'full'), json(concat('{\"node_type\":\"', pipeline().parameters.cluster_size, '\",\"num_workers\":8,\"autoscale_min\":4,\"autoscale_max\":16,\"spark_conf\":{\"spark.sql.shuffle.partitions\":\"400\",\"spark.databricks.delta.optimizeWrite.enabled\":\"true\"}}')), json(concat('{\"node_type\":\"', pipeline().parameters.cluster_size, '\",\"num_workers\":4,\"autoscale_min\":2,\"autoscale_max\":8,\"spark_conf\":{\"spark.sql.shuffle.partitions\":\"200\",\"spark.databricks.delta.optimizeWrite.enabled\":\"true\"}}'))), if(equals(pipeline().parameters.env, 'staging'), json(concat('{\"node_type\":\"', pipeline().parameters.cluster_size, '\",\"num_workers\":3,\"autoscale_min\":2,\"autoscale_max\":6,\"spark_conf\":{\"spark.sql.shuffle.partitions\":\"100\",\"spark.databricks.delta.optimizeWrite.enabled\":\"false\"}}')), json(concat('{\"node_type\":\"Standard_DS3_v2\",\"num_workers\":1,\"autoscale_min\":1,\"autoscale_max\":2,\"spark_conf\":{\"spark.sql.shuffle.partitions\":\"50\",\"spark.databricks.delta.optimizeWrite.enabled\":\"false\"}}'))))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedInputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedClusterConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_input_path",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.run_mode, 'incremental'), concat(pipeline().parameters.input_path, '/incremental/', formatDateTime(utcNow(), 'yyyy/MM/dd')), if(equals(pipeline().parameters.run_mode, 'reprocess'), concat(pipeline().parameters.input_path, '/reprocess/', variables('run_timestamp')), concat(pipeline().parameters.input_path, '/full')))"
+          }
+        }
+      },
+      {
+        "name": "SetResolvedOutputPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedInputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_output_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.output_path, '/', pipeline().parameters.env, '/', if(equals(pipeline().parameters.run_mode, 'full'), 'full_load', if(equals(pipeline().parameters.run_mode, 'incremental'), 'incremental_load', 'reprocess_load')), '/', variables('run_timestamp'))"
+          }
+        }
+      },
+      {
+        "name": "BuildNotebookParamsJson",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedOutputPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "notebook_params_json",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{', '\"env\":\"', pipeline().parameters.env, '\",', '\"run_mode\":\"', pipeline().parameters.run_mode, '\",', '\"input_path\":\"', variables('resolved_input_path'), '\",', '\"output_path\":\"', variables('resolved_output_path'), '\",', '\"run_timestamp\":\"', variables('run_timestamp'), '\",', '\"cluster_config\":\"', replace(variables('resolved_cluster_config'), '\"', '\\\"'), '\",', '\"enable_schema_evolution\":\"', if(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), 'true', 'false'), '\",', '\"merge_strategy\":\"', if(equals(pipeline().parameters.run_mode, 'full'), 'overwrite', if(equals(pipeline().parameters.run_mode, 'incremental'), 'merge_on_key', 'delete_and_insert')), '\",', '\"log_level\":\"', if(equals(pipeline().parameters.env, 'prod'), 'WARN', if(equals(pipeline().parameters.env, 'staging'), 'INFO', 'DEBUG')), '\",', '\"max_retries\":\"', if(equals(pipeline().parameters.env, 'prod'), '3', '1'), '\",', '\"partition_columns\":\"', if(equals(pipeline().parameters.run_mode, 'full'), 'year,month,day', if(equals(pipeline().parameters.run_mode, 'incremental'), 'day', 'year,month')), '\"', '}')"
+          }
+        }
+      },
+      {
+        "name": "CheckEnvAndRunMode",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "BuildNotebookParamsJson",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.run_mode, 'full')), and(equals(pipeline().parameters.env, 'staging'), not(equals(pipeline().parameters.run_mode, 'reprocess'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunNotebookHighPriority",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.notebook_path, if(equals(pipeline().parameters.env, 'prod'), '_prod', '_staging'))"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "run_mode": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.run_mode"
+                  },
+                  "input_path": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_input_path')"
+                  },
+                  "output_path": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_output_path')"
+                  },
+                  "run_timestamp": {
+                    "type": "Expression",
+                    "value": "@variables('run_timestamp')"
+                  },
+                  "enable_schema_evolution": {
+                    "type": "Expression",
+                    "value": "@if(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), 'true', 'false')"
+                  },
+                  "merge_strategy": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'overwrite', if(equals(pipeline().parameters.run_mode, 'incremental'), 'merge_on_key', 'delete_and_insert'))"
+                  },
+                  "log_level": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.env, 'prod'), 'WARN', 'INFO')"
+                  },
+                  "max_retries": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.env, 'prod'), '3', '2')"
+                  },
+                  "partition_columns": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'year,month,day', if(equals(pipeline().parameters.run_mode, 'incremental'), 'day', 'year,month'))"
+                  },
+                  "cluster_node_type": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.cluster_size"
+                  },
+                  "priority": {
+                    "type": "Expression",
+                    "value": "high"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "RunNotebookStandardPriority",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "typeProperties": {
+                "notebookPath": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.notebook_path, '_', pipeline().parameters.env)"
+                },
+                "baseParameters": {
+                  "env": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.env"
+                  },
+                  "run_mode": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.run_mode"
+                  },
+                  "input_path": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_input_path')"
+                  },
+                  "output_path": {
+                    "type": "Expression",
+                    "value": "@variables('resolved_output_path')"
+                  },
+                  "run_timestamp": {
+                    "type": "Expression",
+                    "value": "@variables('run_timestamp')"
+                  },
+                  "enable_schema_evolution": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.env, 'dev'), 'false', 'true')"
+                  },
+                  "merge_strategy": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'overwrite', 'merge_on_key')"
+                  },
+                  "log_level": {
+                    "type": "Expression",
+                    "value": "DEBUG"
+                  },
+                  "max_retries": {
+                    "type": "Expression",
+                    "value": "1"
+                  },
+                  "partition_columns": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'year,month,day', 'day')"
+                  },
+                  "cluster_node_type": {
+                    "type": "Expression",
+                    "value": "Standard_DS3_v2"
+                  },
+                  "priority": {
+                    "type": "Expression",
+                    "value": "standard"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RunMainDatabricksNotebook",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvAndRunMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), concat('/Repos/production', pipeline().parameters.notebook_path), if(equals(pipeline().parameters.env, 'staging'), concat('/Repos/staging', pipeline().parameters.notebook_path), concat('/Repos/dev', pipeline().parameters.notebook_path)))"
+          },
+          "baseParameters": {
+            "env": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            },
+            "run_mode": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.run_mode"
+            },
+            "input_path": {
+              "type": "Expression",
+              "value": "@variables('resolved_input_path')"
+            },
+            "output_path": {
+              "type": "Expression",
+              "value": "@variables('resolved_output_path')"
+            },
+            "run_timestamp": {
+              "type": "Expression",
+              "value": "@variables('run_timestamp')"
+            },
+            "enable_schema_evolution": {
+              "type": "Expression",
+              "value": "@if(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), 'true', 'false')"
+            },
+            "merge_strategy": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'overwrite', if(equals(pipeline().parameters.run_mode, 'incremental'), 'merge_on_key', 'delete_and_insert'))"
+            },
+            "log_level": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.env, 'prod'), 'WARN', if(equals(pipeline().parameters.env, 'staging'), 'INFO', 'DEBUG'))"
+            },
+            "max_retries": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.env, 'prod'), '3', if(equals(pipeline().parameters.env, 'staging'), '2', '1'))"
+            },
+            "partition_columns": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.run_mode, 'full'), 'year,month,day', if(equals(pipeline().parameters.run_mode, 'incremental'), 'day', 'year,month'))"
+            },
+            "cluster_node_type": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.env, 'prod'), pipeline().parameters.cluster_size, if(equals(pipeline().parameters.env, 'staging'), pipeline().parameters.cluster_size, 'Standard_DS3_v2'))"
+            },
+            "write_mode": {
+              "type": "Expression",
+              "value": "@if(and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.run_mode, 'full')), 'overwrite_with_backup', if(and(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.run_mode, 'incremental')), 'append_with_dedup', if(equals(pipeline().parameters.run_mode, 'reprocess'), 'replace_partition', 'overwrite')))"
+            },
+            "quality_checks_enabled": {
+              "type": "Expression",
+              "value": "@if(or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging')), 'true', 'false')"
+            },
+            "notification_email": {
+              "type": "Expression",
+              "value": "@if(equals(pipeline().parameters.env, 'prod'), 'prod-alerts@company.com', if(equals(pipeline().parameters.env, 'staging'), 'staging-alerts@company.com', 'dev-team@company.com'))"
+            },
+            "full_params_json": {
+              "type": "Expression",
+              "value": "@variables('notebook_params_json')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

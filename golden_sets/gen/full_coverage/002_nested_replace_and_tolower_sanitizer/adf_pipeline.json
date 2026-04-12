@@ -1,0 +1,123 @@
+{
+  "name": "nested_replace_and_tolower_sanitizer",
+  "properties": {
+    "parameters": {
+      "raw_input": {
+        "type": "String",
+        "defaultValue": "  Hello@World#Test  "
+      },
+      "forbidden_chars": {
+        "type": "String",
+        "defaultValue": "@#$"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "sanitized_step1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "sanitized_step2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_sanitized": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RemoveForbiddenCharsPass1",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_step1",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(replace(replace(replace(pipeline().parameters.raw_input, '@', ''), '#', ''), '$', '')))"
+          }
+        }
+      },
+      {
+        "name": "RemoveForbiddenCharsPass2",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RemoveForbiddenCharsPass1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized_step2",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(replace(replace(replace(variables('sanitized_step1'), '!', ''), '%', ''), '&', '')))"
+          }
+        }
+      },
+      {
+        "name": "BuildFinalSanitizedValue",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RemoveForbiddenCharsPass2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_sanitized",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.env, '/', toLower(trim(replace(replace(replace(variables('sanitized_step2'), ' ', '_'), '__', '_'), '___', '_'))))"
+          }
+        }
+      },
+      {
+        "name": "PostSanitizedResult",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildFinalSanitizedValue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://api-', pipeline().parameters.env, '.example.com/v1/sanitized-inputs')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Environment": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.env"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@json(concat('{\"original_input\":\"', pipeline().parameters.raw_input, '\",\"sanitized_pass1\":\"', variables('sanitized_step1'), '\",\"sanitized_pass2\":\"', variables('sanitized_step2'), '\",\"final_sanitized\":\"', variables('final_sanitized'), '\",\"environment\":\"', pipeline().parameters.env, '\",\"forbidden_chars\":\"', pipeline().parameters.forbidden_chars, '\",\"pipeline_run_id\":\"', pipeline().RunId, '\"}'))"
+          },
+          "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      }
+    ]
+  }
+}

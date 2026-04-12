@@ -1,0 +1,247 @@
+{
+  "name": "deep_expression_copy_with_dynamic_dataset",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "table_pattern": {
+        "type": "String",
+        "defaultValue": "sales_%"
+      },
+      "partition_date": {
+        "type": "String",
+        "defaultValue": "2024-01-01"
+      }
+    },
+    "variables": {
+      "resolved_source_ref": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "resolved_sink_ref": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "lookup_result_count": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "LookupTableMetadata",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT table_name, source_dataset, sink_dataset, row_count FROM ',pipeline().parameters.schema,'.pipeline_metadata WHERE environment = ''',pipeline().parameters.env,''' AND table_name LIKE ''',pipeline().parameters.table_pattern,''' AND partition_date = ''',pipeline().parameters.partition_date,''' ORDER BY table_name')"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_sql_metadata",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true,
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetVarResolvedSourceRef",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "LookupTableMetadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_source_ref",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(if(equals(pipeline().parameters.env,'prod'),'ds_prod_','ds_dev_'), replace(replace(activity('LookupTableMetadata').output.firstRow.source_dataset, '{schema}', pipeline().parameters.schema), '{table}', replace(activity('LookupTableMetadata').output.firstRow.table_name, pipeline().parameters.env, concat(pipeline().parameters.env, '_', formatDateTime(utcnow(), 'yyyyMMdd')))), '_', replace(pipeline().parameters.partition_date, '-', ''))"
+          }
+        }
+      },
+      {
+        "name": "SetVarResolvedSinkRef",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetVarResolvedSourceRef",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "resolved_sink_ref",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('delta_', toLower(pipeline().parameters.env), '/', pipeline().parameters.schema, '/', replace(activity('LookupTableMetadata').output.firstRow.sink_dataset, '{partition}', replace(pipeline().parameters.partition_date, '-', '')), '/', if(greater(int(activity('LookupTableMetadata').output.firstRow.row_count), 1000000), concat('large_partition_', replace(pipeline().parameters.partition_date, '-', '')), concat('small_partition_', replace(pipeline().parameters.partition_date, '-', ''))))"
+          }
+        }
+      },
+      {
+        "name": "CheckMetadataValid",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetVarResolvedSinkRef",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(greater(length(variables('resolved_source_ref')), 0), greater(length(variables('resolved_sink_ref')), 0))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyDynamicData",
+              "type": "Copy",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.01:00:00",
+                "retry": 3,
+                "retryIntervalInSeconds": 60
+              },
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sql_reader_query": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', pipeline().parameters.schema, '.', activity('LookupTableMetadata').output.firstRow.table_name, ' WHERE partition_date = ''', pipeline().parameters.partition_date, ''' /* source_ref=', variables('resolved_source_ref'), ' */')"
+                  }
+                },
+                "sink": {
+                  "type": "AzureDatabricksDeltaLakeSink",
+                  "importSettings": {
+                    "type": "AzureDatabricksDeltaLakeImportCommand"
+                  }
+                },
+                "enableStaging": false,
+                "translator": {
+                  "type": "TabularTranslator",
+                  "mappings": [
+                    {
+                      "source": {
+                        "name": "src_col"
+                      },
+                      "sink": {
+                        "name": "tgt_col",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "partition_date"
+                      },
+                      "sink": {
+                        "name": "partition_date",
+                        "type": "String"
+                      }
+                    },
+                    {
+                      "source": {
+                        "name": "row_id"
+                      },
+                      "sink": {
+                        "name": "row_id",
+                        "type": "String"
+                      }
+                    }
+                  ]
+                },
+                "input_dataset_definitions": [
+                  {
+                    "type": "AzureSqlSource",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_sql",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "output_dataset_definitions": [
+                  {
+                    "type": "AzureDatabricksDeltaLakeSink",
+                    "schema": [],
+                    "linkedServiceName": {
+                      "referenceName": "ls_delta",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ]
+              },
+              "inputs": [
+                {
+                  "referenceName": "ds_sql_dynamic",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "resolved_name": {
+                      "type": "Expression",
+                      "value": "@variables('resolved_source_ref')"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_delta_dynamic",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "resolved_path": {
+                      "type": "Expression",
+                      "value": "@variables('resolved_sink_ref')"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "FailOnInvalidMetadata",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "typeProperties": {
+                "variableName": "lookup_result_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(-1)"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,413 @@
+{
+  "name": "nested_expression_stress_maximum_depth",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "dev"
+      },
+      "batch_id": {
+        "type": "String",
+        "defaultValue": "BATCH-001"
+      },
+      "source_system": {
+        "type": "String",
+        "defaultValue": "ERP_ORACLE"
+      },
+      "target_system": {
+        "type": "String",
+        "defaultValue": "DWH_DELTA"
+      },
+      "run_date": {
+        "type": "String",
+        "defaultValue": "2024-01-15T00:00:00Z"
+      },
+      "fallback_date": {
+        "type": "String",
+        "defaultValue": "2024-01-01T00:00:00Z"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east-1"
+      },
+      "debug_mode": {
+        "type": "String",
+        "defaultValue": "false"
+      }
+    },
+    "variables": {
+      "resolved_env": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "computed_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "effective_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "query_filter": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "iteration_items": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetResolvedEnv",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "resolved_env",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env,'prod'),concat(replace(join(split(coalesce(pipeline().parameters.source_system,'UNKNOWN'),'_'),'-'),'ERP','ENTERPRISE'),'-',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd'),'-PROD'),if(equals(pipeline().parameters.env,'staging'),concat(replace(join(split(coalesce(pipeline().parameters.source_system,'FALLBACK_SRC'),'_'),'-'),'ERP','STG'),'-',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd'),'-STG'),concat(replace(join(split(coalesce(pipeline().parameters.source_system,'DEV_SRC'),'_'),'.'),'ERP','DEV'),'-',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyy-MM-dd'),'-DEV')))"
+          }
+        }
+      },
+      {
+        "name": "SetComputedPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetResolvedEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/',replace(coalesce(pipeline().parameters.region,'default-region'),'-','_'),'/',if(equals(pipeline().parameters.debug_mode,'true'),concat('debug/',replace(join(split(concat(coalesce(pipeline().parameters.target_system,'UNKNOWN_TGT'),'_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMddHHmmss')),'_'),'/'),'-','_')),concat('release/',replace(join(split(concat(coalesce(pipeline().parameters.target_system,'DEFAULT_TGT'),'_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd')),'_'),'/'),'-','_'))))"
+          }
+        }
+      },
+      {
+        "name": "SetEffectiveDate",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetComputedPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_date",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(coalesce(pipeline().parameters.run_date,''),''),formatDateTime(coalesce(pipeline().parameters.fallback_date,utcNow()),'yyyy-MM-dd'),if(greater(formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd'),formatDateTime(utcNow(),'yyyyMMdd')),concat('FUTURE_',replace(join(split(formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyy-MM-dd-HH-mm'),'-'),'_'),':','_')),concat('PAST_OR_CURRENT_',replace(join(split(formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyy-MM-dd-HH-mm'),'-'),'/'),':','_'))))"
+          }
+        }
+      },
+      {
+        "name": "SetQueryFilter",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetEffectiveDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "query_filter",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('WHERE batch_id = ''',replace(coalesce(pipeline().parameters.batch_id,'NO_BATCH'),'-','_'),''' AND source_system = ''',if(equals(pipeline().parameters.env,'prod'),replace(join(split(coalesce(pipeline().parameters.source_system,'UNKNOWN'),'_'),'.'),'ERP','ENTERPRISE'),replace(join(split(coalesce(pipeline().parameters.source_system,'DEV_UNKNOWN'),'_'),'-'),'ERP','TEST')),''' AND run_date >= ''',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyy-MM-dd'),''' AND region IN (''',replace(join(split(coalesce(pipeline().parameters.region,'us-east-1'),'-'),''','''),'-','_'),''')')"
+          }
+        }
+      },
+      {
+        "name": "SetIterationItems",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetQueryFilter",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "iteration_items",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('[\"',join(split(if(equals(pipeline().parameters.env,'prod'),concat(replace(coalesce(pipeline().parameters.source_system,'SRC'),'_',','),',',replace(coalesce(pipeline().parameters.target_system,'TGT'),'_',','),',',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd')),concat(replace(coalesce(pipeline().parameters.source_system,'DEV_SRC'),'_',','),',',replace(coalesce(pipeline().parameters.target_system,'DEV_TGT'),'_',','),',DEBUG_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd'))),','),'\",\"'),'\"]')"
+          }
+        }
+      },
+      {
+        "name": "CheckDebugMode",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetIterationItems",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.debug_mode,'true')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "DebugWebCall",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://logging.',replace(coalesce(pipeline().parameters.region,'us-east-1'),'-','.'),'.api.internal/debug/',if(equals(pipeline().parameters.env,'prod'),concat('prod/',replace(join(split(coalesce(pipeline().parameters.batch_id,'UNKNOWN'),'_'),'-'),'-','_')),concat('non-prod/',replace(join(split(coalesce(pipeline().parameters.batch_id,'DEV_BATCH'),'_'),'-'),'-','_'))),'/log')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "X-Batch-Id": {
+                    "type": "Expression",
+                    "value": "@coalesce(pipeline().parameters.batch_id,'NO_BATCH')"
+                  },
+                  "X-Region": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.region"
+                  }
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"env\":\"',pipeline().parameters.env,'\",\"resolved_env\":\"',variables('resolved_env'),'\",\"path\":\"',replace(variables('computed_path'),'\"','\\\"'),'\",\"effective_date\":\"',variables('effective_date'),'\",\"filter\":\"',replace(variables('query_filter'),'\"','\\\"'),'\"}')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "CheckEnvironmentForCopy",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckDebugMode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env,'prod'),equals(pipeline().parameters.env,'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "InnerSetVarMarker",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "resolved_env",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('APPROVED_',replace(join(split(if(equals(pipeline().parameters.env,'prod'),concat(coalesce(pipeline().parameters.source_system,'SRC'),'_TO_',coalesce(pipeline().parameters.target_system,'TGT')),concat('STG_',coalesce(pipeline().parameters.source_system,'SRC'),'_TO_STG_',coalesce(pipeline().parameters.target_system,'TGT'))),'_'),'-'),'-','_'),'_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMddHHmmss'))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": []
+        }
+      },
+      {
+        "name": "IterateSourceTables",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "CheckEnvironmentForCopy",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray(concat('table_',replace(coalesce(pipeline().parameters.source_system,'src'),'_',''),'_orders'),concat('table_',replace(coalesce(pipeline().parameters.source_system,'src'),'_',''),'_customers'),concat('table_',replace(coalesce(pipeline().parameters.source_system,'src'),'_',''),'_products'))"
+          },
+          "activities": [
+            {
+              "name": "WebNotifyPerTable",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@concat('https://orchestrator.',replace(coalesce(pipeline().parameters.region,'us-east-1'),'-','.'),'.api.internal/notify')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"table\":\"',item(),'\",\"batch_id\":\"',coalesce(pipeline().parameters.batch_id,'UNKNOWN'),'\",\"env\":\"',pipeline().parameters.env,'\",\"path\":\"',replace(variables('computed_path'),'\"','\\\"'),'\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "WebActivityFinalCallback",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "IterateSourceTables",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@concat('https://callback.',replace(coalesce(pipeline().parameters.region,'us-east-1'),'-','.'),'.api.internal/',if(equals(pipeline().parameters.env,'prod'),concat('prod/complete/',replace(join(split(concat(coalesce(pipeline().parameters.batch_id,'BATCH'),'_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMddHHmmss')),'_'),'-'),'-','_')),concat('nonprod/complete/',replace(join(split(concat(coalesce(pipeline().parameters.batch_id,'DEV_BATCH'),'_',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyyMMdd')),'_'),'-'),'-','_'))))"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Pipeline-Run": {
+              "type": "Expression",
+              "value": "@pipeline().RunId"
+            }
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"status\":\"completed\",\"resolved_env\":\"',variables('resolved_env'),'\",\"effective_date\":\"',variables('effective_date'),'\",\"computed_path\":\"',replace(variables('computed_path'),'\"','\\\"'),'\",\"region\":\"',coalesce(pipeline().parameters.region,'unknown'),'\",\"debug\":\"',pipeline().parameters.debug_mode,'\"}')"
+          }
+        }
+      },
+      {
+        "name": "CopySourceToTarget",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "WebActivityFinalCallback",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ',if(equals(pipeline().parameters.env,'prod'),concat('[',replace(join(split(coalesce(pipeline().parameters.source_system,'dbo'),'_'),'].[')),'].[',replace(coalesce(pipeline().parameters.batch_id,'default'),'_',''),']'),concat('[dev_',replace(join(split(coalesce(pipeline().parameters.source_system,'dbo'),'_'),'_dev_')),'].[',replace(coalesce(pipeline().parameters.batch_id,'dev_default'),'_',''),']')),' ',variables('query_filter'),' AND target_system = ''',replace(join(split(coalesce(pipeline().parameters.target_system,'UNKNOWN_TGT'),'_'),'-'),'-','_'),''' AND effective_date = ''',formatDateTime(coalesce(pipeline().parameters.run_date,pipeline().parameters.fallback_date),'yyyy-MM-dd'),''' ORDER BY ',if(equals(pipeline().parameters.debug_mode,'true'),'created_at DESC','id ASC'))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "src_col"
+                },
+                "sink": {
+                  "name": "tgt_col",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_batch_id"
+                },
+                "sink": {
+                  "name": "tgt_batch_id",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_run_date"
+                },
+                "sink": {
+                  "name": "tgt_run_date",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "src_region"
+                },
+                "sink": {
+                  "name": "tgt_region",
+                  "type": "String"
+                }
+              }
+            ]
+          }
+        },
+        "inputs": [
+          {
+            "referenceName": "ds_azure_sql_source",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_delta_lake_sink",
+            "type": "DatasetReference"
+          }
+        ],
+        "input_dataset_definitions": [
+          {
+            "type": "AzureSqlSource",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_sql",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ],
+        "output_dataset_definitions": [
+          {
+            "type": "AzureDatabricksDeltaLakeSink",
+            "schema": [],
+            "linkedServiceName": {
+              "referenceName": "ls_delta",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "name": "conditional_math_branching",
+  "properties": {
+    "parameters": {
+      "input_value": {
+        "type": "Float",
+        "defaultValue": 50
+      },
+      "low_threshold": {
+        "type": "Float",
+        "defaultValue": 25
+      },
+      "high_threshold": {
+        "type": "Float",
+        "defaultValue": 75
+      },
+      "scale_factor": {
+        "type": "Float",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "computed_result": {
+        "type": "String",
+        "defaultValue": "0"
+      },
+      "branch_label": {
+        "type": "String",
+        "defaultValue": "none"
+      },
+      "final_query_param": {
+        "type": "String",
+        "defaultValue": "0"
+      }
+    },
+    "activities": [
+      {
+        "name": "InitializeResult",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(pipeline().parameters.input_value)"
+          }
+        }
+      },
+      {
+        "name": "CheckLowThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "InitializeResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@less(pipeline().parameters.input_value, pipeline().parameters.low_threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetResultLowBranch",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "computed_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(mul(pipeline().parameters.input_value, pipeline().parameters.scale_factor), pipeline().parameters.low_threshold))"
+                }
+              }
+            },
+            {
+              "name": "SetLabelLow",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetResultLowBranch",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_label",
+                "value": "low_branch_multiply_then_add"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetResultNotLowBranch",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "computed_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(pipeline().parameters.input_value, div(pipeline().parameters.low_threshold, pipeline().parameters.scale_factor)))"
+                }
+              }
+            },
+            {
+              "name": "SetLabelNotLow",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetResultNotLowBranch",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "branch_label",
+                "value": "not_low_branch_subtract_divided"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "SetFinalQueryParam",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckLowThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_query_param",
+          "value": {
+            "type": "Expression",
+            "value": "@variables('computed_result')"
+          }
+        }
+      },
+      {
+        "name": "SetBranchLabelForHigh",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFinalQueryParam",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "branch_label",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('threshold_check_', variables('branch_label'))"
+          }
+        }
+      },
+      {
+        "name": "CheckHighThreshold",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetBranchLabelForHigh",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(pipeline().parameters.input_value, pipeline().parameters.high_threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "OverrideResultHighBranch",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_query_param",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(mul(sub(pipeline().parameters.input_value, pipeline().parameters.high_threshold), mul(pipeline().parameters.scale_factor, pipeline().parameters.scale_factor)))"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "KeepResultMidBranch",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_query_param",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(div(pipeline().parameters.input_value, pipeline().parameters.scale_factor), mul(pipeline().parameters.low_threshold, sub(pipeline().parameters.high_threshold, pipeline().parameters.input_value))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CopyComputedData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "CheckHighThreshold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sql_reader_query": {
+              "type": "Expression",
+              "value": "@concat('SELECT ''', variables('branch_label'), ''' AS branch_label, ', variables('final_query_param'), ' AS computed_value, ', string(pipeline().parameters.input_value), ' AS original_input, ', string(pipeline().parameters.scale_factor), ' AS scale_factor FROM dbo.math_results WHERE threshold_value <= ', variables('final_query_param'))"
+            }
+          },
+          "sink": {
+            "type": "AzureDatabricksDeltaLakeSink"
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "branch_label"
+                },
+                "sink": {
+                  "name": "branch_label",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "computed_value"
+                },
+                "sink": {
+                  "name": "computed_value",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "original_input"
+                },
+                "sink": {
+                  "name": "original_input",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "name": "scale_factor"
+                },
+                "sink": {
+                  "name": "scale_factor",
+                  "type": "String"
+                }
+              }
+            ]
+          },
+          "input_dataset_definitions": [
+            {
+              "type": "AzureSqlSource",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_sql",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "output_dataset_definitions": [
+            {
+              "type": "AzureDatabricksDeltaLakeSink",
+              "schema": [],
+              "linkedServiceName": {
+                "referenceName": "ls_delta",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
