@@ -75,20 +75,44 @@ Run the autonomous ratchet loop from the plan. Two parallel tracks:
 
 ## KPI Journey
 
-| Time | Tier | X-1 set_var | X-2 set_var | X-2 avg | Notes |
-|------|------|-------------|-------------|---------|-------|
-| baseline | pre-W17 | 1.000 | 0.735 | — | From golden_sets/semantic_eval_results.json |
-| T1 | post-W17 | ? | ? | ? | Running now |
+| Time | Tier | X-2 set_var | X-2 web_body | X-2 if_cond | X-2 avg (4 core) | Pipeline CCS | Crash% |
+|------|------|-------------|-------------|-------------|------------------|-------------|--------|
+| baseline | pre-session | 0.735 | — | — | — | — | — |
+| T1 | post W-17/W-18 | **0.808** | 0.406 | 0.157 | — | 88.6 | 39% |
+| T2 | full 7-context | 0.808 | 0.406 | 0.157 | 0.810 | 88.6 | 39% |
+| T6a | post W-20a/c | 0.808 | 0.406 | 0.157 | 0.810 | **90.7** | **0%** |
+| post-W21 | IfCondition fix | 0.808 | 0.406 | **0.542** | 0.810 | 90.7 | 0% |
+| post-web fix | lmv walker fix | 0.812 | **0.798** | 0.542 | **0.808** | 90.7 | 0% |
+| T5 | post W-23/24/25 | 0.750* | — | — | — | 90.7 | 0% |
+
+*0.750 on 60-sample (smaller sample, includes 10 new harder comparison expressions). Full 200-sample re-eval needed for stable comparison.
 
 ---
 
 ## Commits Landed (wkmigrate fork, during this run)
 
-(Populated as Tier 4 subagents push.)
+| SHA | Subject | W-findings |
+|-----|---------|-----------|
+| `21c6d06` | fix: robustness for _parse_policy crashes and typeProperties normalization | W-20a, W-20c |
+| `0be186f` | fix: IfCondition emits Python operators + Copy/Lookup missing datasets | W-22 (regression), W-20b |
+| `10653f5` | fix: revert W-22 op mapping regression | W-22 revert |
+| `2c86a1b` | fix: W-21 IfCondition truthy wrap — stop emitting right="True" | W-21 |
+| `b8c9be2` | fix: W-23/W-24/W-25 — remove json.loads, integer division, extend coercion | W-23, W-24, W-25 |
 
 ## Commits Landed (lmv repo, during this run)
 
-- `6b2a5da` pre-run commit: semantic-eval CLI + resolved_pairs capture
+| SHA | Subject |
+|-----|---------|
+| `6b2a5da` | feat: semantic-eval CLI + resolved_pairs capture + W-17/W-18/W-19 spec |
+| `ae94c4a` | data: autonomous run artifacts — Tier 1/6a/6-PRE/7 results |
+| `4d0e2c0` | docs(W-20): robustness fix spec |
+| `ce0aa80` | docs(W-21/W-22/W-20b): IfCondition semantic failure + missing datasets crash spec |
+| `259361b` | docs(W-22): revert spec — op mapping regression |
+| `a65d1cd` | fix(adapter): L-F17 walker maps IR op enum to Python operators |
+| `89afbdb` | docs(W-21): IfCondition truthy wrap spec |
+| `b496cbe` | fix(adapter): WebActivity only emits pairs for Expression properties + corpus growth |
+| `a3852ed` | data: Tier 2 full 7-context semantic-eval results + Tier 5 re-measurement |
+| `5c2c3b1` | docs(W-23/W-24/W-25): semantic cluster spec |
 
 ## Subagent Sessions Spawned
 
