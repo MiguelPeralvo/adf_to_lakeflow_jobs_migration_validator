@@ -21,6 +21,12 @@
 | [wkmigrate-fix-spec-W15-W16-join-variables.md](wkmigrate-fix-spec-W15-W16-join-variables.md) | Fix spec for W-15 (@join not supported) + W-16 (variables() not resolved) | The final 19.5% gap — fixes push adversarial rate from 80.5% to ~100% |
 | [wkmigrate-fix-spec-W17-W18-W19-semantic-bugs.md](wkmigrate-fix-spec-W17-W18-W19-semantic-bugs.md) | Fix spec for W-17 (firstRow flattening) + W-18 (missing type coercion) + W-19 (variables taskKey) | Semantic correctness bugs — expressions resolve but produce wrong Python |
 | [wkmigrate-fix-spec-issue-refs-extensibility.md](wkmigrate-fix-spec-issue-refs-extensibility.md) | Add GitHub issue reference comments to ExpressionContext enum | Documentation-only — breadcrumbs for future activity type implementers |
+| [wkmigrate-fix-spec-W20-robustness.md](wkmigrate-fix-spec-W20-robustness.md) | W-20 parse_policy and typeProperties normalization | Robustness fixes for edge cases |
+| [wkmigrate-fix-spec-W21-ifcondition-truthy-wrap.md](wkmigrate-fix-spec-W21-ifcondition-truthy-wrap.md) | W-21 IfCondition truthy wrap fix | Stop emitting right="True" for non-comparison expressions |
+| [wkmigrate-fix-spec-W22-revert-op-mapping.md](wkmigrate-fix-spec-W22-revert-op-mapping.md) | W-22 revert op mapping regression | IfConditionActivity.op must use IR enum names |
+| [wkmigrate-fix-spec-W23-W24-W25-semantic-clusters.md](wkmigrate-fix-spec-W23-W24-W25-semantic-clusters.md) | W-23/W-24/W-25 remove json.loads, integer division, extend coercion | Key semantic fixes: biggest impact on X-2 scores |
+| [wkmigrate-fix-spec-W26-if-condition-bugs.md](wkmigrate-fix-spec-W26-if-condition-bugs.md) | W-26 IfCondition string quoting and not(equals) fallback | IfCondition predicate emission fixes |
+| [wkmigrate-fix-spec-W27-missing-datetime-utility-functions.md](wkmigrate-fix-spec-W27-missing-datetime-utility-functions.md) | W-27 missing DateTime & utility functions | 11 new function emitters: dayOfWeek, ticks, guid, etc. |
 
 ## Usage Protocol
 

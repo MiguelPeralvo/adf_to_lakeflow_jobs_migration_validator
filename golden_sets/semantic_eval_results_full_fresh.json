@@ -1,0 +1,76 @@
+{
+  "context": "set_variable",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 197,
+  "total_evaluated": 197,
+  "overall_mean_score": 0.946,
+  "by_category": {
+    "collection": {
+      "count": 38,
+      "mean_score": 0.941,
+      "min_score": 0.5,
+      "max_score": 1.0
+    },
+    "datetime": {
+      "count": 13,
+      "mean_score": 0.958,
+      "min_score": 0.9,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 56,
+      "mean_score": 0.969,
+      "min_score": 0.7,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 18,
+      "mean_score": 0.964,
+      "min_score": 0.65,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 49,
+      "mean_score": 0.946,
+      "min_score": 0.75,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 23,
+      "mean_score": 0.877,
+      "min_score": 0.3,
+      "max_score": 1.0
+    }
+  },
+  "low_scoring_count": 4,
+  "low_scoring": [
+    {
+      "adf_expression": "@replace(pipeline().parameters.path, '\\\\', '/')",
+      "python_code": "str(dbutils.widgets.get('path')).replace('\\\\\\\\', '/')",
+      "category": "string",
+      "score": 0.3,
+      "reasoning": "The ADF expression replaces single backslash '\\' with '/'. In ADF, the string literal '\\\\' in the expression language represents a single backslash character. However, in the Python translation, '\\\\\\\\' (four backslashes in the source) represents two backslashes at runtime, meaning the Python code searches for a double backslash ('\\\\') rather than a single backslash ('\\').\n\nIn ADF: replace(path, '\\\\', '/') \u2014 the '\\\\' in ADF expression syntax is an escaped backslash, representing a single '\\' character at runtime.\n\nIn Python: str(...).replace('\\\\\\\\', '/') \u2014 '\\\\\\\\' in Python source is two escaped backslashes, representing '\\\\' (two backslash characters) at runtime.\n\nSo the Python code replaces double backslashes, while ADF replaces single backslashes. This is a semantic difference that would produce incorrect results for paths containing single backslashes (the common case). The str() wrapping and .replace() method usage are otherwise correct, but the backslash escaping mismatch is a significant semantic error."
+    },
+    {
+      "adf_expression": "@coalesce(trim(activity('Lookup').output.firstRow.optional_value), pipeline().parameters.defaultValue, 'fallback')",
+      "python_code": "next((v for v in [str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['optional_value']).strip(), dbutils.widgets.get('defaultValue'), 'fallback'] if v is not None), None)",
+      "category": "string",
+      "score": 0.45,
+      "reasoning": "The translation correctly maps activity output references, parameter references, trim() to .strip(), and coalesce() to the generator pattern. However, there is a critical semantic flaw: wrapping the activity output in str() before calling .strip() means that if optional_value is null/None, it becomes the string 'None' rather than remaining None. In ADF, trim(null) returns null, allowing coalesce to fall through to the next argument. In this Python translation, str(None).strip() = 'None' (a non-null string), so coalesce would incorrectly return 'None' instead of falling through to pipeline().parameters.defaultValue. This is a significant semantic difference in null handling."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')['firstRow']['path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.5,
+      "reasoning": "The translation correctly maps activity output reference, split(), and last() (as [-1]). However, the replace() call uses '\\\\\\\\' (four backslashes in source = two literal backslashes) instead of '\\\\' (two backslashes in source = one literal backslash). ADF's '\\\\' represents a single backslash, so the Python should use .replace('\\\\', '/') where '\\\\' is a Python string literal for one backslash. The translation instead replaces double-backslash sequences, which is semantically incorrect for the typical case of single backslashes in paths. This is a meaningful semantic difference that would cause incorrect behavior on standard Windows-style paths."
+    },
+    {
+      "adf_expression": "@equals(mod(add(pipeline().parameters.sequence, variables('increment')), 2), 0)",
+      "python_code": "((((lambda __wkm_p: int(__wkm_p) if __wkm_p.lstrip('-').isdigit() else float(__wkm_p))(str(dbutils.widgets.get('sequence'))) + dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')) % 2) == 0)",
+      "category": "math",
+      "score": 0.65,
+      "reasoning": "The overall structure is correct: add() maps to +, mod() maps to %, equals() maps to ==, pipeline().parameters.sequence is properly coerced via a lambda, and variables('increment') correctly uses taskValues.get(). However, the 'increment' variable value is used without numeric coercion, while ADF's add() function auto-coerces both operands. If 'increment' is stored as a string (common in ADF), the Python addition would raise a TypeError at runtime, whereas ADF would succeed. This is a meaningful semantic gap in type handling for one of the two operands."
+    }
+  ]
+}
