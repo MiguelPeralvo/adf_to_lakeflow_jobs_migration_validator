@@ -1,0 +1,79 @@
+{
+  "context": "if_condition",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 12,
+  "total_evaluated": 12,
+  "overall_mean_score": 0.542,
+  "by_category": {
+    "collection": {
+      "count": 1,
+      "mean_score": 0.6,
+      "min_score": 0.6,
+      "max_score": 0.6
+    },
+    "logical": {
+      "count": 10,
+      "mean_score": 0.555,
+      "min_score": 0.05,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 1,
+      "mean_score": 0.35,
+      "min_score": 0.35,
+      "max_score": 0.35
+    }
+  },
+  "low_scoring_count": 7,
+  "low_scoring": [
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.skipValidation, 'true'))",
+      "python_code": "(dbutils.widgets.get('skipValidation') NOT_EQUAL true)",
+      "category": "logical",
+      "score": 0.05,
+      "reasoning": "The Python translation is completely incorrect. It uses invalid Python syntax ('NOT_EQUAL' is not a Python operator, and 'true' is not valid Python - it should be 'True'). The ADF expression checks if 'skipValidation' parameter equals the string 'true', then negates that result. The correct Python translation should be something like: `not (dbutils.widgets.get('skipValidation') == 'true')`. The output is not executable Python code and does not reproduce the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.env, 'prod')",
+      "python_code": "(dbutils.widgets.get('env') == prod)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation has a critical error: 'prod' is referenced as a bare variable name `prod` instead of the string literal `'prod'`. This will cause a NameError at runtime (unless a variable named `prod` happens to exist in scope), completely breaking the semantic equivalence. The correct translation should be `(dbutils.widgets.get('env') == 'prod')`. The parameter reference mapping (`pipeline().parameters.env` \u2192 `dbutils.widgets.get('env')`) and the equality operator mapping (`@equals` \u2192 `==`) are correct, but the missing quotes around 'prod' is a fatal semantic error."
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.env, 'prod'))",
+      "python_code": "(dbutils.widgets.get('env') NOT_EQUAL prod)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation is fundamentally incorrect. The ADF expression @not(equals(pipeline().parameters.env, 'prod')) should evaluate to a boolean: it checks if the 'env' parameter equals 'prod' and then negates that result. The correct Python equivalent would be something like: not (dbutils.widgets.get('env') == 'prod'). The output '(dbutils.widgets.get('env') NOT_EQUAL prod)' is not valid Python syntax at all \u2014 'NOT_EQUAL' is not a Python operator, and 'prod' is an unquoted string (which would be treated as a variable name, not the string literal 'prod'). This translation would cause a NameError or SyntaxError at runtime and does not preserve the semantics of the original ADF expression."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.status, 'complete')",
+      "python_code": "(dbutils.widgets.get('status') == complete)",
+      "category": "logical",
+      "score": 0.1,
+      "reasoning": "The Python translation has a critical error: 'complete' is missing its string quotes, making it a variable reference rather than a string literal. This would cause a NameError at runtime (unless a variable named 'complete' happens to exist). The correct translation should be `(dbutils.widgets.get('status') == 'complete')`. The parameter reference mapping (pipeline().parameters.status \u2192 dbutils.widgets.get('status')) is correct, and the equality operator mapping (@equals \u2192 ==) is correct, but the missing quotes around 'complete' fundamentally breaks the semantic equivalence."
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.mode, 'incremental')",
+      "python_code": "(dbutils.widgets.get('mode') == incremental)",
+      "category": "logical",
+      "score": 0.2,
+      "reasoning": "The Python translation has a critical error: 'incremental' is treated as a variable name (no quotes) rather than a string literal. In the ADF expression, 'incremental' is a string constant, so the Python equivalent should be `(dbutils.widgets.get('mode') == 'incremental')`. Without the quotes, Python will attempt to evaluate `incremental` as a variable reference, which will raise a NameError at runtime unless such a variable happens to exist in scope. This is a semantic difference that changes runtime behaviour from a boolean comparison to a potential exception."
+    },
+    {
+      "adf_expression": "@equals(mod(add(pipeline().parameters.sequence, variables('increment')), 2), 0)",
+      "python_code": "((((lambda __wkm_p: int(__wkm_p) if __wkm_p.lstrip('-').isdigit() else float(__wkm_p))(str(dbutils.widgets.get('sequence'))) + dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')) % 2) == 0)",
+      "category": "math",
+      "score": 0.35,
+      "reasoning": "The Python translation has a significant semantic error: `variables('increment')` (ADF pipeline variable) is mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')`, which is a Databricks Jobs task value \u2014 a fundamentally different concept. The task key 'set_variable_increment' is invented and not derivable from the ADF expression. Additionally, no numeric coercion is applied to the increment value from task values, while the sequence parameter gets coercion. The modulo and equality comparison logic (`% 2) == 0`) is correctly implemented, and the parameter handling for `sequence` is reasonable, but the variable mapping is a core semantic difference that would produce incorrect behavior in most scenarios."
+    },
+    {
+      "adf_expression": "@equals(first(split(activity('Lookup').output.firstRow.status_list, ',')), pipeline().parameters.expectedStatus)",
+      "python_code": "((str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['status_list']).split(','))[0] == dbutils.widgets.get('expectedStatus'))",
+      "category": "collection",
+      "score": 0.6,
+      "reasoning": "The translation preserves the core logic: split on comma, get first element, compare with parameter. However, there are several issues: (1) The activity output access uses `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))` which assumes a specific key name 'result' that may not match the actual migration convention; (2) No null/empty array guard \u2014 ADF's `first()` returns null on empty arrays while Python `[0]` raises IndexError; (3) The `str()` wrapping before split is appropriate for type coercion; (4) The `equals()` \u2192 `==` mapping is correct but ADF's equals handles null comparisons differently than Python's `==`. The overall structure is partially correct but the activity output access pattern introduces uncertainty about semantic equivalence."
+    }
+  ]
+}

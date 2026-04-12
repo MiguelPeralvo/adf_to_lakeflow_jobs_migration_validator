@@ -310,20 +310,17 @@ def _extract_resolved_expression_pairs(
                 code = _coerce_resolved_value(prop_value)
                 if code is None:
                     continue
-                adf = _source_expression_at(source_activity, prop_name) or f"@web('{task_name}').{prop_name}"
+                adf = _source_expression_at(source_activity, prop_name)
+                if adf is None:
+                    continue
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=code))
             # headers can be: dict[str, Any | ResolvedExpression], a single
             # ResolvedExpression covering the whole dict, or None.
             headers_code = _coerce_resolved_value(task.headers)
             if headers_code is not None:
-                pairs.append(
-                    ExpressionPair(
-                        adf_expression=(
-                            _source_expression_at(source_activity, "headers") or f"@web('{task_name}').headers"
-                        ),
-                        python_code=headers_code,
-                    )
-                )
+                headers_adf = _source_expression_at(source_activity, "headers")
+                if headers_adf is not None:
+                    pairs.append(ExpressionPair(adf_expression=headers_adf, python_code=headers_code))
             elif isinstance(task.headers, dict):
                 for header_name, header_value in task.headers.items():
                     code = _coerce_resolved_value(header_value)

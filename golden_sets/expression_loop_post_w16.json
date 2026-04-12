@@ -1,5 +1,5 @@
 {
-  "count": 200,
+  "count": 210,
   "source": "adversarial_expression_loop",
   "expressions": [
     {
@@ -2410,6 +2410,120 @@
         },
         {
           "name": "root",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.env, 'prod')",
+      "category": "logical",
+      "difficulty": "simple",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@greater(int(pipeline().parameters.threshold), 50)",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "threshold",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@less(int(pipeline().parameters.retryCount), 5)",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "retryCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.env, 'prod'))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "env",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.status, 'complete')",
+      "category": "logical",
+      "difficulty": "simple",
+      "referenced_params": [
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@greater(int(pipeline().parameters.batchSize), 100)",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "batchSize",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@less(int(pipeline().parameters.attempt), int(pipeline().parameters.maxRetries))",
+      "category": "logical",
+      "difficulty": "complex",
+      "referenced_params": [
+        {
+          "name": "attempt",
+          "type": "String"
+        },
+        {
+          "name": "maxRetries",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.mode, 'incremental')",
+      "category": "logical",
+      "difficulty": "simple",
+      "referenced_params": [
+        {
+          "name": "mode",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@greater(int(pipeline().parameters.recordCount), 0)",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "recordCount",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.skipValidation, 'true'))",
+      "category": "logical",
+      "difficulty": "moderate",
+      "referenced_params": [
+        {
+          "name": "skipValidation",
           "type": "String"
         }
       ]
