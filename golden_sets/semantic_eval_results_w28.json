@@ -1,0 +1,47 @@
+{
+  "context": "set_variable",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 197,
+  "total_evaluated": 197,
+  "overall_mean_score": 0.944,
+  "by_category": {
+    "collection": {
+      "count": 38,
+      "mean_score": 0.943,
+      "min_score": 0.85,
+      "max_score": 1.0
+    },
+    "datetime": {
+      "count": 13,
+      "mean_score": 0.948,
+      "min_score": 0.85,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 56,
+      "mean_score": 0.961,
+      "min_score": 0.82,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 18,
+      "mean_score": 0.983,
+      "min_score": 0.85,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 49,
+      "mean_score": 0.923,
+      "min_score": 0.82,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 23,
+      "mean_score": 0.916,
+      "min_score": 0.8,
+      "max_score": 1.0
+    }
+  },
+  "low_scoring_count": 0,
+  "low_scoring": []
+}
