@@ -1,0 +1,188 @@
+{
+  "context": "if_condition",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 190,
+  "total_evaluated": 190,
+  "overall_mean_score": 0.157,
+  "by_category": {
+    "collection": {
+      "count": 40,
+      "mean_score": 0.11,
+      "min_score": 0.0,
+      "max_score": 0.3
+    },
+    "datetime": {
+      "count": 25,
+      "mean_score": 0.106,
+      "min_score": 0.1,
+      "max_score": 0.2
+    },
+    "logical": {
+      "count": 35,
+      "mean_score": 0.297,
+      "min_score": 0.1,
+      "max_score": 0.6
+    },
+    "math": {
+      "count": 26,
+      "mean_score": 0.115,
+      "min_score": 0.1,
+      "max_score": 0.3
+    },
+    "nested": {
+      "count": 51,
+      "mean_score": 0.154,
+      "min_score": 0.1,
+      "max_score": 0.35
+    },
+    "string": {
+      "count": 13,
+      "mean_score": 0.115,
+      "min_score": 0.1,
+      "max_score": 0.2
+    }
+  },
+  "low_scoring_count": 190,
+  "low_scoring": [
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.file_name, '.csv', ''), '_'))",
+      "python_code": "((str(str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['file_name']).replace('.csv', '')).split('_'))[-1] EQUAL_TO True)",
+      "category": "collection",
+      "score": 0.0,
+      "reasoning": "The Python translation is fundamentally broken and does not reproduce the ADF expression's behaviour. Key issues: 1) The expression ends with `EQUAL_TO True` which is syntactically invalid Python and semantically nonsensical \u2014 there is no comparison in the original ADF expression. 2) The ADF `last()` function should map to `[-1]` indexing on the split result, but the overall structure wraps this in a comparison that doesn't exist in the original. 3) The use of `dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')` with JSON parsing is a reasonable approach for activity output, but the `['firstRow']['file_name']` access pattern may not match the actual structure. 4) The `str(str(...).replace(...)).split('_')` nesting is overly verbose but functionally acceptable for the split/replace part. However, the `EQUAL_TO True` at the end makes this completely invalid Python syntax and changes the semantics entirely \u2014 instead of returning the last element of the split array, it would attempt a boolean comparison (and fail to even parse). The core logic of getting the last element after split is partially there, but the invalid `EQUAL_TO True` suffix makes the entire expression non-functional."
+    },
+    {
+      "adf_expression": "@first(split(activity('Lookup').output.firstRow.csv_values, ','))",
+      "python_code": "((str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['csv_values']).split(','))[0] EQUAL_TO True)",
+      "category": "collection",
+      "score": 0.0,
+      "reasoning": "The Python translation is fundamentally incorrect in multiple ways: (1) It appends '== True' (shown as 'EQUAL_TO True') to the result of indexing the split array, which completely changes the semantics from returning the first element to returning a boolean comparison. (2) The ADF expression simply returns the first element of the split array, but the Python wraps it in a boolean equality check against True, which would return True/False instead of the actual string value. (3) While the activity output access pattern using taskValues.get and json.loads is a reasonable approach, the overall expression is broken by the spurious equality comparison. (4) The str() wrapping before split is unnecessary but acceptable; however the final '== True' comparison makes this semantically incorrect - it would return True if the first element is the string 'True', and False otherwise, rather than returning the actual first CSV value."
+    },
+    {
+      "adf_expression": "@last(split(activity('Lookup').output.firstRow.full_path, '/'))",
+      "python_code": "((str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['full_path']).split('/'))[-1] EQUAL_TO True)",
+      "category": "collection",
+      "score": 0.0,
+      "reasoning": "The Python translation is fundamentally incorrect in multiple ways: 1) The `EQUAL_TO True` suffix is nonsensical and syntactically invalid Python - it appears to be a corrupted artifact that has no equivalent in the ADF expression. 2) The ADF `@last()` function returns the last element of an array, which in Python would correctly be `[-1]` indexing, but the overall expression is wrapped in a comparison that completely changes the semantics. 3) The activity output access pattern using `dbutils.jobs.taskValues.get()` with JSON parsing may be a reasonable approximation for activity outputs in Databricks, but the final `EQUAL_TO True` makes the entire expression return a boolean comparison result rather than the last path segment string. 4) The expression as written is not valid Python syntax due to `EQUAL_TO`. The core logic of splitting and getting the last element is partially present, but the `EQUAL_TO True` corruption makes this completely non-functional and semantically wrong."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation appends '` EQUAL_TO True`' at the end of the expression, which fundamentally changes the semantics. Instead of returning a concatenated string (e.g., '2024-01-01/prod'), the expression now compares that string to `True` using some `EQUAL_TO` operator, returning a boolean or raising an error. The core concat logic (using `_wkmigrate_format_datetime`, `_wkmigrate_utc_now`, and `dbutils.widgets.get('env')`) is correctly translated, but the appended `EQUAL_TO True` makes the entire expression semantically incorrect \u2014 it no longer returns the concatenated string value that the ADF expression produces."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which completely changes the semantics of the expression. Instead of returning a concatenated string (e.g., 'mycontainer/2024/01/15'), the expression now performs a comparison with True, returning a boolean value. The core concatenation logic itself (str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd'))) is correct and would score well on its own, but the appended 'EQUAL_TO True' comparison fundamentally alters the return type and value from a string to a boolean, making this translation semantically incorrect at runtime."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' suffix appended to the otherwise correct concat expression. This changes the semantics entirely: instead of returning a concatenated string, the expression would attempt to compare the string to True (or is syntactically invalid Python). The core concat logic (using _wkmigrate_format_datetime, _wkmigrate_utc_now, str() coercions, and dbutils.widgets.get('env')) is correct and matches the reference example, but the appended 'EQUAL_TO True' makes the output semantically incorrect and likely a syntax/runtime error. This is a critical flaw that prevents the expression from reproducing the ADF behaviour."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which is not part of the original ADF expression at all. The original expression is a simple string concatenation of three parts: the container parameter, a '/' separator, and a formatted datetime. While the core concatenation logic (str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd'))) is correct and would score highly on its own, the 'EQUAL_TO True' comparison completely changes the semantics \u2014 it turns a string concatenation expression into a boolean comparison expression. The result would be True or False (a boolean) rather than a string path like 'mycontainer/2024/01/15'. This is a fundamental semantic difference that makes the output incorrect."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation appends '` EQUAL_TO True`' at the end, which is syntactically invalid Python and completely changes the semantics of the expression. Instead of returning a concatenated string, it attempts a comparison with `True`, which would either be a syntax error or produce a boolean result rather than the expected string. The core concat logic (using `str()` wrappers and `_wkmigrate_format_datetime`/`_wkmigrate_utc_now` helpers and `dbutils.widgets.get('env')`) is correct, but the spurious `EQUAL_TO True` suffix makes the output semantically incorrect and non-functional."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which is not part of the original ADF expression. The original expression is simply a string concatenation of three parts: the container parameter, '/', and a formatted datetime. While the individual components (dbutils.widgets.get('container'), str('/'), _wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) are correctly translated, the entire expression is wrapped in a comparison with True ('EQUAL_TO True'), which fundamentally changes the semantics. Instead of returning a concatenated string, this would return a boolean value. This is a major semantic difference that completely alters the runtime behavior of the expression."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'), ':', '-'), '/', activity('Lookup').output.firstRow.partition_key)",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-ddTHH:mm:ss')).replace(':', '-')) + str('/') + str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['partition_key']) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation has a critical semantic error: it appends '`EQUAL_TO True`' at the end of the expression, which is completely wrong and would cause a syntax error or change the semantics entirely. The expression should be a string concatenation result, not a boolean comparison. The core concatenation logic is partially correct (container parameter, date formatting with replace, activity output), but the spurious 'EQUAL_TO True' appended makes the output incorrect as Python code. Additionally, the activity output access pattern using `json.loads(dbutils.jobs.taskValues.get(...))` is a reasonable mapping for ADF activity output, and the format datetime/utcNow helper functions are properly used. The replace(':','-') is correctly applied to the formatted datetime string. However, the fatal 'EQUAL_TO True' suffix renders the entire expression semantically broken."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' appended to the end of the expression. This fundamentally changes the semantics: instead of producing a concatenated string (e.g., '2024-01-01/prod'), the expression now compares that string to True, which in Python would evaluate to False (since a non-empty string is not equal to the boolean True). The core concat logic (using _wkmigrate_format_datetime, _wkmigrate_utc_now, str() coercions, and dbutils.widgets.get('env')) is correctly translated, but the 'EQUAL_TO True' suffix makes the overall expression semantically incorrect \u2014 it returns a boolean instead of a string."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which is completely wrong and not part of the original ADF expression. The original expression is simply a string concatenation of three parts: the container parameter, '/', and a formatted datetime. While the individual components (dbutils.widgets.get('container'), str('/'), _wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) are correctly translated, the appended 'EQUAL_TO True' comparison fundamentally changes the semantics \u2014 it would turn a string concatenation result into a boolean comparison, producing True or False instead of the expected string. This is a major semantic error that completely breaks the runtime behaviour of the expression."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' appended to the end of the expression. This fundamentally changes the semantics: instead of returning a concatenated string (e.g., '2024-01-01/prod'), the expression now compares that string to True using some 'EQUAL_TO' operator, which would return a boolean (or raise an error). The core concat/format/utcNow/parameter logic is correctly translated (matching the 0.95-score example), but the appended 'EQUAL_TO True' completely breaks the runtime behaviour by changing the return type from string to boolean/comparison result. This is a critical semantic error that makes the output incorrect for the intended purpose."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends `EQUAL_TO True` at the end, which is not part of the original ADF expression at all. The original expression is a simple string concatenation of three parts: the container parameter, a '/' separator, and a formatted datetime. While the core concatenation logic (str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd'))) is correct and would score highly on its own, the appended `EQUAL_TO True` comparison fundamentally changes the semantics \u2014 it would either cause a runtime error (if EQUAL_TO is not defined) or return a boolean True/False instead of the expected string. This is a severe semantic difference that makes the output incorrect as written."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' suffix appended to the otherwise correct concat expression. This is syntactically invalid Python and fundamentally changes the semantics \u2014 instead of returning the concatenated string, it would either raise a SyntaxError or (if EQUAL_TO were somehow defined) return a boolean comparison result. The core concat/formatDateTime/utcNow/parameter logic is correctly translated (matching the 0.95-score example), but the appended 'EQUAL_TO True' makes the output semantically incorrect and non-functional, warranting a very low score."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which is completely wrong and not part of the original ADF expression. The original expression is simply a string concatenation of three parts: the container parameter, '/', and a formatted datetime. While the individual components (dbutils.widgets.get('container'), str('/'), _wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) are correctly translated, the addition of 'EQUAL_TO True' fundamentally changes the semantics \u2014 it turns a string concatenation into a boolean comparison, which would produce a completely different result (a boolean True/False instead of a string path). This is a severe semantic error that makes the output incorrect."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' appended to the expression. This changes the semantics entirely: instead of returning the concatenated string (e.g., '2024-01-01/prod'), the expression now attempts a comparison with True (or uses some undefined EQUAL_TO operator), which would either raise an error or return a boolean. The core concat/formatDateTime/utcNow/parameter logic is correctly translated (matching the 0.95-score example), but the appended 'EQUAL_TO True' fundamentally breaks the runtime behaviour, making the output incorrect."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "(str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a critical semantic error: it appends 'EQUAL_TO True' at the end, which is not part of the original ADF expression at all. The original expression is simply a string concatenation of three parts: the container parameter, a '/' separator, and a formatted datetime. While the core concatenation logic (str(dbutils.widgets.get('container')) + str('/') + str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy/MM/dd'))) is correctly translated, the appended 'EQUAL_TO True' completely changes the semantics \u2014 it would cause a syntax error or produce a boolean comparison result rather than a string. This makes the translation fundamentally broken and non-equivalent to the original ADF expression."
+    },
+    {
+      "adf_expression": "@formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ')",
+      "python_code": "(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-ddTHH:mm:ssZ') EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation is fundamentally incorrect. The original ADF expression `@formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ')` should simply return a formatted datetime string. The correct Python translation would be `_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-ddTHH:mm:ssZ')`. Instead, the output wraps this in a comparison `(...) EQUAL_TO True`, which is not valid Python syntax and completely changes the semantics \u2014 it would attempt to compare the formatted datetime string to a boolean `True` rather than returning the formatted string. The function mapping itself (`_wkmigrate_format_datetime` and `_wkmigrate_utc_now`) appears correct, but the surrounding `EQUAL_TO True` comparison makes the entire expression semantically wrong and syntactically invalid Python."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "(str(_wkmigrate_format_datetime(_wkmigrate_utc_now(), 'yyyy-MM-dd')) + str('/') + str(dbutils.widgets.get('env')) EQUAL_TO True)",
+      "category": "datetime",
+      "score": 0.1,
+      "reasoning": "The Python translation contains a spurious '... EQUAL_TO True' appended to the end of the expression. This fundamentally changes the semantics: instead of returning a concatenated string (e.g., '2024-01-01/prod'), the expression now compares that string to True using some 'EQUAL_TO' operator, which would return a boolean (or raise an error). The core concat logic (using _wkmigrate_format_datetime, _wkmigrate_utc_now, str() coercions, and dbutils.widgets.get('env')) is correctly translated, but the appended 'EQUAL_TO True' makes the entire expression semantically incorrect \u2014 it no longer returns a string but instead a boolean comparison result. This is a critical semantic difference that breaks the intended behavior."
+    }
+  ]
+}

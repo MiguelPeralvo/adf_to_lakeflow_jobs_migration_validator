@@ -1,0 +1,188 @@
+{
+  "context": "web_body",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 400,
+  "total_evaluated": 400,
+  "overall_mean_score": 0.406,
+  "by_category": {
+    "collection": {
+      "count": 80,
+      "mean_score": 0.388,
+      "min_score": 0.0,
+      "max_score": 0.95
+    },
+    "datetime": {
+      "count": 50,
+      "mean_score": 0.487,
+      "min_score": 0.0,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 70,
+      "mean_score": 0.437,
+      "min_score": 0.0,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 52,
+      "mean_score": 0.412,
+      "min_score": 0.0,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 102,
+      "mean_score": 0.42,
+      "min_score": 0.0,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 46,
+      "mean_score": 0.263,
+      "min_score": 0.0,
+      "max_score": 0.88
+    }
+  },
+  "low_scoring_count": 242,
+  "low_scoring": [
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a formatted current UTC date (in 'yyyy-MM-dd' format) with '/' and the 'env' pipeline parameter. The Python output does not implement any of the required logic: no utcNow() equivalent, no formatDateTime() equivalent, no parameter reference to 'env', and no string concatenation. This is completely incorrect and does not reproduce the ADF expression's behaviour in any way."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter 'container', a literal '/', and a formatted current UTC datetime. The Python output does not reference dbutils.widgets.get('container'), does not call any datetime/utcNow function, does not perform any string formatting, and does not perform any concatenation. It is completely incorrect and does not reproduce any part of the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates the current UTC date formatted as 'yyyy-MM-dd', a '/' separator, and the 'env' pipeline parameter. The Python output does not implement any of the required logic: no date formatting, no utcNow() equivalent, no parameter reference, and no string concatenation. This is completely incorrect."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted current UTC datetime. The Python output does not reference any pipeline parameters, does not call any datetime functions, performs no string concatenation, and is completely static. This is entirely incorrect and does not reproduce any aspect of the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string with no relation to the ADF expression. The ADF expression dynamically concatenates a formatted current UTC date (in 'yyyy-MM-dd' format) with '/' and the pipeline parameter 'env'. The translation completely ignores all dynamic components: utcNow(), formatDateTime(), the '/' separator, and pipeline().parameters.env. There is zero semantic equivalence between the output and the original ADF expression."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted current UTC datetime (yyyy/MM/dd format). The Python output does not reference any pipeline parameters, does not call any datetime functions, does not perform any string concatenation, and does not preserve any of the semantic logic of the original expression. This is completely incorrect."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'), ':', '-'), '/', activity('Lookup').output.firstRow.partition_key)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string and bears no relationship to the ADF expression. The ADF expression is a dynamic concat operation that combines: (1) a pipeline parameter 'container' via dbutils.widgets.get('container'), (2) a literal '/', (3) a formatted UTC timestamp with colons replaced by dashes, (4) another literal '/', and (5) an activity output value from 'Lookup'. The Python output does not implement any of these operations \u2014 no parameter references, no datetime formatting, no string replacement, no activity output reference, and no concatenation logic. This is completely incorrect."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The original expression dynamically concatenates the current UTC date formatted as 'yyyy-MM-dd', a literal '/', and the pipeline parameter 'env'. The translation does not call any date/time functions, does not reference any parameters, and does not perform any string concatenation. It is completely incorrect and does not reproduce the ADF expression's behaviour in any way."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string and bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted current UTC datetime (yyyy/MM/dd format). The translation completely ignores all dynamic components: the pipeline parameter reference, the utcNow() call, the formatDateTime() call, and the concat() operation. This is entirely incorrect and does not reproduce any of the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.basePath, '/', replace(formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ss'),'T','/'), '/', toLower(trim(pipeline().parameters.env)))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string, not a Python expression that reproduces the ADF expression's behaviour. The ADF expression is a dynamic concat that combines pipeline parameters, a formatted/replaced datetime, and a lowercased/trimmed environment parameter. The output completely ignores all dynamic logic: no parameter references (basePath, env), no utcNow() call, no formatDateTime, no replace of 'T' with '/', no toLower/trim operations. This is entirely incorrect and has zero semantic equivalence with the original ADF expression."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string with no relationship to the ADF expression. The ADF expression dynamically concatenates the current UTC date formatted as 'yyyy-MM-dd', a '/' separator, and the 'env' pipeline parameter. The Python output does not call any date/time functions, does not reference any parameters, and does not perform any string concatenation. It is completely incorrect and bears no semantic equivalence to the original ADF expression."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted current UTC datetime (formatted as 'yyyy/MM/dd'). The translation completely ignores: (1) the pipeline().parameters.container reference which should map to dbutils.widgets.get('container'), (2) the utcNow() call which should map to a UTC time function, (3) the formatDateTime() call which should format the datetime, and (4) the concat() function which should string-concatenate all parts. The output is entirely incorrect and does not reproduce any of the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.basePath, '/', formatDateTime(utcNow(),'yyyy'), '/', formatDateTime(utcNow(),'MM'), '/', formatDateTime(utcNow(),'dd'), '/', toLower(pipeline().parameters.env))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string literal, not a Python code translation of the ADF expression. It does not preserve any of the semantics of the original ADF expression, which dynamically constructs a path by concatenating: a basePath parameter, '/', the current year, '/', the current month, '/', the current day, '/', and a lowercased env parameter. There is no parameter reference handling (dbutils.widgets.get()), no datetime formatting (_wkmigrate_format_datetime/_wkmigrate_utc_now()), no toLower/lower() call, and no string concatenation logic whatsoever. The output is completely incorrect."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a formatted current UTC date (in 'yyyy-MM-dd' format) with a '/' separator and the 'env' pipeline parameter. The translation completely fails to reproduce any of the logic: no utcNow() call, no formatDateTime(), no parameter reference, no concatenation. This is entirely incorrect."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter 'container', a '/' separator, and a formatted current UTC datetime (formatted as 'yyyy/MM/dd'). The Python output does not reference any pipeline parameters, does not call any datetime functions, does not perform any string concatenation, and is simply a static string literal. This is completely incorrect and does not reproduce the ADF expression's behaviour in any way."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates the current UTC date formatted as 'yyyy-MM-dd', a '/' separator, and the 'env' pipeline parameter. The Python output does not implement any of these operations: no datetime formatting, no utcNow() equivalent, no parameter reference, and no string concatenation logic. This is completely incorrect and does not reproduce the ADF expression's behaviour in any way."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string and bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted UTC datetime. The Python output does not reference dbutils.widgets.get('container'), does not call any datetime formatting function, and does not perform any string concatenation. This is completely incorrect and does not reproduce the ADF expression's behaviour in any way."
+    },
+    {
+      "adf_expression": "@formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ')",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is completely unrelated to the ADF expression '@formatDateTime(utcNow(),'yyyy-MM-ddTHH:mm:ssZ')'. The ADF expression formats the current UTC timestamp into an ISO 8601 string format. The Python output is a URL string literal that does not perform any datetime formatting, does not call utcNow() or any equivalent, and does not apply any format pattern. There is zero semantic equivalence between the two."
+    },
+    {
+      "adf_expression": "@concat(formatDateTime(utcNow(),'yyyy-MM-dd'), '/', pipeline().parameters.env)",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The original expression dynamically concatenates the current UTC date formatted as 'yyyy-MM-dd', a '/' separator, and the 'env' pipeline parameter. The translation completely ignores all dynamic components: utcNow(), formatDateTime(), the '/' literal, and pipeline().parameters.env. This is entirely incorrect and does not reproduce any of the ADF expression's behaviour."
+    },
+    {
+      "adf_expression": "@concat(pipeline().parameters.container, '/', formatDateTime(utcNow(), 'yyyy/MM/dd'))",
+      "python_code": "https://example.com/api",
+      "category": "datetime",
+      "score": 0.0,
+      "reasoning": "The Python translation 'https://example.com/api' is a hardcoded URL string that bears no relationship to the ADF expression. The ADF expression dynamically concatenates a pipeline parameter (container), a '/' separator, and a formatted current UTC datetime. The Python output does not reference any pipeline parameters, does not call any datetime functions, does not perform any string concatenation, and does not reproduce any of the logic in the original expression. This is completely incorrect."
+    }
+  ]
+}

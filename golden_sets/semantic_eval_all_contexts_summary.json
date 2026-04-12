@@ -1,0 +1,271 @@
+{
+  "by_context_overall": {
+    "copy_query": 0.808,
+    "if_condition": 0.157,
+    "lookup_query": 0.812,
+    "notebook_base_param": 0.81,
+    "set_variable": 0.808,
+    "web_body": 0.406
+  },
+  "results": {
+    "copy_query": {
+      "by_category": {
+        "collection": {
+          "count": 40,
+          "max_score": 0.95,
+          "mean_score": 0.766,
+          "min_score": 0.3
+        },
+        "datetime": {
+          "count": 25,
+          "max_score": 1.0,
+          "mean_score": 0.97,
+          "min_score": 0.95
+        },
+        "logical": {
+          "count": 35,
+          "max_score": 1.0,
+          "mean_score": 0.87,
+          "min_score": 0.4
+        },
+        "math": {
+          "count": 26,
+          "max_score": 1.0,
+          "mean_score": 0.841,
+          "min_score": 0.35
+        },
+        "nested": {
+          "count": 51,
+          "max_score": 1.0,
+          "mean_score": 0.83,
+          "min_score": 0.3
+        },
+        "string": {
+          "count": 23,
+          "max_score": 0.88,
+          "mean_score": 0.525,
+          "min_score": 0.3
+        }
+      },
+      "low_scoring_count": 38,
+      "overall": 0.808,
+      "total_evaluated": 200
+    },
+    "if_condition": {
+      "by_category": {
+        "collection": {
+          "count": 40,
+          "max_score": 0.3,
+          "mean_score": 0.11,
+          "min_score": 0.0
+        },
+        "datetime": {
+          "count": 25,
+          "max_score": 0.2,
+          "mean_score": 0.106,
+          "min_score": 0.1
+        },
+        "logical": {
+          "count": 35,
+          "max_score": 0.6,
+          "mean_score": 0.297,
+          "min_score": 0.1
+        },
+        "math": {
+          "count": 26,
+          "max_score": 0.3,
+          "mean_score": 0.115,
+          "min_score": 0.1
+        },
+        "nested": {
+          "count": 51,
+          "max_score": 0.35,
+          "mean_score": 0.154,
+          "min_score": 0.1
+        },
+        "string": {
+          "count": 13,
+          "max_score": 0.2,
+          "mean_score": 0.115,
+          "min_score": 0.1
+        }
+      },
+      "low_scoring_count": 190,
+      "overall": 0.157,
+      "total_evaluated": 190
+    },
+    "lookup_query": {
+      "by_category": {
+        "collection": {
+          "count": 40,
+          "max_score": 0.95,
+          "mean_score": 0.786,
+          "min_score": 0.45
+        },
+        "datetime": {
+          "count": 25,
+          "max_score": 1.0,
+          "mean_score": 0.97,
+          "min_score": 0.95
+        },
+        "logical": {
+          "count": 35,
+          "max_score": 1.0,
+          "mean_score": 0.862,
+          "min_score": 0.3
+        },
+        "math": {
+          "count": 26,
+          "max_score": 1.0,
+          "mean_score": 0.81,
+          "min_score": 0.35
+        },
+        "nested": {
+          "count": 51,
+          "max_score": 1.0,
+          "mean_score": 0.846,
+          "min_score": 0.3
+        },
+        "string": {
+          "count": 23,
+          "max_score": 0.88,
+          "mean_score": 0.531,
+          "min_score": 0.3
+        }
+      },
+      "low_scoring_count": 36,
+      "overall": 0.812,
+      "total_evaluated": 200
+    },
+    "notebook_base_param": {
+      "by_category": {
+        "collection": {
+          "count": 40,
+          "max_score": 0.95,
+          "mean_score": 0.763,
+          "min_score": 0.3
+        },
+        "datetime": {
+          "count": 25,
+          "max_score": 1.0,
+          "mean_score": 0.974,
+          "min_score": 0.95
+        },
+        "logical": {
+          "count": 35,
+          "max_score": 1.0,
+          "mean_score": 0.873,
+          "min_score": 0.3
+        },
+        "math": {
+          "count": 26,
+          "max_score": 1.0,
+          "mean_score": 0.83,
+          "min_score": 0.35
+        },
+        "nested": {
+          "count": 51,
+          "max_score": 1.0,
+          "mean_score": 0.838,
+          "min_score": 0.3
+        },
+        "string": {
+          "count": 23,
+          "max_score": 0.9,
+          "mean_score": 0.53,
+          "min_score": 0.3
+        }
+      },
+      "low_scoring_count": 41,
+      "overall": 0.81,
+      "total_evaluated": 200
+    },
+    "set_variable": {
+      "by_category": {
+        "collection": {
+          "count": 40,
+          "max_score": 0.95,
+          "mean_score": 0.779,
+          "min_score": 0.45
+        },
+        "datetime": {
+          "count": 25,
+          "max_score": 1.0,
+          "mean_score": 0.974,
+          "min_score": 0.95
+        },
+        "logical": {
+          "count": 35,
+          "max_score": 1.0,
+          "mean_score": 0.863,
+          "min_score": 0.3
+        },
+        "math": {
+          "count": 26,
+          "max_score": 1.0,
+          "mean_score": 0.821,
+          "min_score": 0.4
+        },
+        "nested": {
+          "count": 51,
+          "max_score": 1.0,
+          "mean_score": 0.836,
+          "min_score": 0.3
+        },
+        "string": {
+          "count": 23,
+          "max_score": 0.92,
+          "mean_score": 0.516,
+          "min_score": 0.3
+        }
+      },
+      "low_scoring_count": 40,
+      "overall": 0.808,
+      "total_evaluated": 200
+    },
+    "web_body": {
+      "by_category": {
+        "collection": {
+          "count": 80,
+          "max_score": 0.95,
+          "mean_score": 0.388,
+          "min_score": 0.0
+        },
+        "datetime": {
+          "count": 50,
+          "max_score": 1.0,
+          "mean_score": 0.487,
+          "min_score": 0.0
+        },
+        "logical": {
+          "count": 70,
+          "max_score": 1.0,
+          "mean_score": 0.437,
+          "min_score": 0.0
+        },
+        "math": {
+          "count": 52,
+          "max_score": 1.0,
+          "mean_score": 0.412,
+          "min_score": 0.0
+        },
+        "nested": {
+          "count": 102,
+          "max_score": 1.0,
+          "mean_score": 0.42,
+          "min_score": 0.0
+        },
+        "string": {
+          "count": 46,
+          "max_score": 0.88,
+          "mean_score": 0.263,
+          "min_score": 0.0
+        }
+      },
+      "low_scoring_count": 242,
+      "overall": 0.406,
+      "total_evaluated": 400
+    }
+  },
+  "tier": "Tier 2: 7-context semantic-eval summary"
+}

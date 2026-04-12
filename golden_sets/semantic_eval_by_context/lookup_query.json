@@ -1,0 +1,188 @@
+{
+  "context": "lookup_query",
+  "model": "databricks-claude-sonnet-4-6",
+  "total_resolved": 200,
+  "total_evaluated": 200,
+  "overall_mean_score": 0.812,
+  "by_category": {
+    "collection": {
+      "count": 40,
+      "mean_score": 0.786,
+      "min_score": 0.45,
+      "max_score": 0.95
+    },
+    "datetime": {
+      "count": 25,
+      "mean_score": 0.97,
+      "min_score": 0.95,
+      "max_score": 1.0
+    },
+    "logical": {
+      "count": 35,
+      "mean_score": 0.862,
+      "min_score": 0.3,
+      "max_score": 1.0
+    },
+    "math": {
+      "count": 26,
+      "mean_score": 0.81,
+      "min_score": 0.35,
+      "max_score": 1.0
+    },
+    "nested": {
+      "count": 51,
+      "mean_score": 0.846,
+      "min_score": 0.3,
+      "max_score": 1.0
+    },
+    "string": {
+      "count": 23,
+      "mean_score": 0.531,
+      "min_score": 0.3,
+      "max_score": 0.88
+    }
+  },
+  "low_scoring_count": 36,
+  "low_scoring": [
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue, variables('fallback'))",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.widgets.get('defaultValue'), dbutils.jobs.taskValues.get(taskKey='set_variable_fallback', key='fallback')] if v is not None), None)",
+      "category": "logical",
+      "score": 0.3,
+      "reasoning": "The Python translation preserves the overall coalesce pattern (next with a generator filtering None values) correctly. However, there are several semantic issues:\n\n1. **Activity output access**: `activity('Lookup').output.firstRow.optional_value` is translated as `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']`. The ADF activity output is accessed via `.output.firstRow.optional_value`, but the translation assumes the task value key is 'result' and wraps it with `json.loads()`. This is an assumption that may not hold \u2014 the key could be different, and the value may already be a dict rather than a JSON string. Also, if `optional_value` doesn't exist in the dict, this will raise a `KeyError` rather than returning `None` as ADF would.\n\n2. **Variable access**: `variables('fallback')` is translated as `dbutils.jobs.taskValues.get(taskKey='set_variable_fallback', key='fallback')`. ADF pipeline variables are internal state, not task values. The mapping to `dbutils.jobs.taskValues.get(taskKey='set_variable_fallback', key='fallback')` is a non-standard interpretation. A more appropriate mapping might use a local Python variable or a different mechanism. The `taskKey='set_variable_fallback'` is entirely invented and not derivable from the original expression.\n\n3. **Error handling**: If `optional_value` key is missing from the dict, Python raises `KeyError` instead of returning `None` (which ADF would do gracefully for missing properties).\n\nThe coalesce structure is correctly implemented, but the data access patterns for activity outputs and variables have significant semantic differences that could cause runtime failures or incorrect behavior."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue, 'fallback')",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.widgets.get('defaultValue'), 'fallback'] if v is not None), None)",
+      "category": "string",
+      "score": 0.3,
+      "reasoning": "The Python translation partially preserves the coalesce logic (iterating through values and returning the first non-None), but has several semantic issues:\n\n1. **Activity output access**: `activity('Lookup').output.firstRow.optional_value` in ADF accesses the output of a Lookup activity at runtime. The translation uses `dbutils.jobs.taskValues.get(taskKey='Lookup', key='result')` which is a Databricks-specific task value mechanism. This is a reasonable approximation in a Databricks context, but it's not a direct semantic equivalent \u2014 it assumes the result was stored under key 'result' as a JSON string, which is an assumption not present in the original.\n\n2. **JSON parsing**: The translation wraps the task value in `json.loads(...)`, which assumes the stored value is a JSON string. If it's already a dict/object, this would fail. Also, accessing `['firstRow']['optional_value']` could raise a KeyError if the key doesn't exist, whereas ADF's `optional_value` access on a missing field typically returns null/None rather than throwing an error.\n\n3. **Null handling for missing keys**: In ADF, if `optional_value` doesn't exist in `firstRow`, the expression evaluates to null and coalesce moves to the next value. In Python, `['optional_value']` on a dict would raise a KeyError rather than returning None, breaking the coalesce semantics.\n\n4. **Parameter reference**: `dbutils.widgets.get('defaultValue')` is a reasonable mapping for `pipeline().parameters.defaultValue`, though it always returns a string, which may differ from ADF's typed parameters.\n\n5. The coalesce pattern itself (`next((v for v in [...] if v is not None), None)`) is correct.\n\nThe main issues are the fragile activity output access (potential KeyError instead of null) and the assumptions about how task values are stored, which could cause runtime failures in edge cases that ADF handles gracefully."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.fallbackValue, variables('defaultValue'))",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.widgets.get('fallbackValue'), dbutils.jobs.taskValues.get(taskKey='set_variable_defaultValue', key='defaultValue')] if v is not None), None)",
+      "category": "string",
+      "score": 0.3,
+      "reasoning": "The coalesce logic structure is correct \u2014 it uses next() with a generator filtering out None values, which matches ADF's coalesce semantics. However, there are several semantic issues:\n\n1. **Activity output mapping**: `activity('Lookup').output.firstRow.optional_value` in ADF refers to the output of a Lookup activity within the same pipeline. Mapping this to `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']` is a reasonable Databricks approximation, but it assumes the result was stored as a JSON string under key 'result', which is a convention assumption, not a guaranteed semantic equivalence. The key name 'result' is invented.\n\n2. **Variable mapping**: `variables('defaultValue')` in ADF refers to a pipeline variable. Mapping it to `dbutils.jobs.taskValues.get(taskKey='set_variable_defaultValue', key='defaultValue')` is highly questionable \u2014 ADF pipeline variables are not the same as task values, and the taskKey 'set_variable_defaultValue' is a fabricated convention that may not exist. A more appropriate mapping might be a Python variable or a widget.\n\n3. **Parameter mapping**: `pipeline().parameters.fallbackValue` \u2192 `dbutils.widgets.get('fallbackValue')` is a reasonable and standard mapping.\n\n4. **Type coercion**: The coalesce doesn't apply str() coercion, but coalesce in ADF returns the first non-null value as-is (no coercion), so this is actually correct.\n\n5. **Error handling**: `dbutils.jobs.taskValues.get()` without a default will raise an error if the key doesn't exist, whereas ADF's activity output access on a missing key would return null. The `json.loads()` call could also throw exceptions.\n\nThe core coalesce pattern is correct, but the mappings for activity output and variables are semantically dubious and rely on invented conventions, making this only partially equivalent."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.defaultValue, variables('fallbackValue'))",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.widgets.get('defaultValue'), dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue')] if v is not None), None)",
+      "category": "string",
+      "score": 0.3,
+      "reasoning": "The overall coalesce pattern is correctly implemented using next((v for v in [...] if v is not None), None), which preserves the null-coalescing semantics. However, there are several semantic issues:\n\n1. Activity output mapping: `activity('Lookup').output.firstRow.optional_value` is mapped to `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']`. This is a reasonable Databricks migration approach, but it assumes the task value is stored under key='result' and is JSON-encoded \u2014 these are assumptions not present in the original ADF expression. The key should arguably be 'output' or similar, and the JSON parsing adds an assumption about encoding.\n\n2. Variable mapping: `variables('fallbackValue')` is mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue')`. ADF pipeline variables are not the same as task values. Variables in ADF are pipeline-scoped mutable values, not job task values. The taskKey='set_variable_fallbackValue' is a fabricated convention that doesn't reflect standard ADF-to-Databricks migration patterns. A more appropriate mapping might use a Python dictionary or a widget.\n\n3. The coalesce logic itself doesn't guard against KeyError exceptions \u2014 if `optional_value` doesn't exist in the dict, it will raise an exception rather than returning None (treating missing as null like ADF does).\n\n4. The pipeline parameter mapping `pipeline().parameters.defaultValue` \u2192 `dbutils.widgets.get('defaultValue')` is correct.\n\nThe partial credit is for the correct coalesce pattern and parameter mapping, but the activity output and variable mappings have significant semantic differences."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, variables('fallbackValue'), pipeline().parameters.defaultValue)",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue'), dbutils.widgets.get('defaultValue')] if v is not None), None)",
+      "category": "nested",
+      "score": 0.3,
+      "reasoning": "The Python translation preserves the overall coalesce pattern (next with a generator filtering None values) and correctly maps pipeline().parameters.defaultValue to dbutils.widgets.get('defaultValue'). However, there are significant semantic issues:\n\n1. **Activity output mapping**: `activity('Lookup').output.firstRow.optional_value` is mapped to `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']`. This is problematic because: (a) the key used is 'result' rather than something that directly corresponds to the activity output, (b) the ADF activity output is accessed via `.output` which is the full output object, not a serialized JSON string that needs parsing, and (c) this mapping assumes a specific convention that may not hold.\n\n2. **Variable mapping**: `variables('fallbackValue')` is mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_fallbackValue', key='fallbackValue')`. ADF pipeline variables are not the same as task values from a 'set_variable_fallbackValue' task. This is an incorrect mapping \u2014 variables should be accessed differently (e.g., via a dedicated variable store or widget), not by assuming there's a task named 'set_variable_fallbackValue'.\n\n3. **Null/exception handling**: The activity output access `json.loads(...)['firstRow']['optional_value']` will raise a KeyError if 'optional_value' doesn't exist, rather than returning None as ADF's coalesce would expect. ADF's coalesce treats missing properties as null.\n\n4. The coalesce logic structure itself is correct, but the input values being coalesced are incorrectly derived, making this only partially equivalent."
+    },
+    {
+      "adf_expression": "@div(add(mul(int(pipeline().parameters.records), sub(int(pipeline().parameters.factor), 1)), int(variables('increment'))), 3)",
+      "python_code": "int(((int(dbutils.widgets.get('records')) * (int(dbutils.widgets.get('factor')) - 1)) + int(dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment'))) / 3)",
+      "category": "math",
+      "score": 0.35,
+      "reasoning": "Two semantic issues: (1) `variables('increment')` is incorrectly mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')` \u2014 ADF pipeline variables should map to a variable store, not job task values, which is a significant semantic difference; (2) ADF's `div()` performs integer division, but the Python uses true division `/` wrapped in `int()`, which differs for negative numbers (truncation vs floor). The arithmetic structure (mul, sub, add) and parameter mappings are otherwise correct."
+    },
+    {
+      "adf_expression": "@equals(mod(add(pipeline().parameters.sequence, variables('increment')), 2), 0)",
+      "python_code": "((((lambda __wkm_p: int(__wkm_p) if __wkm_p.lstrip('-').isdigit() else float(__wkm_p))(str(dbutils.widgets.get('sequence'))) + dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')) % 2) == 0)",
+      "category": "math",
+      "score": 0.35,
+      "reasoning": "The arithmetic operations (add, mod, equals) are correctly translated as Python addition, modulo, and equality comparison. The pipeline parameter coercion to numeric type is reasonable. However, the critical semantic error is mapping ADF's `variables('increment')` (a pipeline variable) to `dbutils.jobs.taskValues.get(taskKey='set_variable_increment', key='increment')` (a Databricks task value from a specific named task). These are fundamentally different constructs \u2014 pipeline variables are mutable state within a pipeline run, while task values are outputs from specific upstream tasks. Additionally, the task value retrieval lacks type coercion, which could cause type errors when adding to the numeric sequence parameter."
+    },
+    {
+      "adf_expression": "@coalesce(trim(activity('Lookup').output.firstRow.optional_value), pipeline().parameters.defaultValue, 'fallback')",
+      "python_code": "next((v for v in [str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']).strip(), dbutils.widgets.get('defaultValue'), 'fallback'] if v is not None), None)",
+      "category": "string",
+      "score": 0.35,
+      "reasoning": "The translation has a critical semantic flaw: wrapping the activity output with str() before the coalesce check means that if optional_value is null/None, str(None) produces the string 'None' rather than None. This breaks the coalesce semantics \u2014 instead of falling through to pipeline().parameters.defaultValue, it would incorrectly return the string 'None'. In ADF, trim(null) returns null, allowing coalesce to proceed to the next argument. The rest of the structure (coalesce via next/generator, parameter mapping, trim via .strip()) is logically sound, but this null-propagation bug is a significant semantic difference."
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.batchSize), int(pipeline().parameters.parallelism)), int(pipeline().parameters.offset)), 2)",
+      "python_code": "int(((int(dbutils.widgets.get('batchSize')) * int(dbutils.widgets.get('parallelism'))) - int(dbutils.widgets.get('offset'))) / 2)",
+      "category": "math",
+      "score": 0.4,
+      "reasoning": "The Python translation has two issues: 1) ADF's @div performs integer division, but the Python code uses `/` which performs float division in Python 3. The outer `int()` wrapping does truncate the result, but it truncates toward zero after a float division, whereas ADF's div() performs integer division directly. While the final result may often be the same for positive numbers, the semantics differ for negative numbers (Python's int() truncates toward zero, while ADF div may have different behavior). 2) More critically, the outer `int()` wrapper is not part of the original ADF expression - the original expression returns the result of div() directly, not wrapped in int(). The div() function in ADF returns an integer when given integer inputs, so the outer int() is unnecessary but doesn't change behavior for integer inputs. The main concern is the use of `/` (true division) instead of integer division `//`. For example, div(7, 2) in ADF returns 3, while int(7/2) in Python returns 3 as well due to the int() wrapper, so in practice the outer int() does save the semantics here. However, the outer int() is an addition not present in the original. Overall, the translation partially preserves semantics but uses float division internally which is a semantic difference even if often masked by the outer int() cast."
+    },
+    {
+      "adf_expression": "@div(sub(mul(int(pipeline().parameters.records), 10), mod(int(pipeline().parameters.records), 3)), 2)",
+      "python_code": "int(((int(dbutils.widgets.get('records')) * 10) - (int(dbutils.widgets.get('records')) % 3)) / 2)",
+      "category": "math",
+      "score": 0.4,
+      "reasoning": "The ADF expression uses @div which performs INTEGER division, not floating-point division. In ADF, div() truncates toward zero (integer division semantics). The Python translation uses regular float division (/) wrapped in int(), which does produce an integer result via truncation, but the behavior differs from ADF's integer division in edge cases involving negative numbers. Python's int() on a float truncates toward zero (same as ADF div), so for positive numbers this works correctly. However, the outer int() wrapping of a float division is semantically different from true integer division (//) in Python. For the specific case here with positive numbers, int(x/2) and x//2 would give the same result, but the approach is fragile. Additionally, the ADF expression retrieves pipeline().parameters.records twice, and the Python code calls dbutils.widgets.get('records') twice - this is semantically equivalent but slightly inefficient. The main concern is the division semantics: using / instead of // could cause floating-point precision issues for large numbers, and the int() wrapper doesn't fully replicate integer division semantics. The correct Python equivalent should use // for integer division. This is a meaningful semantic difference that could cause incorrect results with large integers or negative values, warranting a score in the 0.3-0.6 range."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to access activity output from a Lookup activity, but has several semantic issues. In ADF, @activity('Lookup').output.firstRow.config_value accesses the output of a Lookup activity directly - the 'output' property contains the full result object, and 'firstRow' is a direct property of that output. The translation uses dbutils.jobs.taskValues.get() which is a Databricks-specific mechanism for passing values between tasks, and assumes the result was stored under key='result' as a JSON string that needs to be parsed. This is a reasonable migration pattern for Databricks, but: 1) It assumes the data was stored with taskKey='Lookup' and key='result', which is a convention not guaranteed by the ADF semantics. 2) It uses json.loads() implying the value was serialized as JSON string, which may not always be the case. 3) The nested access ['firstRow']['config_value'] correctly maps the property chain. 4) However, the overall approach is partially correct - in a Databricks migration context, activity outputs would need to be passed via task values, but the specific key naming ('result') is an assumption. The translation preserves the general intent but introduces assumptions about serialization format and key naming that could break at runtime."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to map the ADF activity output reference to a Databricks task value lookup, which is a reasonable migration strategy. However, there are several semantic issues: 1) The ADF expression `@activity('Lookup').output.firstRow.config_value` accesses the output of a Lookup activity, where `.output` is the full output object and `.firstRow` is a property of the Lookup activity's output containing the first row of results. The Python translation uses `json.loads(dbutils.jobs.taskValues.get(...))['firstRow']['config_value']`, which assumes the stored result is a JSON string that needs parsing - this may not always be the case. 2) The key used is 'result' which is an assumption about how the output was stored; the actual key structure depends on how the migration framework stores activity outputs. 3) The `.output` level is skipped - in ADF, `activity('Lookup').output` returns the full output object, and then `.firstRow` is accessed from that. The translation goes directly to `['firstRow']` after parsing, which may be correct if the stored value is the `.output` object, but this is an assumption. 4) There's no null/error handling if the task value doesn't exist or the JSON parsing fails. The translation preserves partial logic but makes assumptions about the storage format and skips the intermediate `.output` property access, making it only partially equivalent."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to access activity output from a Lookup activity, but has several semantic issues. In ADF, @activity('Lookup').output.firstRow.config_value accesses the output of a Lookup activity, specifically the firstRow property and then config_value. The translation uses dbutils.jobs.taskValues.get() which is a Databricks-specific mechanism for passing values between tasks, and wraps it with json.loads() assuming the result is a JSON string. However: 1) The ADF Lookup activity's output structure has 'output' as the top-level key, and the translation skips this level - it goes directly to ['firstRow']['config_value'] rather than ['output']['firstRow']['config_value']. 2) The assumption that the stored value is a JSON string that needs json.loads() may or may not be correct depending on how the migration framework stores task values. 3) The taskKey='Lookup' and key='result' mapping is a reasonable convention but not guaranteed to match the actual storage format. The missing 'output' level in the dictionary access is a clear semantic difference that would cause a KeyError or return wrong data if the full output object were stored."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to access activity output from a Lookup activity, but there are several semantic issues. In ADF, @activity('Lookup').output.firstRow.config_value accesses the output of a Lookup activity directly - specifically the firstRow property and then config_value within it. The translation uses dbutils.jobs.taskValues.get() which is a Databricks-specific mechanism for passing values between tasks, and this may or may not be how the ADF activity output is stored depending on the migration framework. More critically: (1) The translation wraps the result in json.loads(), assuming the stored value is a JSON string, but if it's already a dict/object this would fail. (2) The ADF Lookup activity output structure has 'output.firstRow' - the translation skips the 'output' level and directly accesses 'firstRow', which could be correct if the stored result only contains the output portion. (3) The key 'result' is assumed but this is framework-specific and not guaranteed. (4) There's no null/error handling if the task value doesn't exist. The general approach of using taskValues for cross-activity data access in Databricks is reasonable, but the specific implementation makes assumptions about serialization format and key naming that may not match the actual migration framework's conventions, making this a partial equivalence at best."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to access activity output from a Lookup activity, but there are several semantic issues: 1) ADF activity outputs are accessed via the activity() function which retrieves the output of a completed activity in the pipeline - mapping this to dbutils.jobs.taskValues.get() is a Databricks-specific approach that may not correctly represent the ADF semantics. 2) The 'output' property is skipped in the translation - in ADF, activity('Lookup').output gives the full output object, and then .firstRow.config_value navigates into it. The translation goes directly to json.loads(...)['firstRow']['config_value'], which assumes the stored result is the entire output object serialized as JSON. 3) The taskKey='Lookup' and key='result' assumptions are migration-framework-specific conventions that may or may not match how the actual pipeline stores task values. 4) The json.loads() call assumes the value is stored as a JSON string, which adds an assumption not present in the original ADF expression. 5) The .output property access is missing from the path - ADF's activity('Lookup').output.firstRow.config_value has three levels of navigation after the activity reference, but the translation only preserves two levels (['firstRow']['config_value']). While the overall approach of using task values to simulate cross-activity data passing is reasonable in a Databricks context, the translation makes several assumptions and omits the .output level, resulting in partial equivalence at best."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to map the ADF activity output reference to a Databricks task value lookup, which is a reasonable migration strategy. However, there are several semantic issues: 1) The ADF expression accesses activity('Lookup').output.firstRow.config_value, which refers to the output of a Lookup activity where 'output' is the full output object and 'firstRow' is a property of it. The translation wraps the result in json.loads(), assuming the stored value is a JSON string, but this may not always be the case. 2) The key used is 'result' rather than 'output', which may not correctly map to the ADF output structure. 3) In ADF, activity('Lookup').output gives the entire output object, and .firstRow is a direct property \u2014 the translation assumes the task value stores the entire output as JSON under key 'result', then accesses ['firstRow']['config_value'], which may work if the data is stored correctly but introduces assumptions not present in the original. 4) The overall approach of using dbutils.jobs.taskValues is a valid Databricks pattern for inter-task communication, but the exact key mapping ('result') and JSON parsing assumption introduce potential semantic differences. The partial logic is preserved (accessing firstRow.config_value from a Lookup activity result), but the assumptions about storage format and key names create meaningful semantic gaps."
+    },
+    {
+      "adf_expression": "@activity('Lookup').output.firstRow.config_value",
+      "python_code": "json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['config_value']",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to access the output of a 'Lookup' activity, but there are several semantic issues. In ADF, @activity('Lookup').output.firstRow.config_value accesses the output object of a Lookup activity directly - the output already contains the parsed structure with firstRow as a direct property. The translation uses dbutils.jobs.taskValues.get() which is a Databricks-specific mechanism for passing values between tasks, and applies json.loads() to parse the result. While this is a reasonable approach for inter-task communication in Databricks, the key assumptions are problematic: (1) It assumes the result was stored under the key 'result', which is a convention not guaranteed by the ADF semantics. (2) It assumes the entire output was serialized as JSON and stored as a task value, which is an implementation choice not derivable from the ADF expression alone. (3) The structure access ['firstRow']['config_value'] correctly maps the property access chain. (4) However, if the Lookup activity stores its output differently (e.g., under a different key, or with a different structure), this would fail. The translation captures the general intent but makes assumptions about the storage mechanism and key naming that may not hold, representing partial equivalence with semantic differences in how the activity output is retrieved."
+    },
+    {
+      "adf_expression": "@coalesce(activity('Lookup').output.firstRow.optional_value, pipeline().parameters.fallbackValue, variables('defaultValue'))",
+      "python_code": "next((v for v in [json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value'], dbutils.widgets.get('fallbackValue'), dbutils.jobs.taskValues.get(taskKey='set_variable_defaultValue', key='defaultValue')] if v is not None), None)",
+      "category": "string",
+      "score": 0.4,
+      "reasoning": "The Python translation attempts to preserve the coalesce logic correctly using next() with a generator filtering None values, which is the right approach. However, there are several semantic issues:\n\n1. **Activity output access**: `activity('Lookup').output.firstRow.optional_value` refers to the output of a previous ADF activity's lookup result. The translation uses `json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['optional_value']` \u2014 this is a reasonable Databricks-specific mapping, but it assumes the result was stored as a JSON string under key 'result', which may not match the actual task value structure. The key name 'result' is assumed and may be incorrect.\n\n2. **Variable access**: `variables('defaultValue')` in ADF refers to a pipeline variable. The translation maps it to `dbutils.jobs.taskValues.get(taskKey='set_variable_defaultValue', key='defaultValue')` \u2014 this is a non-standard mapping. ADF pipeline variables are typically not stored as task values; they would more likely be accessed via `dbutils.widgets.get('defaultValue')` or some other mechanism. The taskKey 'set_variable_defaultValue' is fabricated and likely incorrect.\n\n3. **Error handling**: The translation eagerly evaluates all three values in the list before filtering, meaning if `dbutils.jobs.taskValues.get(...)` raises an exception (e.g., key not found), the whole expression fails. ADF's coalesce may short-circuit or handle missing values differently.\n\n4. **json.loads wrapping**: Wrapping the activity output in `json.loads()` adds an assumption about serialization format that may not hold.\n\nThe coalesce pattern itself is correctly implemented, but the data access patterns for activity outputs and variables are semantically questionable and likely incorrect in practice."
+    },
+    {
+      "adf_expression": "@add(div(mul(add(int(pipeline().parameters.a), int(pipeline().parameters.b)), sub(int(pipeline().parameters.c), int(variables('delta')))), mod(int(pipeline().parameters.d), 5)), 2)",
+      "python_code": "(int(((int(dbutils.widgets.get('a')) + int(dbutils.widgets.get('b'))) * (int(dbutils.widgets.get('c')) - int(dbutils.jobs.taskValues.get(taskKey='set_variable_delta', key='delta')))) / (int(dbutils.widgets.get('d')) % 5)) + 2)",
+      "category": "math",
+      "score": 0.45,
+      "reasoning": "The Python translation has two notable issues: (1) `variables('delta')` is mapped to `dbutils.jobs.taskValues.get(taskKey='set_variable_delta', key='delta')`, which is semantically incorrect \u2014 ADF pipeline variables should map to a local Python variable or widget, not job task values from a specific task key. This is a significant semantic difference. (2) ADF's `div()` performs integer division (truncate toward zero); the Python uses `int(... / ...)` which does approximate this behavior (truncates toward zero via int()), so this is acceptable. The arithmetic structure (add, mul, sub, mod) is correctly preserved, and pipeline parameters are correctly mapped to `dbutils.widgets.get()`. The main semantic error is the incorrect mapping of `variables('delta')`."
+    },
+    {
+      "adf_expression": "@last(split(replace(activity('Lookup').output.firstRow.path, '\\\\', '/'), '/'))",
+      "python_code": "(str(str(json.loads(dbutils.jobs.taskValues.get(taskKey='Lookup', key='result'))['firstRow']['path']).replace('\\\\\\\\', '/')).split('/'))[-1]",
+      "category": "collection",
+      "score": 0.45,
+      "reasoning": "The main semantic error is in the replace argument: ADF's '\\\\' in the expression represents a single backslash character, but the Python translation uses '\\\\\\\\' (four backslashes in raw form, representing two backslashes as a string). This means the replace operation targets double-backslashes instead of single backslashes, producing incorrect results on typical Windows paths. The activity output access pattern, split, and last ([-1]) mappings are otherwise reasonable, but this backslash mismatch is a significant semantic difference."
+    }
+  ]
+}
