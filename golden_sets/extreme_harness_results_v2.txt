@@ -1,0 +1,20 @@
+extreme_bool_coercion_complex_branching: CCS=83,0.61
+extreme_coalesce_with_nested_expressions: CCS=71,0.35
+extreme_collection_operations_with_split_join: CCS=87,0.71
+extreme_compound_logical_predicates: CCS=85,0.67
+extreme_concat_many_args_interpolation: CCS=80,0.57
+extreme_datetime_formatting_nested_conditionals: CCS=80,0.63
+extreme_dayofweek_conditional_routing: CCS=81,0.71
+extreme_division_modulo_chain_with_coercion: CCS=95,0.84
+extreme_foreach_dynamic_array_generation: CCS=80,0.93
+extreme_greaterorequals_range_validation: CCS=90,0.63
+extreme_mixed_math_string_type_conversion: CCS=90,0.79
+extreme_multi_replace_substring_indexing: CCS=90,0.67
+extreme_nested_if_with_startswith_endswith: CCS=82,0.85
+extreme_nested_ternary_string_interpolation: CCS=80,0.79
+extreme_string_manipulation_cascade: CCS=81,0.63
+extreme_ticks_based_computation_chain: CCS=84,0.83
+extreme_union_createarray_dynamic_iteration: CCS=67,1.00
+extreme_utcnow_addhours_timezone_logic: CCS=82,0.68
+extreme_variable_self_reference_accumulation: CCS=85,0.61
+=== DONE ===
