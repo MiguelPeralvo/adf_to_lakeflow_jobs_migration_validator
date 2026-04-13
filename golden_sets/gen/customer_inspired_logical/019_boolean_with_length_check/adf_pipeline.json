@@ -1,0 +1,67 @@
+{
+  "name": "boolean_with_length_check",
+  "properties": {
+    "parameters": {
+      "required_modules": {
+        "type": "Array",
+        "defaultValue": [
+          "core"
+        ]
+      },
+      "min_modules": {
+        "type": "Int",
+        "defaultValue": 1
+      }
+    },
+    "variables": {
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LengthGate",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(empty(pipeline().parameters.required_modules)), greaterOrEquals(length(pipeline().parameters.required_modules), pipeline().parameters.min_modules))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

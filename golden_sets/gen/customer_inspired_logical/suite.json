@@ -1,0 +1,3863 @@
+{
+  "pipelines": [
+    {
+      "adf_json": {
+        "name": "dual_variable_gate",
+        "properties": {
+          "parameters": {
+            "enable_processing": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_continue": {
+              "type": "Boolean",
+              "defaultValue": true
+            },
+            "not_skipped": {
+              "type": "Boolean",
+              "defaultValue": true
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "InitContinue",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "should_continue",
+                "value": {
+                  "type": "Expression",
+                  "value": "@bool(pipeline().parameters.enable_processing)"
+                }
+              }
+            },
+            {
+              "name": "ContinuationGate",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "InitContinue",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(variables('should_continue'), variables('not_skipped'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "and(variables('a'), variables('b')) \u2014 dual boolean variable gate for continuation logic.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "InitContinue",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ContinuationGate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "enable_processing"
+        ],
+        "dependencies": [
+          {
+            "source_task": "InitContinue",
+            "target_task": "ContinuationGate"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "dual_variable_gate",
+          "properties": {
+            "parameters": {
+              "enable_processing": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_continue": {
+                "type": "Boolean",
+                "defaultValue": true
+              },
+              "not_skipped": {
+                "type": "Boolean",
+                "defaultValue": true
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "InitContinue",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "should_continue",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@bool(pipeline().parameters.enable_processing)"
+                  }
+                }
+              },
+              {
+                "name": "ContinuationGate",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "InitContinue",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(variables('should_continue'), variables('not_skipped'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_module_filter",
+        "properties": {
+          "parameters": {
+            "allowed_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all",
+                "core",
+                "reporting"
+              ]
+            },
+            "run_mode": {
+              "type": "String",
+              "defaultValue": "full"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ModuleFilterGate",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(empty(intersection(pipeline().parameters.allowed_modules, createArray('all', 'core', 'reporting', 'analytics')))), equals(pipeline().parameters.run_mode, 'full'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "and(not(empty(intersection(param, createArray(...)))), equals(param, value)) \u2014 module filtering with intersection.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ModuleFilterGate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "allowed_modules",
+          "run_mode"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_module_filter",
+          "properties": {
+            "parameters": {
+              "allowed_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all",
+                  "core",
+                  "reporting"
+                ]
+              },
+              "run_mode": {
+                "type": "String",
+                "defaultValue": "full"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ModuleFilterGate",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(not(empty(intersection(pipeline().parameters.allowed_modules, createArray('all', 'core', 'reporting', 'analytics')))), equals(pipeline().parameters.run_mode, 'full'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "triple_nested_validation",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "load_type": {
+              "type": "String",
+              "defaultValue": "full"
+            },
+            "factory_name": {
+              "type": "String",
+              "defaultValue": "data_factory_prod"
+            }
+          },
+          "variables": {
+            "validation_passed": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunDataValidation",
+              "type": "Lookup",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "TripleGate",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "RunDataValidation",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(and(equals(activity('RunDataValidation').output.firstRow.is_valid, '1'), not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'test')))), equals(pipeline().parameters.factory_name, 'data_factory_prod'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetValidated",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "validation_passed",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetNotValidated",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "validation_passed",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "and(and(equals(lookup_output, val), not(or(equals, equals))), equals(param, val)) \u2014 triple-nested boolean validation.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunDataValidation",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "TripleGate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "load_type",
+          "factory_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "RunDataValidation",
+            "target_task": "TripleGate"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "triple_nested_validation",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "load_type": {
+                "type": "String",
+                "defaultValue": "full"
+              },
+              "factory_name": {
+                "type": "String",
+                "defaultValue": "data_factory_prod"
+              }
+            },
+            "variables": {
+              "validation_passed": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunDataValidation",
+                "type": "Lookup",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "TripleGate",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "RunDataValidation",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(and(equals(activity('RunDataValidation').output.firstRow.is_valid, '1'), not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'test')))), equals(pipeline().parameters.factory_name, 'data_factory_prod'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetValidated",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "validation_passed",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetNotValidated",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "validation_passed",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "load_type_router",
+        "properties": {
+          "parameters": {
+            "load_type": {
+              "type": "String",
+              "defaultValue": "full"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "LoadTypeCheck",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunCopy",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "source": {
+                        "type": "AzureSqlSource"
+                      },
+                      "sink": {
+                        "type": "ParquetSink"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "FailInvalidType",
+                    "type": "Fail",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "message": {
+                        "type": "Expression",
+                        "value": "@concat('Invalid load_type: ', pipeline().parameters.load_type)"
+                      },
+                      "errorCode": {
+                        "type": "Expression",
+                        "value": "@string('INVALID_LOAD_TYPE')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "or(equals(param, 'val1'), equals(param, 'val2')) \u2014 load type routing with fail on invalid.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "LoadTypeCheck",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "load_type"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "load_type_router",
+          "properties": {
+            "parameters": {
+              "load_type": {
+                "type": "String",
+                "defaultValue": "full"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "LoadTypeCheck",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "RunCopy",
+                      "type": "Copy",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "source": {
+                          "type": "AzureSqlSource"
+                        },
+                        "sink": {
+                          "type": "ParquetSink"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "FailInvalidType",
+                      "type": "Fail",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "message": {
+                          "type": "Expression",
+                          "value": "@concat('Invalid load_type: ', pipeline().parameters.load_type)"
+                        },
+                        "errorCode": {
+                          "type": "Expression",
+                          "value": "@string('INVALID_LOAD_TYPE')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "retry_loop_exit",
+        "properties": {
+          "parameters": {
+            "max_retries": {
+              "type": "Int",
+              "defaultValue": 5
+            }
+          },
+          "variables": {
+            "is_complete": {
+              "type": "Boolean",
+              "defaultValue": false
+            },
+            "retry_attempts": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "current_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RetryLoop",
+              "type": "Until",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(variables('is_complete'), equals(length(variables('retry_attempts')), pipeline().parameters.max_retries))"
+                },
+                "activities": [
+                  {
+                    "name": "AttemptCall",
+                    "type": "WebActivity",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "url": "https://api.example-corp.com/v1/check",
+                      "method": "GET",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      }
+                    }
+                  },
+                  {
+                    "name": "TrackAttempt",
+                    "type": "AppendVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "retry_attempts",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(utcnow())"
+                      }
+                    }
+                  }
+                ],
+                "timeout": "0.01:00:00"
+              }
+            }
+          ]
+        }
+      },
+      "description": "or(variables('done'), equals(length(variables('attempts')), param)) \u2014 Until loop exit with retry tracking.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RetryLoop",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "max_retries"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "retry_loop_exit",
+          "properties": {
+            "parameters": {
+              "max_retries": {
+                "type": "Int",
+                "defaultValue": 5
+              }
+            },
+            "variables": {
+              "is_complete": {
+                "type": "Boolean",
+                "defaultValue": false
+              },
+              "retry_attempts": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "current_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RetryLoop",
+                "type": "Until",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@or(variables('is_complete'), equals(length(variables('retry_attempts')), pipeline().parameters.max_retries))"
+                  },
+                  "activities": [
+                    {
+                      "name": "AttemptCall",
+                      "type": "WebActivity",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "url": "https://api.example-corp.com/v1/check",
+                        "method": "GET",
+                        "headers": {
+                          "Content-Type": "application/json"
+                        }
+                      }
+                    },
+                    {
+                      "name": "TrackAttempt",
+                      "type": "AppendVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "retry_attempts",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string(utcnow())"
+                        }
+                      }
+                    }
+                  ],
+                  "timeout": "0.01:00:00"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_005",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "customers,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterCustomers",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'customers')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessCustomers",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/customers/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'customers') \u2014 filter variant for customer data processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterCustomers",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_005",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "customers,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterCustomers",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'customers')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessCustomers",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/customers/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_006",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "orders,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterOrders",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'orders')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessOrders",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/orders/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'orders') \u2014 filter variant for order records processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterOrders",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_006",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "orders,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterOrders",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'orders')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessOrders",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/orders/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_007",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "products,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterProducts",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'products')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessProducts",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/products/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'products') \u2014 filter variant for product catalog processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterProducts",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_007",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "products,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterProducts",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'products')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessProducts",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/products/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_008",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "inventory,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterInventory",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'inventory')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessInventory",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/inventory/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'inventory') \u2014 filter variant for stock levels processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterInventory",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_008",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "inventory,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterInventory",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'inventory')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessInventory",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/inventory/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_009",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "shipments,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterShipments",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'shipments')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessShipments",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/shipments/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'shipments') \u2014 filter variant for logistics data processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterShipments",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_009",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "shipments,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterShipments",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'shipments')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessShipments",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/shipments/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_010",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "payments,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterPayments",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'payments')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessPayments",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/payments/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'payments') \u2014 filter variant for payment records processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterPayments",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_010",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "payments,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterPayments",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'payments')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessPayments",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/payments/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_011",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "audit_log,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterAuditLog",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'audit_log')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessAuditLog",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/audit_log/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'audit_log') \u2014 filter variant for audit entries processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterAuditLog",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_011",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "audit_log,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterAuditLog",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'audit_log')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessAuditLog",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/audit_log/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "contains_filter_variant_012",
+        "properties": {
+          "parameters": {
+            "target_tables": {
+              "type": "String",
+              "defaultValue": "analytics,accounts,reports"
+            },
+            "enable_filter": {
+              "type": "Bool",
+              "defaultValue": true
+            }
+          },
+          "variables": {
+            "should_process": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FilterAnalytics",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(pipeline().parameters.target_tables, 'analytics')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ProcessAnalytics",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/analytics/load",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SkipProcessing",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "should_process",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('skipped')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "contains(param, 'analytics') \u2014 filter variant for analytics tables processing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FilterAnalytics",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_tables",
+          "enable_filter"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "contains_filter_variant_012",
+          "properties": {
+            "parameters": {
+              "target_tables": {
+                "type": "String",
+                "defaultValue": "analytics,accounts,reports"
+              },
+              "enable_filter": {
+                "type": "Bool",
+                "defaultValue": true
+              }
+            },
+            "variables": {
+              "should_process": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FilterAnalytics",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@contains(pipeline().parameters.target_tables, 'analytics')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "ProcessAnalytics",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/analytics/load",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SkipProcessing",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "should_process",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('skipped')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "time_window_guard",
+        "properties": {
+          "parameters": {
+            "earliest_start": {
+              "type": "String",
+              "defaultValue": "08:15"
+            },
+            "latest_start": {
+              "type": "String",
+              "defaultValue": "22:00"
+            }
+          },
+          "variables": {
+            "current_hour": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetCurrentHour",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_hour",
+                "value": {
+                  "type": "Expression",
+                  "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'HH:mm')"
+                }
+              }
+            },
+            {
+              "name": "TimeWindowCheck",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "SetCurrentHour",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greaterOrEquals(variables('current_hour'), pipeline().parameters.earliest_start)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunScheduledJob",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/scheduler/main",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "TooEarly",
+                    "type": "Fail",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "message": {
+                        "type": "Expression",
+                        "value": "@concat('Current time ', variables('current_hour'), ' is before allowed window ', pipeline().parameters.earliest_start)"
+                      },
+                      "errorCode": {
+                        "type": "Expression",
+                        "value": "@string('TIME_WINDOW_VIOLATION')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "greaterOrEquals(variables('hour'), param) \u2014 time window guard with convertFromUtc.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetCurrentHour",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "TimeWindowCheck",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "earliest_start",
+          "latest_start"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetCurrentHour",
+            "target_task": "TimeWindowCheck"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "time_window_guard",
+          "properties": {
+            "parameters": {
+              "earliest_start": {
+                "type": "String",
+                "defaultValue": "08:15"
+              },
+              "latest_start": {
+                "type": "String",
+                "defaultValue": "22:00"
+              }
+            },
+            "variables": {
+              "current_hour": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetCurrentHour",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "current_hour",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'HH:mm')"
+                  }
+                }
+              },
+              {
+                "name": "TimeWindowCheck",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "SetCurrentHour",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@greaterOrEquals(variables('current_hour'), pipeline().parameters.earliest_start)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "RunScheduledJob",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/scheduler/main",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "TooEarly",
+                      "type": "Fail",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "message": {
+                          "type": "Expression",
+                          "value": "@concat('Current time ', variables('current_hour'), ' is before allowed window ', pipeline().parameters.earliest_start)"
+                        },
+                        "errorCode": {
+                          "type": "Expression",
+                          "value": "@string('TIME_WINDOW_VIOLATION')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "complex_boolean_orchestrator",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "load_type": {
+              "type": "String",
+              "defaultValue": "full"
+            },
+            "modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "enable_validation": {
+              "type": "Bool",
+              "defaultValue": true
+            },
+            "run_mode": {
+              "type": "String",
+              "defaultValue": "full"
+            }
+          },
+          "variables": {
+            "should_continue": {
+              "type": "Boolean",
+              "defaultValue": true
+            },
+            "not_skipped": {
+              "type": "Boolean",
+              "defaultValue": true
+            },
+            "validation_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "EnvironmentGate",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'sandbox'))), or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental')))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "ModuleGate",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "EnvironmentGate",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(empty(intersection(pipeline().parameters.modules, createArray('all', 'core', 'reporting')))), equals(pipeline().parameters.run_mode, 'full'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "CombinedGate",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ModuleGate",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(and(variables('should_continue'), variables('not_skipped')), bool(pipeline().parameters.enable_validation))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "5+ boolean operators: and, or, not, empty, intersection, equals, bool combined in 3 cascading gates.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "EnvironmentGate",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ModuleGate",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CombinedGate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "load_type",
+          "modules",
+          "enable_validation",
+          "run_mode"
+        ],
+        "dependencies": [
+          {
+            "source_task": "EnvironmentGate",
+            "target_task": "ModuleGate"
+          },
+          {
+            "source_task": "ModuleGate",
+            "target_task": "CombinedGate"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "complex_boolean_orchestrator",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "load_type": {
+                "type": "String",
+                "defaultValue": "full"
+              },
+              "modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "enable_validation": {
+                "type": "Bool",
+                "defaultValue": true
+              },
+              "run_mode": {
+                "type": "String",
+                "defaultValue": "full"
+              }
+            },
+            "variables": {
+              "should_continue": {
+                "type": "Boolean",
+                "defaultValue": true
+              },
+              "not_skipped": {
+                "type": "Boolean",
+                "defaultValue": true
+              },
+              "validation_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "EnvironmentGate",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'sandbox'))), or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental')))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "ModuleGate",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "EnvironmentGate",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(not(empty(intersection(pipeline().parameters.modules, createArray('all', 'core', 'reporting')))), equals(pipeline().parameters.run_mode, 'full'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "CombinedGate",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "ModuleGate",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(and(variables('should_continue'), variables('not_skipped')), bool(pipeline().parameters.enable_validation))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "switch_like_if_cascade",
+        "properties": {
+          "parameters": {
+            "action": {
+              "type": "String",
+              "defaultValue": "transform"
+            }
+          },
+          "variables": {
+            "result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "Route",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().parameters.action, 'extract')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetExtract",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "result",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('extracting')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "Route2",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@equals(pipeline().parameters.action, 'transform')"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "SetTransform",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "result",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@string('transforming')"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "Route3",
+                          "type": "IfCondition",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "expression": {
+                              "type": "Expression",
+                              "value": "@equals(pipeline().parameters.action, 'load')"
+                            },
+                            "ifTrueActivities": [
+                              {
+                                "name": "SetLoad",
+                                "type": "SetVariable",
+                                "dependsOn": [],
+                                "userProperties": [],
+                                "typeProperties": {
+                                  "variableName": "result",
+                                  "value": {
+                                    "type": "Expression",
+                                    "value": "@string('loading')"
+                                  }
+                                }
+                              }
+                            ],
+                            "ifFalseActivities": [
+                              {
+                                "name": "SetUnknown",
+                                "type": "SetVariable",
+                                "dependsOn": [],
+                                "userProperties": [],
+                                "typeProperties": {
+                                  "variableName": "result",
+                                  "value": {
+                                    "type": "Expression",
+                                    "value": "@concat('unknown_action:', pipeline().parameters.action)"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "Chained if(equals(...), ..., if(equals(...), ...)) \u2014 cascading dispatch without Switch activity.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "Route",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "action"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "switch_like_if_cascade",
+          "properties": {
+            "parameters": {
+              "action": {
+                "type": "String",
+                "defaultValue": "transform"
+              }
+            },
+            "variables": {
+              "result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "Route",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(pipeline().parameters.action, 'extract')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetExtract",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "result",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('extracting')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "Route2",
+                      "type": "IfCondition",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "expression": {
+                          "type": "Expression",
+                          "value": "@equals(pipeline().parameters.action, 'transform')"
+                        },
+                        "ifTrueActivities": [
+                          {
+                            "name": "SetTransform",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                              "variableName": "result",
+                              "value": {
+                                "type": "Expression",
+                                "value": "@string('transforming')"
+                              }
+                            }
+                          }
+                        ],
+                        "ifFalseActivities": [
+                          {
+                            "name": "Route3",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                              "expression": {
+                                "type": "Expression",
+                                "value": "@equals(pipeline().parameters.action, 'load')"
+                              },
+                              "ifTrueActivities": [
+                                {
+                                  "name": "SetLoad",
+                                  "type": "SetVariable",
+                                  "dependsOn": [],
+                                  "userProperties": [],
+                                  "typeProperties": {
+                                    "variableName": "result",
+                                    "value": {
+                                      "type": "Expression",
+                                      "value": "@string('loading')"
+                                    }
+                                  }
+                                }
+                              ],
+                              "ifFalseActivities": [
+                                {
+                                  "name": "SetUnknown",
+                                  "type": "SetVariable",
+                                  "dependsOn": [],
+                                  "userProperties": [],
+                                  "typeProperties": {
+                                    "variableName": "result",
+                                    "value": {
+                                      "type": "Expression",
+                                      "value": "@concat('unknown_action:', pipeline().parameters.action)"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "negated_or_compound",
+        "properties": {
+          "parameters": {
+            "load_type": {
+              "type": "String",
+              "defaultValue": "full"
+            },
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ExcludeDevTypes",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(or(equals(pipeline().parameters.load_type, 'test'), equals(pipeline().parameters.load_type, 'debug')))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "RunProduction",
+                    "type": "DatabricksNotebook",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "notebookPath": "/pipelines/etl/main",
+                      "baseParameters": {}
+                    },
+                    "linkedServiceName": {
+                      "referenceName": "ls_databricks",
+                      "type": "LinkedServiceReference"
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(or(equals(...), equals(...))) \u2014 negated compound condition for excluding dev types.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ExcludeDevTypes",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "load_type",
+          "env"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "negated_or_compound",
+          "properties": {
+            "parameters": {
+              "load_type": {
+                "type": "String",
+                "defaultValue": "full"
+              },
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ExcludeDevTypes",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(or(equals(pipeline().parameters.load_type, 'test'), equals(pipeline().parameters.load_type, 'debug')))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "RunProduction",
+                      "type": "DatabricksNotebook",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "notebookPath": "/pipelines/etl/main",
+                        "baseParameters": {}
+                      },
+                      "linkedServiceName": {
+                        "referenceName": "ls_databricks",
+                        "type": "LinkedServiceReference"
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "multi_equals_dispatch",
+        "properties": {
+          "parameters": {
+            "source_type": {
+              "type": "String",
+              "defaultValue": "database"
+            }
+          },
+          "variables": {
+            "connector": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "DispatchConnector",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "connector",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.source_type, 'database'), 'jdbc', if(equals(pipeline().parameters.source_type, 'api'), 'rest', if(equals(pipeline().parameters.source_type, 'file'), 'blob', if(equals(pipeline().parameters.source_type, 'stream'), 'kafka', 'unknown'))))"
+                }
+              }
+            },
+            {
+              "name": "ValidateConnector",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "DispatchConnector",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(equals(variables('connector'), 'unknown'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "Nested if(equals(...), val, if(equals(...), val, ...)) \u2014 4-level dispatch without Switch.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "DispatchConnector",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ValidateConnector",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "source_type"
+        ],
+        "dependencies": [
+          {
+            "source_task": "DispatchConnector",
+            "target_task": "ValidateConnector"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "multi_equals_dispatch",
+          "properties": {
+            "parameters": {
+              "source_type": {
+                "type": "String",
+                "defaultValue": "database"
+              }
+            },
+            "variables": {
+              "connector": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "DispatchConnector",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "connector",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.source_type, 'database'), 'jdbc', if(equals(pipeline().parameters.source_type, 'api'), 'rest', if(equals(pipeline().parameters.source_type, 'file'), 'blob', if(equals(pipeline().parameters.source_type, 'stream'), 'kafka', 'unknown'))))"
+                  }
+                }
+              },
+              {
+                "name": "ValidateConnector",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "DispatchConnector",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(equals(variables('connector'), 'unknown'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "coalesce_based_null_guard",
+        "properties": {
+          "parameters": {
+            "input_id": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "fallback_id": {
+              "type": "String",
+              "defaultValue": "default-001"
+            }
+          },
+          "variables": {
+            "effective_id": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ResolveId",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(or(equals(coalesce(pipeline().parameters.input_id, ''), ''), equals(pipeline().parameters.input_id, 'null')), pipeline().parameters.fallback_id, pipeline().parameters.input_id)"
+                }
+              }
+            },
+            {
+              "name": "ValidateId",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ResolveId",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(equals(variables('effective_id'), ''))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "or(equals(coalesce(param, ''), ''), equals(param, 'null')) \u2014 null/empty guard with coalesce.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ResolveId",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ValidateId",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "input_id",
+          "fallback_id"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ResolveId",
+            "target_task": "ValidateId"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "coalesce_based_null_guard",
+          "properties": {
+            "parameters": {
+              "input_id": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "fallback_id": {
+                "type": "String",
+                "defaultValue": "default-001"
+              }
+            },
+            "variables": {
+              "effective_id": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ResolveId",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "effective_id",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@if(or(equals(coalesce(pipeline().parameters.input_id, ''), ''), equals(pipeline().parameters.input_id, 'null')), pipeline().parameters.fallback_id, pipeline().parameters.input_id)"
+                  }
+                }
+              },
+              {
+                "name": "ValidateId",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "ResolveId",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(equals(variables('effective_id'), ''))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "boolean_with_length_check",
+        "properties": {
+          "parameters": {
+            "required_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "core"
+              ]
+            },
+            "min_modules": {
+              "type": "Int",
+              "defaultValue": 1
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "LengthGate",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@and(not(empty(pipeline().parameters.required_modules)), greaterOrEquals(length(pipeline().parameters.required_modules), pipeline().parameters.min_modules))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "and(not(empty(...)), greaterOrEquals(length(...), param)) \u2014 non-empty + minimum length gate.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "LengthGate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "required_modules",
+          "min_modules"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "boolean_with_length_check",
+          "properties": {
+            "parameters": {
+              "required_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "core"
+                ]
+              },
+              "min_modules": {
+                "type": "Int",
+                "defaultValue": 1
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "LengthGate",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@and(not(empty(pipeline().parameters.required_modules)), greaterOrEquals(length(pipeline().parameters.required_modules), pipeline().parameters.min_modules))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    }
+  ]
+}

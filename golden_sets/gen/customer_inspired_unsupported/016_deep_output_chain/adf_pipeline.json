@@ -1,0 +1,51 @@
+{
+  "name": "deep_output_chain",
+  "properties": {
+    "parameters": {},
+    "variables": {
+      "cluster_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GetClusterId",
+        "type": "WebActivity",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/api/2.1/jobs/runs/get",
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      {
+        "name": "ExtractClusterId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GetClusterId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "cluster_id",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('GetClusterId').output.tasks[0].cluster_instance.cluster_id"
+          }
+        }
+      }
+    ]
+  }
+}

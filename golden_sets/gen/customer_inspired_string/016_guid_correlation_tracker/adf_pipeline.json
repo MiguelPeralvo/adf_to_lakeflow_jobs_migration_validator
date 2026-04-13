@@ -1,0 +1,80 @@
+{
+  "name": "guid_correlation_tracker",
+  "properties": {
+    "parameters": {
+      "app_name": {
+        "type": "String",
+        "defaultValue": "data-pipeline"
+      }
+    },
+    "variables": {
+      "correlation_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "trace_id": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GenerateCorrelationId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "correlation_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(guid(), '_', utcnow('yyyyMMddHHmmssfff'))"
+          }
+        }
+      },
+      {
+        "name": "GenerateTraceId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "GenerateCorrelationId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "trace_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.app_name, '#', pipeline().Pipeline, '#', utcnow('yyyy/MM/dd'), '#', pipeline().RunId)"
+          }
+        }
+      },
+      {
+        "name": "RegisterTrace",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "GenerateTraceId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v1/traces",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"correlation_id\": \"', variables('correlation_id'), '\", \"trace_id\": \"', variables('trace_id'), '\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "name": "nested_unsupported_5level",
+  "properties": {
+    "parameters": {
+      "previous_outputs": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "execution_outputs": {
+        "type": "String",
+        "defaultValue": "{}"
+      }
+    },
+    "variables": {
+      "skip_condition": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "debug_trace": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "execution_outputs": {
+        "type": "String",
+        "defaultValue": "{}"
+      }
+    },
+    "activities": [
+      {
+        "name": "EvaluateConditions",
+        "type": "ForEach",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@json(pipeline().parameters.previous_outputs)"
+          },
+          "activities": [
+            {
+              "name": "NonSkipCondition",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "skip_condition",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), true, if(contains(variables('execution_outputs'), concat('\"', coalesce(item()?.condition?.name, 'name_notFound'), '\"')), if(contains(string(json(variables('execution_outputs'))[item().condition.name]), concat('\"', coalesce(item()?.condition?.internal_name, item().condition.name), '\"')), true, false), false))"
+                }
+              }
+            },
+            {
+              "name": "DebugTrace",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "NonSkipCondition",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "debug_trace",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), concat('No condition for task: ', coalesce(item()?.name, 'unnamed')), concat('Outputs: ', variables('execution_outputs')))"
+                }
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

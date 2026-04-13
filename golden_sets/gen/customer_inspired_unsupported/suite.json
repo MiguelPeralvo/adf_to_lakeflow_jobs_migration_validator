@@ -1,0 +1,4010 @@
+{
+  "pipelines": [
+    {
+      "adf_json": {
+        "name": "global_param_env_reader",
+        "properties": {
+          "parameters": {
+            "app_name": {
+              "type": "String",
+              "defaultValue": "etl"
+            }
+          },
+          "variables": {
+            "lib_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "config_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetLibPath",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "lib_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/common_libraries/', pipeline().globalParameters.lib_file_name)"
+                }
+              }
+            },
+            {
+              "name": "SetConfigPath",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetLibPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "config_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/', pipeline().parameters.app_name, '/settings.json')"
+                }
+              }
+            },
+            {
+              "name": "RunWithLibs",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "SetConfigPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/etl/main",
+                "baseParameters": {
+                  "library_path": {
+                    "type": "Expression",
+                    "value": "@variables('lib_path')"
+                  },
+                  "config_path": {
+                    "type": "Expression",
+                    "value": "@variables('config_path')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      "description": "pipeline().globalParameters.X \u2014 unsupported global parameter for library paths.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetLibPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetConfigPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RunWithLibs",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "app_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetLibPath",
+            "target_task": "SetConfigPath"
+          },
+          {
+            "source_task": "SetConfigPath",
+            "target_task": "RunWithLibs"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "global_param_env_reader",
+          "properties": {
+            "parameters": {
+              "app_name": {
+                "type": "String",
+                "defaultValue": "etl"
+              }
+            },
+            "variables": {
+              "lib_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "config_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetLibPath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "lib_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/common_libraries/', pipeline().globalParameters.lib_file_name)"
+                  }
+                }
+              },
+              {
+                "name": "SetConfigPath",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetLibPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "config_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/', pipeline().parameters.app_name, '/settings.json')"
+                  }
+                }
+              },
+              {
+                "name": "RunWithLibs",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                  {
+                    "activity": "SetConfigPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/etl/main",
+                  "baseParameters": {
+                    "library_path": {
+                      "type": "Expression",
+                      "value": "@variables('lib_path')"
+                    },
+                    "config_path": {
+                      "type": "Expression",
+                      "value": "@variables('config_path')"
+                    }
+                  }
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "global_param_url_builder",
+        "properties": {
+          "parameters": {
+            "job_id": {
+              "type": "String",
+              "defaultValue": "j-001"
+            }
+          },
+          "variables": {
+            "api_url": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "permissions_url": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "BuildApiUrl",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "api_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.1/jobs/runs/get?run_id=', pipeline().parameters.job_id)"
+                }
+              }
+            },
+            {
+              "name": "BuildPermissionsUrl",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "BuildApiUrl",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "permissions_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.0/permissions/jobs/', pipeline().parameters.job_id)"
+                }
+              }
+            },
+            {
+              "name": "CheckJobStatus",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "BuildPermissionsUrl",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@variables('api_url')"
+                },
+                "method": "GET",
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "pipeline().globalParameters in URL concat \u2014 unsupported global parameter for API URLs.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "BuildApiUrl",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildPermissionsUrl",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckJobStatus",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "job_id"
+        ],
+        "dependencies": [
+          {
+            "source_task": "BuildApiUrl",
+            "target_task": "BuildPermissionsUrl"
+          },
+          {
+            "source_task": "BuildPermissionsUrl",
+            "target_task": "CheckJobStatus"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "global_param_url_builder",
+          "properties": {
+            "parameters": {
+              "job_id": {
+                "type": "String",
+                "defaultValue": "j-001"
+              }
+            },
+            "variables": {
+              "api_url": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "permissions_url": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "BuildApiUrl",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "api_url",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.1/jobs/runs/get?run_id=', pipeline().parameters.job_id)"
+                  }
+                }
+              },
+              {
+                "name": "BuildPermissionsUrl",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "BuildApiUrl",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "permissions_url",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.0/permissions/jobs/', pipeline().parameters.job_id)"
+                  }
+                }
+              },
+              {
+                "name": "CheckJobStatus",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "BuildPermissionsUrl",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": {
+                    "type": "Expression",
+                    "value": "@variables('api_url')"
+                  },
+                  "method": "GET",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "run_output_variant_data_validation",
+        "properties": {
+          "parameters": {
+            "threshold": {
+              "type": "Int",
+              "defaultValue": 1
+            }
+          },
+          "variables": {
+            "check_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunDataValidation",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/checks/data_validation",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckRunDataValidationResult",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "RunDataValidation",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('RunDataValidation').output.runOutput, pipeline().parameters.threshold)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "StoreResult",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CheckRunDataValidationResult",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "check_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('RunDataValidation').output.runOutput)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunDataValidation').output.runOutput \u2014 unsupported notebook output reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunDataValidation",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckRunDataValidationResult",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "StoreResult",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "threshold"
+        ],
+        "dependencies": [
+          {
+            "source_task": "RunDataValidation",
+            "target_task": "CheckRunDataValidationResult"
+          },
+          {
+            "source_task": "CheckRunDataValidationResult",
+            "target_task": "StoreResult"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "run_output_variant_data_validation",
+          "properties": {
+            "parameters": {
+              "threshold": {
+                "type": "Int",
+                "defaultValue": 1
+              }
+            },
+            "variables": {
+              "check_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunDataValidation",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/checks/data_validation",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CheckRunDataValidationResult",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "RunDataValidation",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(activity('RunDataValidation').output.runOutput, pipeline().parameters.threshold)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "StoreResult",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CheckRunDataValidationResult",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "check_result",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(activity('RunDataValidation').output.runOutput)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "run_output_variant_row_count_check",
+        "properties": {
+          "parameters": {
+            "threshold": {
+              "type": "Int",
+              "defaultValue": 1
+            }
+          },
+          "variables": {
+            "check_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckRowCount",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/checks/row_count_check",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckCheckRowCountResult",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CheckRowCount",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('CheckRowCount').output.runOutput, pipeline().parameters.threshold)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "StoreResult",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CheckCheckRowCountResult",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "check_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('CheckRowCount').output.runOutput)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('CheckRowCount').output.runOutput \u2014 unsupported notebook output reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckRowCount",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckCheckRowCountResult",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "StoreResult",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "threshold"
+        ],
+        "dependencies": [
+          {
+            "source_task": "CheckRowCount",
+            "target_task": "CheckCheckRowCountResult"
+          },
+          {
+            "source_task": "CheckCheckRowCountResult",
+            "target_task": "StoreResult"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "run_output_variant_row_count_check",
+          "properties": {
+            "parameters": {
+              "threshold": {
+                "type": "Int",
+                "defaultValue": 1
+              }
+            },
+            "variables": {
+              "check_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckRowCount",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/checks/row_count_check",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CheckCheckRowCountResult",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "CheckRowCount",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(activity('CheckRowCount').output.runOutput, pipeline().parameters.threshold)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "StoreResult",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CheckCheckRowCountResult",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "check_result",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(activity('CheckRowCount').output.runOutput)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "run_output_variant_schema_check",
+        "properties": {
+          "parameters": {
+            "threshold": {
+              "type": "Int",
+              "defaultValue": 1
+            }
+          },
+          "variables": {
+            "check_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ValidateSchema",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/checks/schema_check",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckValidateSchemaResult",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ValidateSchema",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('ValidateSchema').output.runOutput, pipeline().parameters.threshold)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "StoreResult",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CheckValidateSchemaResult",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "check_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('ValidateSchema').output.runOutput)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('ValidateSchema').output.runOutput \u2014 unsupported notebook output reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ValidateSchema",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckValidateSchemaResult",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "StoreResult",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "threshold"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ValidateSchema",
+            "target_task": "CheckValidateSchemaResult"
+          },
+          {
+            "source_task": "CheckValidateSchemaResult",
+            "target_task": "StoreResult"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "run_output_variant_schema_check",
+          "properties": {
+            "parameters": {
+              "threshold": {
+                "type": "Int",
+                "defaultValue": 1
+              }
+            },
+            "variables": {
+              "check_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ValidateSchema",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/checks/schema_check",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CheckValidateSchemaResult",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "ValidateSchema",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(activity('ValidateSchema').output.runOutput, pipeline().parameters.threshold)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "StoreResult",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CheckValidateSchemaResult",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "check_result",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(activity('ValidateSchema').output.runOutput)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "run_output_variant_notebook_result",
+        "properties": {
+          "parameters": {
+            "threshold": {
+              "type": "Int",
+              "defaultValue": 1
+            }
+          },
+          "variables": {
+            "check_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunNotebook",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/checks/notebook_result",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckRunNotebookResult",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "RunNotebook",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(activity('RunNotebook').output.runOutput, pipeline().parameters.threshold)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "StoreResult",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CheckRunNotebookResult",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "check_result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('RunNotebook').output.runOutput)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunNotebook').output.runOutput \u2014 unsupported notebook output reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunNotebook",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckRunNotebookResult",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "StoreResult",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "threshold"
+        ],
+        "dependencies": [
+          {
+            "source_task": "RunNotebook",
+            "target_task": "CheckRunNotebookResult"
+          },
+          {
+            "source_task": "CheckRunNotebookResult",
+            "target_task": "StoreResult"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "run_output_variant_notebook_result",
+          "properties": {
+            "parameters": {
+              "threshold": {
+                "type": "Int",
+                "defaultValue": 1
+              }
+            },
+            "variables": {
+              "check_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunNotebook",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/checks/notebook_result",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CheckRunNotebookResult",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "RunNotebook",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(activity('RunNotebook').output.runOutput, pipeline().parameters.threshold)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "StoreResult",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CheckRunNotebookResult",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "check_result",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(activity('RunNotebook').output.runOutput)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "pipeline_return_value_result_code",
+        "properties": {
+          "parameters": {
+            "input_param": {
+              "type": "String",
+              "defaultValue": "default"
+            }
+          },
+          "variables": {
+            "return_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunChildPipeline",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "child_etl",
+                  "type": "PipelineReference"
+                },
+                "parameters": {
+                  "input": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.input_param"
+                  }
+                },
+                "waitOnCompletion": true
+              }
+            },
+            {
+              "name": "CaptureReturn",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunChildPipeline",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "return_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('RunChildPipeline').output.pipelineReturnValue.result_code"
+                }
+              }
+            },
+            {
+              "name": "CheckReturn",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CaptureReturn",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(activity('RunChildPipeline').output.pipelineReturnValue.result_code))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunChildPipeline').output.pipelineReturnValue.result_code \u2014 unsupported pipelineReturnValue reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunChildPipeline",
+            "is_placeholder": true
+          },
+          {
+            "task_key": "CaptureReturn",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckReturn",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "input_param"
+        ],
+        "dependencies": [
+          {
+            "source_task": "RunChildPipeline",
+            "target_task": "CaptureReturn"
+          },
+          {
+            "source_task": "CaptureReturn",
+            "target_task": "CheckReturn"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "pipeline_return_value_result_code",
+          "properties": {
+            "parameters": {
+              "input_param": {
+                "type": "String",
+                "defaultValue": "default"
+              }
+            },
+            "variables": {
+              "return_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunChildPipeline",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "pipeline": {
+                    "referenceName": "child_etl",
+                    "type": "PipelineReference"
+                  },
+                  "parameters": {
+                    "input": {
+                      "type": "Expression",
+                      "value": "@pipeline().parameters.input_param"
+                    }
+                  },
+                  "waitOnCompletion": true
+                }
+              },
+              {
+                "name": "CaptureReturn",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "RunChildPipeline",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "return_value",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@activity('RunChildPipeline').output.pipelineReturnValue.result_code"
+                  }
+                }
+              },
+              {
+                "name": "CheckReturn",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "CaptureReturn",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(activity('RunChildPipeline').output.pipelineReturnValue.result_code))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "pipeline_return_value_array_data",
+        "properties": {
+          "parameters": {
+            "input_param": {
+              "type": "String",
+              "defaultValue": "default"
+            }
+          },
+          "variables": {
+            "return_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunDataExtract",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "data_extract",
+                  "type": "PipelineReference"
+                },
+                "parameters": {
+                  "input": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.input_param"
+                  }
+                },
+                "waitOnCompletion": true
+              }
+            },
+            {
+              "name": "CaptureReturn",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunDataExtract",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "return_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('RunDataExtract').output.pipelineReturnValue.str_array"
+                }
+              }
+            },
+            {
+              "name": "CheckReturn",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CaptureReturn",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(activity('RunDataExtract').output.pipelineReturnValue.str_array))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunDataExtract').output.pipelineReturnValue.str_array \u2014 unsupported pipelineReturnValue reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunDataExtract",
+            "is_placeholder": true
+          },
+          {
+            "task_key": "CaptureReturn",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckReturn",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "input_param"
+        ],
+        "dependencies": [
+          {
+            "source_task": "RunDataExtract",
+            "target_task": "CaptureReturn"
+          },
+          {
+            "source_task": "CaptureReturn",
+            "target_task": "CheckReturn"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "pipeline_return_value_array_data",
+          "properties": {
+            "parameters": {
+              "input_param": {
+                "type": "String",
+                "defaultValue": "default"
+              }
+            },
+            "variables": {
+              "return_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunDataExtract",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "pipeline": {
+                    "referenceName": "data_extract",
+                    "type": "PipelineReference"
+                  },
+                  "parameters": {
+                    "input": {
+                      "type": "Expression",
+                      "value": "@pipeline().parameters.input_param"
+                    }
+                  },
+                  "waitOnCompletion": true
+                }
+              },
+              {
+                "name": "CaptureReturn",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "RunDataExtract",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "return_value",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@activity('RunDataExtract').output.pipelineReturnValue.str_array"
+                  }
+                }
+              },
+              {
+                "name": "CheckReturn",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "CaptureReturn",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(activity('RunDataExtract').output.pipelineReturnValue.str_array))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "error_handler_message",
+        "properties": {
+          "parameters": {},
+          "variables": {
+            "error_detail": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "error_code": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunCriticalJob",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/jobs/message_job",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CaptureError",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunCriticalJob",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "error_detail",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('RunCriticalJob').error.message"
+                }
+              }
+            },
+            {
+              "name": "BuildErrorMessage",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CaptureError",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "error_code",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Error: ', activity('RunCriticalJob').error.message)"
+                }
+              }
+            },
+            {
+              "name": "ReportError",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "BuildErrorMessage",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "type": "Expression",
+                  "value": "@concat('Pipeline failed: ', activity('RunCriticalJob').error.message)"
+                },
+                "errorCode": {
+                  "type": "Expression",
+                  "value": "@concat('ERR_', activity('RunCriticalJob').error.errorCode)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunCriticalJob').error.message \u2014 unsupported error property reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunCriticalJob",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CaptureError",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildErrorMessage",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ReportError",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [],
+        "dependencies": [
+          {
+            "source_task": "RunCriticalJob",
+            "target_task": "CaptureError"
+          },
+          {
+            "source_task": "CaptureError",
+            "target_task": "BuildErrorMessage"
+          },
+          {
+            "source_task": "BuildErrorMessage",
+            "target_task": "ReportError"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "error_handler_message",
+          "properties": {
+            "parameters": {},
+            "variables": {
+              "error_detail": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "error_code": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunCriticalJob",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/jobs/message_job",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CaptureError",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "RunCriticalJob",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "error_detail",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@activity('RunCriticalJob').error.message"
+                  }
+                }
+              },
+              {
+                "name": "BuildErrorMessage",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CaptureError",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "error_code",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('Error: ', activity('RunCriticalJob').error.message)"
+                  }
+                }
+              },
+              {
+                "name": "ReportError",
+                "type": "Fail",
+                "dependsOn": [
+                  {
+                    "activity": "BuildErrorMessage",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "message": {
+                    "type": "Expression",
+                    "value": "@concat('Pipeline failed: ', activity('RunCriticalJob').error.message)"
+                  },
+                  "errorCode": {
+                    "type": "Expression",
+                    "value": "@concat('ERR_', activity('RunCriticalJob').error.errorCode)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "error_handler_error_code",
+        "properties": {
+          "parameters": {},
+          "variables": {
+            "error_detail": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "error_code": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunBatchProcess",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/jobs/error_code_job",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CaptureError",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunBatchProcess",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "error_detail",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('RunBatchProcess').error.errorCode"
+                }
+              }
+            },
+            {
+              "name": "BuildErrorMessage",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CaptureError",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "error_code",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Error: ', activity('RunBatchProcess').error.errorCode)"
+                }
+              }
+            },
+            {
+              "name": "ReportError",
+              "type": "Fail",
+              "dependsOn": [
+                {
+                  "activity": "BuildErrorMessage",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "type": "Expression",
+                  "value": "@concat('Pipeline failed: ', activity('RunBatchProcess').error.errorCode)"
+                },
+                "errorCode": {
+                  "type": "Expression",
+                  "value": "@concat('ERR_', activity('RunBatchProcess').error.errorCode)"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('RunBatchProcess').error.errorCode \u2014 unsupported error property reference.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunBatchProcess",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CaptureError",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildErrorMessage",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ReportError",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [],
+        "dependencies": [
+          {
+            "source_task": "RunBatchProcess",
+            "target_task": "CaptureError"
+          },
+          {
+            "source_task": "CaptureError",
+            "target_task": "BuildErrorMessage"
+          },
+          {
+            "source_task": "BuildErrorMessage",
+            "target_task": "ReportError"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "error_handler_error_code",
+          "properties": {
+            "parameters": {},
+            "variables": {
+              "error_detail": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "error_code": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunBatchProcess",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/jobs/error_code_job",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CaptureError",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "RunBatchProcess",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "error_detail",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@activity('RunBatchProcess').error.errorCode"
+                  }
+                }
+              },
+              {
+                "name": "BuildErrorMessage",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CaptureError",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "error_code",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('Error: ', activity('RunBatchProcess').error.errorCode)"
+                  }
+                }
+              },
+              {
+                "name": "ReportError",
+                "type": "Fail",
+                "dependsOn": [
+                  {
+                    "activity": "BuildErrorMessage",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "message": {
+                    "type": "Expression",
+                    "value": "@concat('Pipeline failed: ', activity('RunBatchProcess').error.errorCode)"
+                  },
+                  "errorCode": {
+                    "type": "Expression",
+                    "value": "@concat('ERR_', activity('RunBatchProcess').error.errorCode)"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "optional_chaining_condition",
+        "properties": {
+          "parameters": {
+            "items_config": {
+              "type": "String",
+              "defaultValue": "[{\"name\": \"task1\"}]"
+            }
+          },
+          "variables": {
+            "resolved_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ProcessCondition",
+              "type": "ForEach",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.items_config)"
+                },
+                "activities": [
+                  {
+                    "name": "ResolveChain",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "resolved_value",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@coalesce(item()?.condition, 'notFound')"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "@coalesce(item()?.condition, 'notFound') \u2014 unsupported optional chaining (item()?.X) in ForEach.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ProcessCondition",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "items_config"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "optional_chaining_condition",
+          "properties": {
+            "parameters": {
+              "items_config": {
+                "type": "String",
+                "defaultValue": "[{\"name\": \"task1\"}]"
+              }
+            },
+            "variables": {
+              "resolved_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ProcessCondition",
+                "type": "ForEach",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.items_config)"
+                  },
+                  "activities": [
+                    {
+                      "name": "ResolveChain",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "resolved_value",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@coalesce(item()?.condition, 'notFound')"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "optional_chaining_condition_name",
+        "properties": {
+          "parameters": {
+            "items_config": {
+              "type": "String",
+              "defaultValue": "[{\"name\": \"task1\"}]"
+            }
+          },
+          "variables": {
+            "resolved_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ProcessConditionName",
+              "type": "ForEach",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.items_config)"
+                },
+                "activities": [
+                  {
+                    "name": "ResolveChain",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "resolved_value",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@coalesce(item()?.condition?.name, 'name_notFound')"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "@coalesce(item()?.condition?.name, 'name_notFound') \u2014 unsupported optional chaining (item()?.X) in ForEach.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ProcessConditionName",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "items_config"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "optional_chaining_condition_name",
+          "properties": {
+            "parameters": {
+              "items_config": {
+                "type": "String",
+                "defaultValue": "[{\"name\": \"task1\"}]"
+              }
+            },
+            "variables": {
+              "resolved_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ProcessConditionName",
+                "type": "ForEach",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.items_config)"
+                  },
+                  "activities": [
+                    {
+                      "name": "ResolveChain",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "resolved_value",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@coalesce(item()?.condition?.name, 'name_notFound')"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "optional_chaining_item_type",
+        "properties": {
+          "parameters": {
+            "items_config": {
+              "type": "String",
+              "defaultValue": "[{\"name\": \"task1\"}]"
+            }
+          },
+          "variables": {
+            "resolved_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ProcessItemType",
+              "type": "ForEach",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.items_config)"
+                },
+                "activities": [
+                  {
+                    "name": "ResolveChain",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "resolved_value",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@toUpper(coalesce(item()?.type, 'default'))"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "@toUpper(coalesce(item()?.type, 'default')) \u2014 unsupported optional chaining (item()?.X) in ForEach.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ProcessItemType",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "items_config"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "optional_chaining_item_type",
+          "properties": {
+            "parameters": {
+              "items_config": {
+                "type": "String",
+                "defaultValue": "[{\"name\": \"task1\"}]"
+              }
+            },
+            "variables": {
+              "resolved_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ProcessItemType",
+                "type": "ForEach",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.items_config)"
+                  },
+                  "activities": [
+                    {
+                      "name": "ResolveChain",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "resolved_value",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@toUpper(coalesce(item()?.type, 'default'))"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "optional_chaining_aux_params",
+        "properties": {
+          "parameters": {
+            "items_config": {
+              "type": "String",
+              "defaultValue": "[{\"name\": \"task1\"}]"
+            }
+          },
+          "variables": {
+            "resolved_value": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ProcessAuxParams",
+              "type": "ForEach",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.items_config)"
+                },
+                "activities": [
+                  {
+                    "name": "ResolveChain",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "resolved_value",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@coalesce(item()?.aux_params, '{}')"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "@coalesce(item()?.aux_params, '{}') \u2014 unsupported optional chaining (item()?.X) in ForEach.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ProcessAuxParams",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "items_config"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "optional_chaining_aux_params",
+          "properties": {
+            "parameters": {
+              "items_config": {
+                "type": "String",
+                "defaultValue": "[{\"name\": \"task1\"}]"
+              }
+            },
+            "variables": {
+              "resolved_value": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ProcessAuxParams",
+                "type": "ForEach",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.items_config)"
+                  },
+                  "activities": [
+                    {
+                      "name": "ResolveChain",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "resolved_value",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@coalesce(item()?.aux_params, '{}')"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "data_factory_env_check",
+        "properties": {
+          "parameters": {
+            "expected_factory": {
+              "type": "String",
+              "defaultValue": "data_factory_prod"
+            }
+          },
+          "variables": {
+            "is_prod": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckFactory",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().DataFactory, pipeline().parameters.expected_factory)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetProd",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "is_prod",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetNonProd",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "is_prod",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "pipeline().DataFactory \u2014 unsupported system variable for environment detection.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckFactory",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "expected_factory"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "data_factory_env_check",
+          "properties": {
+            "parameters": {
+              "expected_factory": {
+                "type": "String",
+                "defaultValue": "data_factory_prod"
+              }
+            },
+            "variables": {
+              "is_prod": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckFactory",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(pipeline().DataFactory, pipeline().parameters.expected_factory)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetProd",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "is_prod",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetNonProd",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "is_prod",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "triggered_by_pipeline_id",
+        "properties": {
+          "parameters": {
+            "app_name": {
+              "type": "String",
+              "defaultValue": "orchestrator"
+            },
+            "pipeline_name": {
+              "type": "String",
+              "defaultValue": "main"
+            }
+          },
+          "variables": {
+            "unique_id": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "GenerateUniqueId",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "unique_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.app_name, '#$', pipeline().parameters.pipeline_name, '#', utcnow('yyyy/MM/dd'), '#', pipeline().TriggeredByPipelineRunId)"
+                }
+              }
+            },
+            {
+              "name": "HasParent",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "GenerateUniqueId",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(equals(pipeline().TriggeredByPipelineRunId, ''))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "pipeline().TriggeredByPipelineRunId \u2014 unsupported system variable in UID generation.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "GenerateUniqueId",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "HasParent",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "app_name",
+          "pipeline_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "GenerateUniqueId",
+            "target_task": "HasParent"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "triggered_by_pipeline_id",
+          "properties": {
+            "parameters": {
+              "app_name": {
+                "type": "String",
+                "defaultValue": "orchestrator"
+              },
+              "pipeline_name": {
+                "type": "String",
+                "defaultValue": "main"
+              }
+            },
+            "variables": {
+              "unique_id": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "GenerateUniqueId",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "unique_id",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.app_name, '#$', pipeline().parameters.pipeline_name, '#', utcnow('yyyy/MM/dd'), '#', pipeline().TriggeredByPipelineRunId)"
+                  }
+                }
+              },
+              {
+                "name": "HasParent",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "GenerateUniqueId",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(equals(pipeline().TriggeredByPipelineRunId, ''))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "deep_output_chain",
+        "properties": {
+          "parameters": {},
+          "variables": {
+            "cluster_id": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "GetClusterId",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/api/2.1/jobs/runs/get",
+                "method": "GET",
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            },
+            {
+              "name": "ExtractClusterId",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "GetClusterId",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "cluster_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@activity('GetClusterId').output.tasks[0].cluster_instance.cluster_id"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity().output.tasks[0].cluster_instance.cluster_id \u2014 unsupported deep output chain with index.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "GetClusterId",
+            "is_placeholder": true
+          },
+          {
+            "task_key": "ExtractClusterId",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [],
+        "dependencies": [
+          {
+            "source_task": "GetClusterId",
+            "target_task": "ExtractClusterId"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "deep_output_chain",
+          "properties": {
+            "parameters": {},
+            "variables": {
+              "cluster_id": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "GetClusterId",
+                "type": "WebActivity",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/api/2.1/jobs/runs/get",
+                  "method": "GET",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  }
+                }
+              },
+              {
+                "name": "ExtractClusterId",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "GetClusterId",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "cluster_id",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@activity('GetClusterId').output.tasks[0].cluster_instance.cluster_id"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "activity_output_bare",
+        "properties": {
+          "parameters": {},
+          "variables": {
+            "has_error": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "output_data": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunProcess",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/process/main",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            },
+            {
+              "name": "CheckForError",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "RunProcess",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "has_error",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(contains(activity('RunProcess').output, 'runError'))"
+                }
+              }
+            },
+            {
+              "name": "CaptureOutput",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CheckForError",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "output_data",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('result##', if(contains(activity('RunProcess').output, 'runError'), '', activity('RunProcess').output.runOutput))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "activity('name').output without sub-property \u2014 unsupported bare output reference in contains().",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunProcess",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckForError",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CaptureOutput",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [],
+        "dependencies": [
+          {
+            "source_task": "RunProcess",
+            "target_task": "CheckForError"
+          },
+          {
+            "source_task": "CheckForError",
+            "target_task": "CaptureOutput"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "activity_output_bare",
+          "properties": {
+            "parameters": {},
+            "variables": {
+              "has_error": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "output_data": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunProcess",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/process/main",
+                  "baseParameters": {}
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              },
+              {
+                "name": "CheckForError",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "RunProcess",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "has_error",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(contains(activity('RunProcess').output, 'runError'))"
+                  }
+                }
+              },
+              {
+                "name": "CaptureOutput",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CheckForError",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "output_data",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('result##', if(contains(activity('RunProcess').output, 'runError'), '', activity('RunProcess').output.runOutput))"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "nested_unsupported_5level",
+        "properties": {
+          "parameters": {
+            "previous_outputs": {
+              "type": "String",
+              "defaultValue": "{}"
+            },
+            "execution_outputs": {
+              "type": "String",
+              "defaultValue": "{}"
+            }
+          },
+          "variables": {
+            "skip_condition": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "debug_trace": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "execution_outputs": {
+              "type": "String",
+              "defaultValue": "{}"
+            }
+          },
+          "activities": [
+            {
+              "name": "EvaluateConditions",
+              "type": "ForEach",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.previous_outputs)"
+                },
+                "activities": [
+                  {
+                    "name": "NonSkipCondition",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "skip_condition",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), true, if(contains(variables('execution_outputs'), concat('\"', coalesce(item()?.condition?.name, 'name_notFound'), '\"')), if(contains(string(json(variables('execution_outputs'))[item().condition.name]), concat('\"', coalesce(item()?.condition?.internal_name, item().condition.name), '\"')), true, false), false))"
+                      }
+                    }
+                  },
+                  {
+                    "name": "DebugTrace",
+                    "type": "SetVariable",
+                    "dependsOn": [
+                      {
+                        "activity": "NonSkipCondition",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "debug_trace",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), concat('No condition for task: ', coalesce(item()?.name, 'unnamed')), concat('Outputs: ', variables('execution_outputs')))"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "5-level deep if/equals/coalesce/contains with item()?.X \u2014 the most complex unsupported pattern.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "EvaluateConditions",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "previous_outputs",
+          "execution_outputs"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "nested_unsupported_5level",
+          "properties": {
+            "parameters": {
+              "previous_outputs": {
+                "type": "String",
+                "defaultValue": "{}"
+              },
+              "execution_outputs": {
+                "type": "String",
+                "defaultValue": "{}"
+              }
+            },
+            "variables": {
+              "skip_condition": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "debug_trace": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "execution_outputs": {
+                "type": "String",
+                "defaultValue": "{}"
+              }
+            },
+            "activities": [
+              {
+                "name": "EvaluateConditions",
+                "type": "ForEach",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.previous_outputs)"
+                  },
+                  "activities": [
+                    {
+                      "name": "NonSkipCondition",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "skip_condition",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), true, if(contains(variables('execution_outputs'), concat('\"', coalesce(item()?.condition?.name, 'name_notFound'), '\"')), if(contains(string(json(variables('execution_outputs'))[item().condition.name]), concat('\"', coalesce(item()?.condition?.internal_name, item().condition.name), '\"')), true, false), false))"
+                        }
+                      }
+                    },
+                    {
+                      "name": "DebugTrace",
+                      "type": "SetVariable",
+                      "dependsOn": [
+                        {
+                          "activity": "NonSkipCondition",
+                          "dependencyConditions": [
+                            "Succeeded"
+                          ]
+                        }
+                      ],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "debug_trace",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@if(equals(string(coalesce(item()?.condition, 'notFound')), 'notFound'), concat('No condition for task: ', coalesce(item()?.name, 'unnamed')), concat('Outputs: ', variables('execution_outputs')))"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "union_with_return_value",
+        "properties": {
+          "parameters": {},
+          "variables": {
+            "merged_outputs": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "execution_outputs": {
+              "type": "String",
+              "defaultValue": "{}"
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "RunInternalSwitch",
+              "type": "ExecutePipeline",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "pipeline": {
+                  "referenceName": "internal_switch_pipeline",
+                  "type": "PipelineReference"
+                },
+                "parameters": {},
+                "waitOnCompletion": true
+              }
+            },
+            {
+              "name": "AggregateOutputs",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "RunInternalSwitch",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@createArray('step1', 'step2', 'step3')"
+                },
+                "activities": [
+                  {
+                    "name": "MergeOutput",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "merged_outputs",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(union(json(if(startswith(activity('RunInternalSwitch').output.pipelineReturnValue.result, '{'), concat('{\"', coalesce(item()?.name, 'unnamed'), '\": ', activity('RunInternalSwitch').output.pipelineReturnValue.result, '}'), '{}')), json(variables('execution_outputs'))))"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "string(union(json(if(startswith(activity().output.pipelineReturnValue...)))))  \u2014 deeply nested unsupported with union + json + pipelineReturnValue + item()?.X.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "RunInternalSwitch",
+            "is_placeholder": true
+          },
+          {
+            "task_key": "AggregateOutputs",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [],
+        "dependencies": [
+          {
+            "source_task": "RunInternalSwitch",
+            "target_task": "AggregateOutputs"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "union_with_return_value",
+          "properties": {
+            "parameters": {},
+            "variables": {
+              "merged_outputs": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "execution_outputs": {
+                "type": "String",
+                "defaultValue": "{}"
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "RunInternalSwitch",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "pipeline": {
+                    "referenceName": "internal_switch_pipeline",
+                    "type": "PipelineReference"
+                  },
+                  "parameters": {},
+                  "waitOnCompletion": true
+                }
+              },
+              {
+                "name": "AggregateOutputs",
+                "type": "ForEach",
+                "dependsOn": [
+                  {
+                    "activity": "RunInternalSwitch",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@createArray('step1', 'step2', 'step3')"
+                  },
+                  "activities": [
+                    {
+                      "name": "MergeOutput",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "merged_outputs",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string(union(json(if(startswith(activity('RunInternalSwitch').output.pipelineReturnValue.result, '{'), concat('{\"', coalesce(item()?.name, 'unnamed'), '\": ', activity('RunInternalSwitch').output.pipelineReturnValue.result, '}'), '{}')), json(variables('execution_outputs'))))"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    }
+  ]
+}

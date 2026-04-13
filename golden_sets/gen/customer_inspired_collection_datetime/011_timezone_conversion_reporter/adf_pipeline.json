@@ -1,0 +1,114 @@
+{
+  "name": "timezone_conversion_reporter",
+  "properties": {
+    "parameters": {
+      "target_timezone": {
+        "type": "String",
+        "defaultValue": "Eastern Standard Time"
+      }
+    },
+    "variables": {
+      "local_datetime": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "local_time_only": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "utc_timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ConvertFull",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "local_datetime",
+          "value": {
+            "type": "Expression",
+            "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'dd/MM/yyyy HH:mm')"
+          }
+        }
+      },
+      {
+        "name": "ConvertTimeOnly",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ConvertFull",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "local_time_only",
+          "value": {
+            "type": "Expression",
+            "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'HH:mm')"
+          }
+        }
+      },
+      {
+        "name": "SetUtc",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ConvertFull",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "utc_timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+          }
+        }
+      },
+      {
+        "name": "ReportTimes",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "ConvertTimeOnly",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetUtc",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v1/metrics",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"local\": \"', variables('local_datetime'), '\", \"utc\": \"', variables('utc_timestamp'), '\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "name": "load_type_router",
+  "properties": {
+    "parameters": {
+      "load_type": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "LoadTypeCheck",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunCopy",
+              "type": "Copy",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "FailInvalidType",
+              "type": "Fail",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "type": "Expression",
+                  "value": "@concat('Invalid load_type: ', pipeline().parameters.load_type)"
+                },
+                "errorCode": {
+                  "type": "Expression",
+                  "value": "@string('INVALID_LOAD_TYPE')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

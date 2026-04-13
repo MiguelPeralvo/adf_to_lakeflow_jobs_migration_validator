@@ -1,0 +1,113 @@
+{
+  "name": "datetime_watermark_manager",
+  "properties": {
+    "parameters": {
+      "watermark_override": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "timezone": {
+        "type": "String",
+        "defaultValue": "Eastern Standard Time"
+      }
+    },
+    "variables": {
+      "effective_watermark": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "local_watermark": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "formatted_watermark": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ResolveWatermark",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_watermark",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(pipeline().parameters.watermark_override, formatDateTime(utcnow(), 'yyyy-MM-ddTHH:mm:ss'))"
+          }
+        }
+      },
+      {
+        "name": "ConvertToLocal",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ResolveWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "local_watermark",
+          "value": {
+            "type": "Expression",
+            "value": "@convertFromUtc(utcnow(), pipeline().parameters.timezone, 'yyyy-MM-dd HH:mm:ss')"
+          }
+        }
+      },
+      {
+        "name": "FormatWatermark",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ConvertToLocal",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "formatted_watermark",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+          }
+        }
+      },
+      {
+        "name": "IncrementalCopy",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "FormatWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM events WHERE updated_at > ''', variables('effective_watermark'), '''')"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

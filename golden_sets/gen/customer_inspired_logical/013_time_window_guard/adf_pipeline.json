@@ -1,0 +1,93 @@
+{
+  "name": "time_window_guard",
+  "properties": {
+    "parameters": {
+      "earliest_start": {
+        "type": "String",
+        "defaultValue": "08:15"
+      },
+      "latest_start": {
+        "type": "String",
+        "defaultValue": "22:00"
+      }
+    },
+    "variables": {
+      "current_hour": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetCurrentHour",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_hour",
+          "value": {
+            "type": "Expression",
+            "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'HH:mm')"
+          }
+        }
+      },
+      {
+        "name": "TimeWindowCheck",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "SetCurrentHour",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greaterOrEquals(variables('current_hour'), pipeline().parameters.earliest_start)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunScheduledJob",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/scheduler/main",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "TooEarly",
+              "type": "Fail",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "type": "Expression",
+                  "value": "@concat('Current time ', variables('current_hour'), ' is before allowed window ', pipeline().parameters.earliest_start)"
+                },
+                "errorCode": {
+                  "type": "Expression",
+                  "value": "@string('TIME_WINDOW_VIOLATION')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

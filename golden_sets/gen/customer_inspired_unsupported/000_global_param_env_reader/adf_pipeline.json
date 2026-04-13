@@ -1,0 +1,90 @@
+{
+  "name": "global_param_env_reader",
+  "properties": {
+    "parameters": {
+      "app_name": {
+        "type": "String",
+        "defaultValue": "etl"
+      }
+    },
+    "variables": {
+      "lib_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "config_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetLibPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "lib_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/common_libraries/', pipeline().globalParameters.lib_file_name)"
+          }
+        }
+      },
+      {
+        "name": "SetConfigPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetLibPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "config_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/catalog/', pipeline().globalParameters.env_variable, '/gold/config/', pipeline().parameters.app_name, '/settings.json')"
+          }
+        }
+      },
+      {
+        "name": "RunWithLibs",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetConfigPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/etl/main",
+          "baseParameters": {
+            "library_path": {
+              "type": "Expression",
+              "value": "@variables('lib_path')"
+            },
+            "config_path": {
+              "type": "Expression",
+              "value": "@variables('config_path')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "name": "config_driven_path_assembler",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east"
+      },
+      "app_name": {
+        "type": "String",
+        "defaultValue": "analytics"
+      },
+      "module": {
+        "type": "String",
+        "defaultValue": "ingestion"
+      },
+      "version": {
+        "type": "String",
+        "defaultValue": "v3"
+      },
+      "tenant_id": {
+        "type": "String",
+        "defaultValue": "t-001"
+      },
+      "format": {
+        "type": "String",
+        "defaultValue": "delta"
+      },
+      "compression": {
+        "type": "String",
+        "defaultValue": "snappy"
+      }
+    },
+    "variables": {
+      "base_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "data_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "metadata_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetBasePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "base_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/', pipeline().parameters.tenant_id, '/', pipeline().parameters.app_name, '/', pipeline().parameters.version)"
+          }
+        }
+      },
+      {
+        "name": "SetDataPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetBasePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "data_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('base_path'), '/', pipeline().parameters.module, '/data/', pipeline().parameters.format, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetMetadataPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetBasePath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "metadata_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('base_path'), '/metadata/', pipeline().parameters.module, '_', formatDateTime(utcnow(), 'yyyyMMdd'), '.json')"
+          }
+        }
+      },
+      {
+        "name": "RunIngestion",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetDataPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetMetadataPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/ingestion/main",
+          "baseParameters": {
+            "data_path": {
+              "type": "Expression",
+              "value": "@variables('data_path')"
+            },
+            "metadata_path": {
+              "type": "Expression",
+              "value": "@variables('metadata_path')"
+            },
+            "compression": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.compression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

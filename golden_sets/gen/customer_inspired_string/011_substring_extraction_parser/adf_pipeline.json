@@ -1,0 +1,129 @@
+{
+  "name": "substring_extraction_parser",
+  "properties": {
+    "parameters": {
+      "log_entry": {
+        "type": "String",
+        "defaultValue": "2024-01-15T10:30:00Z|ERROR|Module:Auth|Failed login"
+      }
+    },
+    "variables": {
+      "timestamp_part": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "level_part": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "module_part": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExtractTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "timestamp_part",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.log_entry, 0, indexOf(pipeline().parameters.log_entry, '|'))"
+          }
+        }
+      },
+      {
+        "name": "ExtractLevel",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "level_part",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(length(pipeline().parameters.log_entry), add(indexOf(pipeline().parameters.log_entry, '|'), 1))), '|'), 0))"
+          }
+        }
+      },
+      {
+        "name": "ExtractModule",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ExtractLevel",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "module_part",
+          "value": {
+            "type": "Expression",
+            "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), 50), '|'), 0))"
+          }
+        }
+      },
+      {
+        "name": "CheckError",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ExtractModule",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(variables('level_part'), 'ERROR')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

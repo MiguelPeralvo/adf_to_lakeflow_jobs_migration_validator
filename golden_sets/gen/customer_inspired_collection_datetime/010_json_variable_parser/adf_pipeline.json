@@ -1,0 +1,100 @@
+{
+  "name": "json_variable_parser",
+  "properties": {
+    "parameters": {
+      "serialized_payload": {
+        "type": "String",
+        "defaultValue": "{\"key\": \"value\", \"count\": 42}"
+      }
+    },
+    "variables": {
+      "parsed_data": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "extracted_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "current_entry": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ParsePayload",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_data",
+          "value": {
+            "type": "Expression",
+            "value": "@string(json(pipeline().parameters.serialized_payload))"
+          }
+        }
+      },
+      {
+        "name": "ExtractKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ParsePayload",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "extracted_key",
+          "value": {
+            "type": "Expression",
+            "value": "@json(pipeline().parameters.serialized_payload).key"
+          }
+        }
+      },
+      {
+        "name": "ProcessEntries",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "ExtractKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@json(pipeline().parameters.serialized_payload)"
+          },
+          "activities": [
+            {
+              "name": "ProcessEntry",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_entry",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(item())"
+                }
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "name": "csv_header_builder",
+  "properties": {
+    "parameters": {
+      "column_list": {
+        "type": "String",
+        "defaultValue": "id,name,email,created_at"
+      }
+    },
+    "variables": {
+      "columns": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "header_line": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "column_count": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "current_col": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SplitColumns",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "header_line",
+          "value": {
+            "type": "Expression",
+            "value": "@join(createArray('id', 'name', 'email', 'created_at', 'updated_at'), '|')"
+          }
+        }
+      },
+      {
+        "name": "CountColumns",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SplitColumns",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "column_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(split(pipeline().parameters.column_list, ',')))"
+          }
+        }
+      },
+      {
+        "name": "BuildHeader",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CountColumns",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "header_line",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('HEADER|', variables('column_count'), '|', replace(pipeline().parameters.column_list, ',', '|'))"
+          }
+        }
+      },
+      {
+        "name": "ProcessColumns",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "BuildHeader",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@split(pipeline().parameters.column_list, ',')"
+          },
+          "activities": [
+            {
+              "name": "ProcessCol",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_col",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('col_', item())"
+                }
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "name": "pipeline_return_value_result_code",
+  "properties": {
+    "parameters": {
+      "input_param": {
+        "type": "String",
+        "defaultValue": "default"
+      }
+    },
+    "variables": {
+      "return_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunChildPipeline",
+        "type": "ExecutePipeline",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "child_etl",
+            "type": "PipelineReference"
+          },
+          "parameters": {
+            "input": {
+              "type": "Expression",
+              "value": "@pipeline().parameters.input_param"
+            }
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "CaptureReturn",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RunChildPipeline",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "return_value",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('RunChildPipeline').output.pipelineReturnValue.result_code"
+          }
+        }
+      },
+      {
+        "name": "CheckReturn",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CaptureReturn",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(empty(activity('RunChildPipeline').output.pipelineReturnValue.result_code))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

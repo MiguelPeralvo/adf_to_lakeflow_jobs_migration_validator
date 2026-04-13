@@ -1,0 +1,89 @@
+{
+  "name": "coalesce_based_null_guard",
+  "properties": {
+    "parameters": {
+      "input_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "fallback_id": {
+        "type": "String",
+        "defaultValue": "default-001"
+      }
+    },
+    "variables": {
+      "effective_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ResolveId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_id",
+          "value": {
+            "type": "Expression",
+            "value": "@if(or(equals(coalesce(pipeline().parameters.input_id, ''), ''), equals(pipeline().parameters.input_id, 'null')), pipeline().parameters.fallback_id, pipeline().parameters.input_id)"
+          }
+        }
+      },
+      {
+        "name": "ValidateId",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ResolveId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('effective_id'), ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

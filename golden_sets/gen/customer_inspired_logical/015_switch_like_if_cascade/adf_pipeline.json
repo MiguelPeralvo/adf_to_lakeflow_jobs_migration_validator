@@ -1,0 +1,123 @@
+{
+  "name": "switch_like_if_cascade",
+  "properties": {
+    "parameters": {
+      "action": {
+        "type": "String",
+        "defaultValue": "transform"
+      }
+    },
+    "variables": {
+      "result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "Route",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().parameters.action, 'extract')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetExtract",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "result",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('extracting')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "Route2",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(pipeline().parameters.action, 'transform')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTransform",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "result",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('transforming')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "Route3",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@equals(pipeline().parameters.action, 'load')"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "SetLoad",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "result",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@string('loading')"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "SetUnknown",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "result",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@concat('unknown_action:', pipeline().parameters.action)"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

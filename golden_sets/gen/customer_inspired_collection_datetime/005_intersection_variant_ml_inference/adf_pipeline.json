@@ -1,0 +1,67 @@
+{
+  "name": "intersection_variant_005",
+  "properties": {
+    "parameters": {
+      "requested_modules": {
+        "type": "Array",
+        "defaultValue": [
+          "all"
+        ]
+      },
+      "run_flag": {
+        "type": "String",
+        "defaultValue": "enabled"
+      }
+    },
+    "variables": {
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CheckMlInference",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'ml', 'inference', 'ml_inference'))))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

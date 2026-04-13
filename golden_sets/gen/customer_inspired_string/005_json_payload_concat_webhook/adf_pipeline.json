@@ -1,0 +1,100 @@
+{
+  "name": "json_payload_concat_webhook",
+  "properties": {
+    "parameters": {
+      "job_id": {
+        "type": "String",
+        "defaultValue": "j-001"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "owner": {
+        "type": "String",
+        "defaultValue": "data-team"
+      },
+      "priority": {
+        "type": "String",
+        "defaultValue": "high"
+      },
+      "source_system": {
+        "type": "String",
+        "defaultValue": "erp"
+      }
+    },
+    "variables": {
+      "payload": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "execution_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+          }
+        }
+      },
+      {
+        "name": "BuildPayload",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "payload",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('{\"job_id\":\"', pipeline().parameters.job_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"owner\":\"', pipeline().parameters.owner, '\",\"priority\":\"', pipeline().parameters.priority, '\",\"source\":\"', pipeline().parameters.source_system, '\",\"pipeline\":\"', pipeline().Pipeline, '\",\"run_id\":\"', pipeline().RunId, '\",\"status\":\"', variables('execution_result'), '\",\"timestamp\":\"', variables('timestamp'), '\"}')"
+          }
+        }
+      },
+      {
+        "name": "SendPayload",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildPayload",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v2/events",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@variables('payload')"
+          }
+        }
+      }
+    ]
+  }
+}

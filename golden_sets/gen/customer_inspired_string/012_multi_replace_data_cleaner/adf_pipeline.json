@@ -1,0 +1,106 @@
+{
+  "name": "multi_replace_data_cleaner",
+  "properties": {
+    "parameters": {
+      "raw_data": {
+        "type": "String",
+        "defaultValue": "value with <tags> & \"quotes\""
+      }
+    },
+    "variables": {
+      "clean_step1": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "clean_step2": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "clean_final": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "StripTags",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "clean_step1",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(pipeline().parameters.raw_data, '<', '&lt;'), '>', '&gt;')"
+          }
+        }
+      },
+      {
+        "name": "EscapeQuotes",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "StripTags",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "clean_step2",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(variables('clean_step1'), '\"', '\\\\\"'), '\\\\', '\\\\\\\\')"
+          }
+        }
+      },
+      {
+        "name": "FinalClean",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EscapeQuotes",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "clean_final",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(replace(replace(variables('clean_step2'), '&', '&amp;'), char(10), ' '), char(13), ' '), char(9), ' ')"
+          }
+        }
+      },
+      {
+        "name": "ProcessCleanData",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "FinalClean",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/cleaner/process",
+          "baseParameters": {
+            "cleaned_data": {
+              "type": "Expression",
+              "value": "@variables('clean_final')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

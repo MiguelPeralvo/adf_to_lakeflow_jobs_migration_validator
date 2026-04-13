@@ -1,0 +1,83 @@
+{
+  "name": "global_param_url_builder",
+  "properties": {
+    "parameters": {
+      "job_id": {
+        "type": "String",
+        "defaultValue": "j-001"
+      }
+    },
+    "variables": {
+      "api_url": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "permissions_url": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildApiUrl",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "api_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.1/jobs/runs/get?run_id=', pipeline().parameters.job_id)"
+          }
+        }
+      },
+      {
+        "name": "BuildPermissionsUrl",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildApiUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "permissions_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().globalParameters.databricks_api_url, '/api/2.0/permissions/jobs/', pipeline().parameters.job_id)"
+          }
+        }
+      },
+      {
+        "name": "CheckJobStatus",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildPermissionsUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('api_url')"
+          },
+          "method": "GET",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      }
+    ]
+  }
+}

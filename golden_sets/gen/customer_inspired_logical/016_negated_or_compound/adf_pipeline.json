@@ -1,0 +1,66 @@
+{
+  "name": "negated_or_compound",
+  "properties": {
+    "parameters": {
+      "load_type": {
+        "type": "String",
+        "defaultValue": "full"
+      },
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      }
+    },
+    "variables": {
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ExcludeDevTypes",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(or(equals(pipeline().parameters.load_type, 'test'), equals(pipeline().parameters.load_type, 'debug')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "RunProduction",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/etl/main",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

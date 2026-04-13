@@ -1,0 +1,117 @@
+{
+  "name": "item_to_string_foreach_processor",
+  "properties": {
+    "parameters": {
+      "config_file": {
+        "type": "String",
+        "defaultValue": "etl_config.json"
+      }
+    },
+    "variables": {
+      "processed_items": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_item": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "current_files": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ReadConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "ProcessItems",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "ReadConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@activity('ReadConfig').output.value"
+          },
+          "activities": [
+            {
+              "name": "SerializeItem",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_item",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(item())"
+                }
+              }
+            },
+            {
+              "name": "CheckItemFiles",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@contains(string(item().files), pipeline().parameters.config_file)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "ExtractFiles",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "current_files",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@if(startswith(string(item().files), '['), string(item().files), concat('[', string(item().files), ']'))"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetEmptyFiles",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "current_files",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('[]')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

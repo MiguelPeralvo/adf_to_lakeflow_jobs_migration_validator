@@ -1,0 +1,106 @@
+{
+  "name": "run_output_variant_data_validation",
+  "properties": {
+    "parameters": {
+      "threshold": {
+        "type": "Int",
+        "defaultValue": 1
+      }
+    },
+    "variables": {
+      "check_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunDataValidation",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/checks/data_validation",
+          "baseParameters": {}
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CheckRunDataValidationResult",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "RunDataValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('RunDataValidation').output.runOutput, pipeline().parameters.threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "StoreResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckRunDataValidationResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "check_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('RunDataValidation').output.runOutput)"
+          }
+        }
+      }
+    ]
+  }
+}

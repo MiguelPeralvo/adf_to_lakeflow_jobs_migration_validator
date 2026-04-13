@@ -1,0 +1,69 @@
+{
+  "name": "intersection_module_filter",
+  "properties": {
+    "parameters": {
+      "allowed_modules": {
+        "type": "Array",
+        "defaultValue": [
+          "all",
+          "core",
+          "reporting"
+        ]
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ModuleFilterGate",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(empty(intersection(pipeline().parameters.allowed_modules, createArray('all', 'core', 'reporting', 'analytics')))), equals(pipeline().parameters.run_mode, 'full'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "optional_chaining_condition",
+  "properties": {
+    "parameters": {
+      "items_config": {
+        "type": "String",
+        "defaultValue": "[{\"name\": \"task1\"}]"
+      }
+    },
+    "variables": {
+      "resolved_value": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ProcessCondition",
+        "type": "ForEach",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@json(pipeline().parameters.items_config)"
+          },
+          "activities": [
+            {
+              "name": "ResolveChain",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "resolved_value",
+                "value": {
+                  "type": "Expression",
+                  "value": "@coalesce(item()?.condition, 'notFound')"
+                }
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

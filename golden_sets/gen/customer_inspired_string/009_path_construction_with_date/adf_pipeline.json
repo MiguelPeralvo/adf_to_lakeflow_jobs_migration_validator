@@ -1,0 +1,81 @@
+{
+  "name": "path_construction_with_date",
+  "properties": {
+    "parameters": {
+      "zone": {
+        "type": "String",
+        "defaultValue": "gold"
+      },
+      "dataset": {
+        "type": "String",
+        "defaultValue": "transactions"
+      }
+    },
+    "variables": {
+      "data_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "checkpoint_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetDataPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "data_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/catalog/', pipeline().parameters.zone, '/', pipeline().parameters.dataset, '/year=', formatDateTime(utcnow(), 'yyyy'), '/month=', formatDateTime(utcnow(), 'MM'), '/day=', formatDateTime(utcnow(), 'dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetCheckpointPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetDataPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "checkpoint_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/catalog/checkpoints/', pipeline().parameters.dataset, '_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'))"
+          }
+        }
+      },
+      {
+        "name": "LoadData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetCheckpointPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

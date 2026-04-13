@@ -1,0 +1,70 @@
+{
+  "name": "contains_filter_variant_008",
+  "properties": {
+    "parameters": {
+      "target_tables": {
+        "type": "String",
+        "defaultValue": "inventory,accounts,reports"
+      },
+      "enable_filter": {
+        "type": "Bool",
+        "defaultValue": true
+      }
+    },
+    "variables": {
+      "should_process": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "FilterInventory",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@contains(pipeline().parameters.target_tables, 'inventory')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ProcessInventory",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/etl/inventory/load",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SkipProcessing",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "should_process",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('skipped')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

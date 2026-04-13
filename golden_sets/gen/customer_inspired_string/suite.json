@@ -1,0 +1,5285 @@
+{
+  "pipelines": [
+    {
+      "adf_json": {
+        "name": "multi_arg_concat_path_builder",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "region": {
+              "type": "String",
+              "defaultValue": "us-east"
+            },
+            "dataset_name": {
+              "type": "String",
+              "defaultValue": "customers"
+            },
+            "version": {
+              "type": "String",
+              "defaultValue": "v2"
+            }
+          },
+          "variables": {
+            "full_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "archive_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "log_path": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetFullPath",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "full_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/gold/', pipeline().parameters.dataset_name, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                }
+              }
+            },
+            {
+              "name": "SetArchivePath",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "archive_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/', pipeline().parameters.env, '/archive/', pipeline().parameters.dataset_name, '_', pipeline().parameters.version, '_', formatDateTime(utcnow(), 'yyyyMMdd'))"
+                }
+              }
+            },
+            {
+              "name": "SetLogPath",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetFullPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "log_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/logs/', pipeline().Pipeline, '/', pipeline().RunId)"
+                }
+              }
+            },
+            {
+              "name": "ProcessData",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "SetLogPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/data_loader/process",
+                "baseParameters": {
+                  "input_path": {
+                    "type": "Expression",
+                    "value": "@variables('full_path')"
+                  },
+                  "output_path": {
+                    "type": "Expression",
+                    "value": "@variables('archive_path')"
+                  },
+                  "log_path": {
+                    "type": "Expression",
+                    "value": "@variables('log_path')"
+                  },
+                  "run_date": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(utcnow(), 'yyyy-MM-dd')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      "description": "Multi-argument concat for path construction with 6+ parameters and formatDateTime.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetFullPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetArchivePath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetLogPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ProcessData",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "region",
+          "dataset_name",
+          "version"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetFullPath",
+            "target_task": "SetLogPath"
+          },
+          {
+            "source_task": "SetLogPath",
+            "target_task": "ProcessData"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "multi_arg_concat_path_builder",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "region": {
+                "type": "String",
+                "defaultValue": "us-east"
+              },
+              "dataset_name": {
+                "type": "String",
+                "defaultValue": "customers"
+              },
+              "version": {
+                "type": "String",
+                "defaultValue": "v2"
+              }
+            },
+            "variables": {
+              "full_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "archive_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "log_path": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetFullPath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "full_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/gold/', pipeline().parameters.dataset_name, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                  }
+                }
+              },
+              {
+                "name": "SetArchivePath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "archive_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/', pipeline().parameters.env, '/archive/', pipeline().parameters.dataset_name, '_', pipeline().parameters.version, '_', formatDateTime(utcnow(), 'yyyyMMdd'))"
+                  }
+                }
+              },
+              {
+                "name": "SetLogPath",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetFullPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "log_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/logs/', pipeline().Pipeline, '/', pipeline().RunId)"
+                  }
+                }
+              },
+              {
+                "name": "ProcessData",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                  {
+                    "activity": "SetLogPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/data_loader/process",
+                  "baseParameters": {
+                    "input_path": {
+                      "type": "Expression",
+                      "value": "@variables('full_path')"
+                    },
+                    "output_path": {
+                      "type": "Expression",
+                      "value": "@variables('archive_path')"
+                    },
+                    "log_path": {
+                      "type": "Expression",
+                      "value": "@variables('log_path')"
+                    },
+                    "run_date": {
+                      "type": "Expression",
+                      "value": "@formatDateTime(utcnow(), 'yyyy-MM-dd')"
+                    }
+                  }
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "string_interpolation_table_names",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "table_name": {
+              "type": "String",
+              "defaultValue": "orders"
+            },
+            "schema_name": {
+              "type": "String",
+              "defaultValue": "analytics"
+            }
+          },
+          "variables": {
+            "qualified_name": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "staging_name": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetQualifiedName",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "qualified_name",
+                "value": {
+                  "type": "Expression",
+                  "value": "@{concat(pipeline().parameters.env, '_', pipeline().parameters.schema_name, '.', pipeline().parameters.table_name)}"
+                }
+              }
+            },
+            {
+              "name": "SetStagingName",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetQualifiedName",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "staging_name",
+                "value": {
+                  "type": "Expression",
+                  "value": "@{concat('stg_', pipeline().parameters.table_name, '_', formatDateTime(utcnow(), 'yyyyMMdd'))}"
+                }
+              }
+            },
+            {
+              "name": "CopyToStaging",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "SetStagingName",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM ', variables('qualified_name'), ' WHERE load_date >= ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "String interpolation @{...} for qualified table names with date partitioning.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetQualifiedName",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetStagingName",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CopyToStaging",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "table_name",
+          "schema_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetQualifiedName",
+            "target_task": "SetStagingName"
+          },
+          {
+            "source_task": "SetStagingName",
+            "target_task": "CopyToStaging"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "string_interpolation_table_names",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "table_name": {
+                "type": "String",
+                "defaultValue": "orders"
+              },
+              "schema_name": {
+                "type": "String",
+                "defaultValue": "analytics"
+              }
+            },
+            "variables": {
+              "qualified_name": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "staging_name": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetQualifiedName",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "qualified_name",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@{concat(pipeline().parameters.env, '_', pipeline().parameters.schema_name, '.', pipeline().parameters.table_name)}"
+                  }
+                }
+              },
+              {
+                "name": "SetStagingName",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetQualifiedName",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "staging_name",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@{concat('stg_', pipeline().parameters.table_name, '_', formatDateTime(utcnow(), 'yyyyMMdd'))}"
+                  }
+                }
+              },
+              {
+                "name": "CopyToStaging",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "SetStagingName",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT * FROM ', variables('qualified_name'), ' WHERE load_date >= ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "nested_split_connection_parser",
+        "properties": {
+          "parameters": {
+            "connection_string": {
+              "type": "String",
+              "defaultValue": "Server=myserver;Database=mydb;User=admin"
+            },
+            "fallback_db": {
+              "type": "String",
+              "defaultValue": "default_db"
+            }
+          },
+          "variables": {
+            "server_name": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "database_name": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "is_valid": {
+              "type": "String",
+              "defaultValue": "false"
+            }
+          },
+          "activities": [
+            {
+              "name": "ExtractServer",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "server_name",
+                "value": {
+                  "type": "Expression",
+                  "value": "@split(split(pipeline().parameters.connection_string, ';')[0], '=')[1]"
+                }
+              }
+            },
+            {
+              "name": "ExtractDatabase",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ExtractServer",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "database_name",
+                "value": {
+                  "type": "Expression",
+                  "value": "@split(split(pipeline().parameters.connection_string, ';')[1], '=')[1]"
+                }
+              }
+            },
+            {
+              "name": "ValidateConnection",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ExtractDatabase",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(variables('server_name')))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "MarkValid",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "is_valid",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "UseFallback",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "database_name",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@pipeline().parameters.fallback_db"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "LookupSchema",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "ValidateConnection",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT TOP 1 * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = ''', variables('database_name'), '''')"
+                  }
+                },
+                "firstRowOnly": true
+              }
+            }
+          ]
+        }
+      },
+      "description": "Nested split(split(...)[N], delim)[M] for connection string parsing with validation.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ExtractServer",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExtractDatabase",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ValidateConnection",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "LookupSchema",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "connection_string",
+          "fallback_db"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ExtractServer",
+            "target_task": "ExtractDatabase"
+          },
+          {
+            "source_task": "ExtractDatabase",
+            "target_task": "ValidateConnection"
+          },
+          {
+            "source_task": "ValidateConnection",
+            "target_task": "LookupSchema"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "nested_split_connection_parser",
+          "properties": {
+            "parameters": {
+              "connection_string": {
+                "type": "String",
+                "defaultValue": "Server=myserver;Database=mydb;User=admin"
+              },
+              "fallback_db": {
+                "type": "String",
+                "defaultValue": "default_db"
+              }
+            },
+            "variables": {
+              "server_name": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "database_name": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "is_valid": {
+                "type": "String",
+                "defaultValue": "false"
+              }
+            },
+            "activities": [
+              {
+                "name": "ExtractServer",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "server_name",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@split(split(pipeline().parameters.connection_string, ';')[0], '=')[1]"
+                  }
+                }
+              },
+              {
+                "name": "ExtractDatabase",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractServer",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "database_name",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@split(split(pipeline().parameters.connection_string, ';')[1], '=')[1]"
+                  }
+                }
+              },
+              {
+                "name": "ValidateConnection",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractDatabase",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(variables('server_name')))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "MarkValid",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "is_valid",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "UseFallback",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "database_name",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@pipeline().parameters.fallback_db"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "LookupSchema",
+                "type": "Lookup",
+                "dependsOn": [
+                  {
+                    "activity": "ValidateConnection",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT TOP 1 * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = ''', variables('database_name'), '''')"
+                    }
+                  },
+                  "firstRowOnly": true
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "item_to_string_foreach_processor",
+        "properties": {
+          "parameters": {
+            "config_file": {
+              "type": "String",
+              "defaultValue": "etl_config.json"
+            }
+          },
+          "variables": {
+            "processed_items": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "current_item": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "current_files": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ReadConfig",
+              "type": "Lookup",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "ProcessItems",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "ReadConfig",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@activity('ReadConfig').output.value"
+                },
+                "activities": [
+                  {
+                    "name": "SerializeItem",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "current_item",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(item())"
+                      }
+                    }
+                  },
+                  {
+                    "name": "CheckItemFiles",
+                    "type": "IfCondition",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "expression": {
+                        "type": "Expression",
+                        "value": "@contains(string(item().files), pipeline().parameters.config_file)"
+                      },
+                      "ifTrueActivities": [
+                        {
+                          "name": "ExtractFiles",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "current_files",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@if(startswith(string(item().files), '['), string(item().files), concat('[', string(item().files), ']'))"
+                            }
+                          }
+                        }
+                      ],
+                      "ifFalseActivities": [
+                        {
+                          "name": "SetEmptyFiles",
+                          "type": "SetVariable",
+                          "dependsOn": [],
+                          "userProperties": [],
+                          "typeProperties": {
+                            "variableName": "current_files",
+                            "value": {
+                              "type": "Expression",
+                              "value": "@string('[]')"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "ForEach with string(item()), string(item().files), contains, startswith \u2014 item serialization patterns.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ReadConfig",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ProcessItems",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "config_file"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ReadConfig",
+            "target_task": "ProcessItems"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "item_to_string_foreach_processor",
+          "properties": {
+            "parameters": {
+              "config_file": {
+                "type": "String",
+                "defaultValue": "etl_config.json"
+              }
+            },
+            "variables": {
+              "processed_items": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "current_item": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "current_files": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ReadConfig",
+                "type": "Lookup",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "ProcessItems",
+                "type": "ForEach",
+                "dependsOn": [
+                  {
+                    "activity": "ReadConfig",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@activity('ReadConfig').output.value"
+                  },
+                  "activities": [
+                    {
+                      "name": "SerializeItem",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "current_item",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string(item())"
+                        }
+                      }
+                    },
+                    {
+                      "name": "CheckItemFiles",
+                      "type": "IfCondition",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "expression": {
+                          "type": "Expression",
+                          "value": "@contains(string(item().files), pipeline().parameters.config_file)"
+                        },
+                        "ifTrueActivities": [
+                          {
+                            "name": "ExtractFiles",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                              "variableName": "current_files",
+                              "value": {
+                                "type": "Expression",
+                                "value": "@if(startswith(string(item().files), '['), string(item().files), concat('[', string(item().files), ']'))"
+                              }
+                            }
+                          }
+                        ],
+                        "ifFalseActivities": [
+                          {
+                            "name": "SetEmptyFiles",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                              "variableName": "current_files",
+                              "value": {
+                                "type": "Expression",
+                                "value": "@string('[]')"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "join_collected_ids_notifier",
+        "properties": {
+          "parameters": {
+            "batch_size": {
+              "type": "Int",
+              "defaultValue": 10
+            }
+          },
+          "variables": {
+            "collected_ids": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "id_csv": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CollectId1",
+              "type": "AppendVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "collected_ids",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('id_001')"
+                }
+              }
+            },
+            {
+              "name": "CollectId2",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "CollectId1",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "collected_ids",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('id_002')"
+                }
+              }
+            },
+            {
+              "name": "CollectId3",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "CollectId2",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "collected_ids",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('id_003')"
+                }
+              }
+            },
+            {
+              "name": "BuildCsv",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CollectId3",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "id_csv",
+                "value": {
+                  "type": "Expression",
+                  "value": "@join(variables('collected_ids'), ',')"
+                }
+              }
+            },
+            {
+              "name": "NotifyWebhook",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "BuildCsv",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/notifications",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"batch_ids\": \"', variables('id_csv'), '\", \"count\": ', string(length(variables('collected_ids'))), '}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "AppendVariable + join(variables('array'), ',') for CSV construction + WebActivity notification.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CollectId1",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CollectId2",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CollectId3",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildCsv",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "NotifyWebhook",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "batch_size"
+        ],
+        "dependencies": [
+          {
+            "source_task": "CollectId1",
+            "target_task": "CollectId2"
+          },
+          {
+            "source_task": "CollectId2",
+            "target_task": "CollectId3"
+          },
+          {
+            "source_task": "CollectId3",
+            "target_task": "BuildCsv"
+          },
+          {
+            "source_task": "BuildCsv",
+            "target_task": "NotifyWebhook"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "join_collected_ids_notifier",
+          "properties": {
+            "parameters": {
+              "batch_size": {
+                "type": "Int",
+                "defaultValue": 10
+              }
+            },
+            "variables": {
+              "collected_ids": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "id_csv": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CollectId1",
+                "type": "AppendVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "collected_ids",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string('id_001')"
+                  }
+                }
+              },
+              {
+                "name": "CollectId2",
+                "type": "AppendVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CollectId1",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "collected_ids",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string('id_002')"
+                  }
+                }
+              },
+              {
+                "name": "CollectId3",
+                "type": "AppendVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CollectId2",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "collected_ids",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string('id_003')"
+                  }
+                }
+              },
+              {
+                "name": "BuildCsv",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CollectId3",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "id_csv",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@join(variables('collected_ids'), ',')"
+                  }
+                }
+              },
+              {
+                "name": "NotifyWebhook",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "BuildCsv",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v1/notifications",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"batch_ids\": \"', variables('id_csv'), '\", \"count\": ', string(length(variables('collected_ids'))), '}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 4,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "json_payload_concat_webhook",
+        "properties": {
+          "parameters": {
+            "job_id": {
+              "type": "String",
+              "defaultValue": "j-001"
+            },
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "owner": {
+              "type": "String",
+              "defaultValue": "data-team"
+            },
+            "priority": {
+              "type": "String",
+              "defaultValue": "high"
+            },
+            "source_system": {
+              "type": "String",
+              "defaultValue": "erp"
+            }
+          },
+          "variables": {
+            "payload": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "execution_result": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "timestamp": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetTimestamp",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "timestamp",
+                "value": {
+                  "type": "Expression",
+                  "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                }
+              }
+            },
+            {
+              "name": "BuildPayload",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetTimestamp",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "payload",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('{\"job_id\":\"', pipeline().parameters.job_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"owner\":\"', pipeline().parameters.owner, '\",\"priority\":\"', pipeline().parameters.priority, '\",\"source\":\"', pipeline().parameters.source_system, '\",\"pipeline\":\"', pipeline().Pipeline, '\",\"run_id\":\"', pipeline().RunId, '\",\"status\":\"', variables('execution_result'), '\",\"timestamp\":\"', variables('timestamp'), '\"}')"
+                }
+              }
+            },
+            {
+              "name": "SendPayload",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "BuildPayload",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v2/events",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@variables('payload')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "15-argument concat building JSON payload for webhook with pipeline system variables.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetTimestamp",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildPayload",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SendPayload",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "job_id",
+          "env",
+          "owner",
+          "priority",
+          "source_system"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetTimestamp",
+            "target_task": "BuildPayload"
+          },
+          {
+            "source_task": "BuildPayload",
+            "target_task": "SendPayload"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "json_payload_concat_webhook",
+          "properties": {
+            "parameters": {
+              "job_id": {
+                "type": "String",
+                "defaultValue": "j-001"
+              },
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "owner": {
+                "type": "String",
+                "defaultValue": "data-team"
+              },
+              "priority": {
+                "type": "String",
+                "defaultValue": "high"
+              },
+              "source_system": {
+                "type": "String",
+                "defaultValue": "erp"
+              }
+            },
+            "variables": {
+              "payload": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "execution_result": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "timestamp": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetTimestamp",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "timestamp",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                  }
+                }
+              },
+              {
+                "name": "BuildPayload",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetTimestamp",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "payload",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('{\"job_id\":\"', pipeline().parameters.job_id, '\",\"env\":\"', pipeline().parameters.env, '\",\"owner\":\"', pipeline().parameters.owner, '\",\"priority\":\"', pipeline().parameters.priority, '\",\"source\":\"', pipeline().parameters.source_system, '\",\"pipeline\":\"', pipeline().Pipeline, '\",\"run_id\":\"', pipeline().RunId, '\",\"status\":\"', variables('execution_result'), '\",\"timestamp\":\"', variables('timestamp'), '\"}')"
+                  }
+                }
+              },
+              {
+                "name": "SendPayload",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "BuildPayload",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v2/events",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@variables('payload')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "env_branching_url_builder",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "endpoint": {
+              "type": "String",
+              "defaultValue": "status"
+            }
+          },
+          "variables": {
+            "api_url": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "response": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "BuildUrl",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "api_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(equals(pipeline().parameters.env, 'prod'), concat('https://api.example-corp.com/v2/', pipeline().parameters.endpoint), concat('https://api-', pipeline().parameters.env, '.example-corp.com/v2/', pipeline().parameters.endpoint))"
+                }
+              }
+            },
+            {
+              "name": "CheckEnv",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "BuildUrl",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetProdFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "response",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('production_mode')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "CallApi",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "CheckEnv",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": {
+                  "type": "Expression",
+                  "value": "@variables('api_url')"
+                },
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"pipeline\": \"', pipeline().Pipeline, '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Environment-aware URL construction with if/equals branching and concat.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "BuildUrl",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckEnv",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CallApi",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "endpoint"
+        ],
+        "dependencies": [
+          {
+            "source_task": "BuildUrl",
+            "target_task": "CheckEnv"
+          },
+          {
+            "source_task": "CheckEnv",
+            "target_task": "CallApi"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "env_branching_url_builder",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "endpoint": {
+                "type": "String",
+                "defaultValue": "status"
+              }
+            },
+            "variables": {
+              "api_url": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "response": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "BuildUrl",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "api_url",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@if(equals(pipeline().parameters.env, 'prod'), concat('https://api.example-corp.com/v2/', pipeline().parameters.endpoint), concat('https://api-', pipeline().parameters.env, '.example-corp.com/v2/', pipeline().parameters.endpoint))"
+                  }
+                }
+              },
+              {
+                "name": "CheckEnv",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "BuildUrl",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetProdFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "response",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('production_mode')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "CallApi",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "CheckEnv",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": {
+                    "type": "Expression",
+                    "value": "@variables('api_url')"
+                  },
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"pipeline\": \"', pipeline().Pipeline, '\"}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "message_sanitization_pipeline",
+        "properties": {
+          "parameters": {
+            "raw_message": {
+              "type": "String",
+              "defaultValue": "Line1\nLine2\tTab"
+            }
+          },
+          "variables": {
+            "sanitized": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "encoded": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "final_message": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "EncodeMessage",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "encoded",
+                "value": {
+                  "type": "Expression",
+                  "value": "@uriComponent(pipeline().parameters.raw_message)"
+                }
+              }
+            },
+            {
+              "name": "SanitizeMessage",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "EncodeMessage",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "sanitized",
+                "value": {
+                  "type": "Expression",
+                  "value": "@replace(replace(replace(uriComponentToString(replace(replace(replace(uriComponent(pipeline().parameters.raw_message), '%0a', ''), '%0A', ''), '%09', '')), '\"', ''), '\\\\', '/'), 'nvarchar', 'nvar_char')"
+                }
+              }
+            },
+            {
+              "name": "BuildFinalMessage",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SanitizeMessage",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_message",
+                "value": {
+                  "type": "Expression",
+                  "value": "@if(empty(pipeline().parameters.raw_message), '', variables('sanitized'))"
+                }
+              }
+            },
+            {
+              "name": "LogSanitized",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "BuildFinalMessage",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/logs",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"message\": \"', variables('final_message'), '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Deep replace(replace(uriComponentToString(replace(uriComponent(...))))) chain for message sanitization.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "EncodeMessage",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SanitizeMessage",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildFinalMessage",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "LogSanitized",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "raw_message"
+        ],
+        "dependencies": [
+          {
+            "source_task": "EncodeMessage",
+            "target_task": "SanitizeMessage"
+          },
+          {
+            "source_task": "SanitizeMessage",
+            "target_task": "BuildFinalMessage"
+          },
+          {
+            "source_task": "BuildFinalMessage",
+            "target_task": "LogSanitized"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "message_sanitization_pipeline",
+          "properties": {
+            "parameters": {
+              "raw_message": {
+                "type": "String",
+                "defaultValue": "Line1\nLine2\tTab"
+              }
+            },
+            "variables": {
+              "sanitized": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "encoded": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "final_message": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "EncodeMessage",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "encoded",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@uriComponent(pipeline().parameters.raw_message)"
+                  }
+                }
+              },
+              {
+                "name": "SanitizeMessage",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "EncodeMessage",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "sanitized",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@replace(replace(replace(uriComponentToString(replace(replace(replace(uriComponent(pipeline().parameters.raw_message), '%0a', ''), '%0A', ''), '%09', '')), '\"', ''), '\\\\', '/'), 'nvarchar', 'nvar_char')"
+                  }
+                }
+              },
+              {
+                "name": "BuildFinalMessage",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SanitizeMessage",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "final_message",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@if(empty(pipeline().parameters.raw_message), '', variables('sanitized'))"
+                  }
+                }
+              },
+              {
+                "name": "LogSanitized",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "BuildFinalMessage",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v1/logs",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"message\": \"', variables('final_message'), '\"}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "dynamic_sql_query_builder",
+        "properties": {
+          "parameters": {
+            "table_name": {
+              "type": "String",
+              "defaultValue": "orders"
+            },
+            "date_filter": {
+              "type": "String",
+              "defaultValue": "2024-01-01"
+            },
+            "limit": {
+              "type": "Int",
+              "defaultValue": 1000
+            }
+          },
+          "variables": {
+            "query": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "BuildQuery",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT TOP ', string(pipeline().parameters.limit), ' * FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''' ORDER BY created_at DESC')"
+                }
+              }
+            },
+            {
+              "name": "ExecuteQuery",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "BuildQuery",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@variables('query')"
+                  }
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "ExportResults",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "ExecuteQuery",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM dbo.', pipeline().parameters.table_name, ' WHERE id IN (SELECT id FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''')')"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Dynamic SQL construction via concat with table name, date, and limit parameters.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "BuildQuery",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExecuteQuery",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExportResults",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "table_name",
+          "date_filter",
+          "limit"
+        ],
+        "dependencies": [
+          {
+            "source_task": "BuildQuery",
+            "target_task": "ExecuteQuery"
+          },
+          {
+            "source_task": "ExecuteQuery",
+            "target_task": "ExportResults"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "dynamic_sql_query_builder",
+          "properties": {
+            "parameters": {
+              "table_name": {
+                "type": "String",
+                "defaultValue": "orders"
+              },
+              "date_filter": {
+                "type": "String",
+                "defaultValue": "2024-01-01"
+              },
+              "limit": {
+                "type": "Int",
+                "defaultValue": 1000
+              }
+            },
+            "variables": {
+              "query": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "BuildQuery",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "query",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT TOP ', string(pipeline().parameters.limit), ' * FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''' ORDER BY created_at DESC')"
+                  }
+                }
+              },
+              {
+                "name": "ExecuteQuery",
+                "type": "Lookup",
+                "dependsOn": [
+                  {
+                    "activity": "BuildQuery",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@variables('query')"
+                    }
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "ExportResults",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "ExecuteQuery",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT * FROM dbo.', pipeline().parameters.table_name, ' WHERE id IN (SELECT id FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''')')"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "path_construction_with_date",
+        "properties": {
+          "parameters": {
+            "zone": {
+              "type": "String",
+              "defaultValue": "gold"
+            },
+            "dataset": {
+              "type": "String",
+              "defaultValue": "transactions"
+            }
+          },
+          "variables": {
+            "data_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "checkpoint_path": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetDataPath",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "data_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/catalog/', pipeline().parameters.zone, '/', pipeline().parameters.dataset, '/year=', formatDateTime(utcnow(), 'yyyy'), '/month=', formatDateTime(utcnow(), 'MM'), '/day=', formatDateTime(utcnow(), 'dd'))"
+                }
+              }
+            },
+            {
+              "name": "SetCheckpointPath",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetDataPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "checkpoint_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/catalog/checkpoints/', pipeline().parameters.dataset, '_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'))"
+                }
+              }
+            },
+            {
+              "name": "LoadData",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "SetCheckpointPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Path construction with concat + formatDateTime(utcnow(), ...) for date-partitioned storage.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetDataPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetCheckpointPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "LoadData",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "zone",
+          "dataset"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetDataPath",
+            "target_task": "SetCheckpointPath"
+          },
+          {
+            "source_task": "SetCheckpointPath",
+            "target_task": "LoadData"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "path_construction_with_date",
+          "properties": {
+            "parameters": {
+              "zone": {
+                "type": "String",
+                "defaultValue": "gold"
+              },
+              "dataset": {
+                "type": "String",
+                "defaultValue": "transactions"
+              }
+            },
+            "variables": {
+              "data_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "checkpoint_path": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetDataPath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "data_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/catalog/', pipeline().parameters.zone, '/', pipeline().parameters.dataset, '/year=', formatDateTime(utcnow(), 'yyyy'), '/month=', formatDateTime(utcnow(), 'MM'), '/day=', formatDateTime(utcnow(), 'dd'))"
+                  }
+                }
+              },
+              {
+                "name": "SetCheckpointPath",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetDataPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "checkpoint_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/catalog/checkpoints/', pipeline().parameters.dataset, '_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'))"
+                  }
+                }
+              },
+              {
+                "name": "LoadData",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "SetCheckpointPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "tolower_toupper_normalizer",
+        "properties": {
+          "parameters": {
+            "input_code": {
+              "type": "String",
+              "defaultValue": " ABC-123 "
+            },
+            "category": {
+              "type": "String",
+              "defaultValue": "Premium"
+            }
+          },
+          "variables": {
+            "normalized_code": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "upper_category": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "trimmed_code": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "final_key": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "TrimCode",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "trimmed_code",
+                "value": {
+                  "type": "Expression",
+                  "value": "@trim(pipeline().parameters.input_code)"
+                }
+              }
+            },
+            {
+              "name": "NormalizeCode",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "TrimCode",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "normalized_code",
+                "value": {
+                  "type": "Expression",
+                  "value": "@toLower(trim(pipeline().parameters.input_code))"
+                }
+              }
+            },
+            {
+              "name": "UpperCategory",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "TrimCode",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "upper_category",
+                "value": {
+                  "type": "Expression",
+                  "value": "@toUpper(pipeline().parameters.category)"
+                }
+              }
+            },
+            {
+              "name": "BuildKey",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "NormalizeCode",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "UpperCategory",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "final_key",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('normalized_code'), ':', variables('upper_category'))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "String normalization with toLower, toUpper, trim combinations.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "TrimCode",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "NormalizeCode",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "UpperCategory",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildKey",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "input_code",
+          "category"
+        ],
+        "dependencies": [
+          {
+            "source_task": "TrimCode",
+            "target_task": "NormalizeCode"
+          },
+          {
+            "source_task": "TrimCode",
+            "target_task": "UpperCategory"
+          },
+          {
+            "source_task": "NormalizeCode",
+            "target_task": "BuildKey"
+          },
+          {
+            "source_task": "UpperCategory",
+            "target_task": "BuildKey"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "tolower_toupper_normalizer",
+          "properties": {
+            "parameters": {
+              "input_code": {
+                "type": "String",
+                "defaultValue": " ABC-123 "
+              },
+              "category": {
+                "type": "String",
+                "defaultValue": "Premium"
+              }
+            },
+            "variables": {
+              "normalized_code": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "upper_category": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "trimmed_code": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "final_key": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "TrimCode",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "trimmed_code",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@trim(pipeline().parameters.input_code)"
+                  }
+                }
+              },
+              {
+                "name": "NormalizeCode",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "TrimCode",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "normalized_code",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@toLower(trim(pipeline().parameters.input_code))"
+                  }
+                }
+              },
+              {
+                "name": "UpperCategory",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "TrimCode",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "upper_category",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@toUpper(pipeline().parameters.category)"
+                  }
+                }
+              },
+              {
+                "name": "BuildKey",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "NormalizeCode",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  },
+                  {
+                    "activity": "UpperCategory",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "final_key",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(variables('normalized_code'), ':', variables('upper_category'))"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 4,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "substring_extraction_parser",
+        "properties": {
+          "parameters": {
+            "log_entry": {
+              "type": "String",
+              "defaultValue": "2024-01-15T10:30:00Z|ERROR|Module:Auth|Failed login"
+            }
+          },
+          "variables": {
+            "timestamp_part": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "level_part": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "module_part": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ExtractTimestamp",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "timestamp_part",
+                "value": {
+                  "type": "Expression",
+                  "value": "@substring(pipeline().parameters.log_entry, 0, indexOf(pipeline().parameters.log_entry, '|'))"
+                }
+              }
+            },
+            {
+              "name": "ExtractLevel",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ExtractTimestamp",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "level_part",
+                "value": {
+                  "type": "Expression",
+                  "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(length(pipeline().parameters.log_entry), add(indexOf(pipeline().parameters.log_entry, '|'), 1))), '|'), 0))"
+                }
+              }
+            },
+            {
+              "name": "ExtractModule",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ExtractLevel",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "module_part",
+                "value": {
+                  "type": "Expression",
+                  "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), 50), '|'), 0))"
+                }
+              }
+            },
+            {
+              "name": "CheckError",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "ExtractModule",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(variables('level_part'), 'ERROR')"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "Complex substring with indexOf for structured log entry parsing.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ExtractTimestamp",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExtractLevel",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExtractModule",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckError",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "log_entry"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ExtractTimestamp",
+            "target_task": "ExtractLevel"
+          },
+          {
+            "source_task": "ExtractLevel",
+            "target_task": "ExtractModule"
+          },
+          {
+            "source_task": "ExtractModule",
+            "target_task": "CheckError"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "substring_extraction_parser",
+          "properties": {
+            "parameters": {
+              "log_entry": {
+                "type": "String",
+                "defaultValue": "2024-01-15T10:30:00Z|ERROR|Module:Auth|Failed login"
+              }
+            },
+            "variables": {
+              "timestamp_part": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "level_part": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "module_part": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ExtractTimestamp",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "timestamp_part",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@substring(pipeline().parameters.log_entry, 0, indexOf(pipeline().parameters.log_entry, '|'))"
+                  }
+                }
+              },
+              {
+                "name": "ExtractLevel",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractTimestamp",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "level_part",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, '|'), 1), sub(length(pipeline().parameters.log_entry), add(indexOf(pipeline().parameters.log_entry, '|'), 1))), '|'), 0))"
+                  }
+                }
+              },
+              {
+                "name": "ExtractModule",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractLevel",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "module_part",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), sub(indexOf(substring(pipeline().parameters.log_entry, add(indexOf(pipeline().parameters.log_entry, 'Module:'), 7), 50), '|'), 0))"
+                  }
+                }
+              },
+              {
+                "name": "CheckError",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractModule",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(variables('level_part'), 'ERROR')"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "multi_replace_data_cleaner",
+        "properties": {
+          "parameters": {
+            "raw_data": {
+              "type": "String",
+              "defaultValue": "value with <tags> & \"quotes\""
+            }
+          },
+          "variables": {
+            "clean_step1": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "clean_step2": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "clean_final": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "StripTags",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "clean_step1",
+                "value": {
+                  "type": "Expression",
+                  "value": "@replace(replace(pipeline().parameters.raw_data, '<', '&lt;'), '>', '&gt;')"
+                }
+              }
+            },
+            {
+              "name": "EscapeQuotes",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "StripTags",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "clean_step2",
+                "value": {
+                  "type": "Expression",
+                  "value": "@replace(replace(variables('clean_step1'), '\"', '\\\\\"'), '\\\\', '\\\\\\\\')"
+                }
+              }
+            },
+            {
+              "name": "FinalClean",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "EscapeQuotes",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "clean_final",
+                "value": {
+                  "type": "Expression",
+                  "value": "@replace(replace(replace(replace(variables('clean_step2'), '&', '&amp;'), char(10), ' '), char(13), ' '), char(9), ' ')"
+                }
+              }
+            },
+            {
+              "name": "ProcessCleanData",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "FinalClean",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/cleaner/process",
+                "baseParameters": {
+                  "cleaned_data": {
+                    "type": "Expression",
+                    "value": "@variables('clean_final')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      "description": "Chained replace() calls (4+ levels) for data sanitization with HTML escaping.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "StripTags",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "EscapeQuotes",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "FinalClean",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ProcessCleanData",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "raw_data"
+        ],
+        "dependencies": [
+          {
+            "source_task": "StripTags",
+            "target_task": "EscapeQuotes"
+          },
+          {
+            "source_task": "EscapeQuotes",
+            "target_task": "FinalClean"
+          },
+          {
+            "source_task": "FinalClean",
+            "target_task": "ProcessCleanData"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "multi_replace_data_cleaner",
+          "properties": {
+            "parameters": {
+              "raw_data": {
+                "type": "String",
+                "defaultValue": "value with <tags> & \"quotes\""
+              }
+            },
+            "variables": {
+              "clean_step1": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "clean_step2": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "clean_final": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "StripTags",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "clean_step1",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@replace(replace(pipeline().parameters.raw_data, '<', '&lt;'), '>', '&gt;')"
+                  }
+                }
+              },
+              {
+                "name": "EscapeQuotes",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "StripTags",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "clean_step2",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@replace(replace(variables('clean_step1'), '\"', '\\\\\"'), '\\\\', '\\\\\\\\')"
+                  }
+                }
+              },
+              {
+                "name": "FinalClean",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "EscapeQuotes",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "clean_final",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@replace(replace(replace(replace(variables('clean_step2'), '&', '&amp;'), char(10), ' '), char(13), ' '), char(9), ' ')"
+                  }
+                }
+              },
+              {
+                "name": "ProcessCleanData",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                  {
+                    "activity": "FinalClean",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/cleaner/process",
+                  "baseParameters": {
+                    "cleaned_data": {
+                      "type": "Expression",
+                      "value": "@variables('clean_final')"
+                    }
+                  }
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "base64_config_decoder",
+        "properties": {
+          "parameters": {
+            "encoded_config": {
+              "type": "String",
+              "defaultValue": "eyJrZXkiOiAidmFsdWUifQ=="
+            }
+          },
+          "variables": {
+            "decoded_config": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "parsed_key": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FetchEncodedConfig",
+              "type": "Lookup",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "DecodeConfig",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "FetchEncodedConfig",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "decoded_config",
+                "value": {
+                  "type": "Expression",
+                  "value": "@base64ToString(pipeline().parameters.encoded_config)"
+                }
+              }
+            },
+            {
+              "name": "ExtractKey",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "DecodeConfig",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "parsed_key",
+                "value": {
+                  "type": "Expression",
+                  "value": "@split(split(variables('decoded_config'), '\"key\":')[1], '\"')[1]"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "base64ToString for config decoding with nested split for JSON field extraction.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FetchEncodedConfig",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "DecodeConfig",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExtractKey",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "encoded_config"
+        ],
+        "dependencies": [
+          {
+            "source_task": "FetchEncodedConfig",
+            "target_task": "DecodeConfig"
+          },
+          {
+            "source_task": "DecodeConfig",
+            "target_task": "ExtractKey"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "base64_config_decoder",
+          "properties": {
+            "parameters": {
+              "encoded_config": {
+                "type": "String",
+                "defaultValue": "eyJrZXkiOiAidmFsdWUifQ=="
+              }
+            },
+            "variables": {
+              "decoded_config": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "parsed_key": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FetchEncodedConfig",
+                "type": "Lookup",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "DecodeConfig",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "FetchEncodedConfig",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "decoded_config",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@base64ToString(pipeline().parameters.encoded_config)"
+                  }
+                }
+              },
+              {
+                "name": "ExtractKey",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "DecodeConfig",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "parsed_key",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@split(split(variables('decoded_config'), '\"key\":')[1], '\"')[1]"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "connection_string_resolver",
+        "properties": {
+          "parameters": {
+            "host": {
+              "type": "String",
+              "defaultValue": "db.example-corp.com"
+            },
+            "port": {
+              "type": "Int",
+              "defaultValue": 5432
+            },
+            "database": {
+              "type": "String",
+              "defaultValue": "analytics"
+            },
+            "ssl_mode": {
+              "type": "String",
+              "defaultValue": "require"
+            }
+          },
+          "variables": {
+            "conn_string": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "jdbc_url": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "BuildConnString",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "conn_string",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Host=', pipeline().parameters.host, ';Port=', string(pipeline().parameters.port), ';Database=', pipeline().parameters.database, ';SslMode=', pipeline().parameters.ssl_mode)"
+                }
+              }
+            },
+            {
+              "name": "BuildJdbc",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "BuildConnString",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "jdbc_url",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('jdbc:postgresql://', pipeline().parameters.host, ':', string(pipeline().parameters.port), '/', pipeline().parameters.database, '?sslmode=', pipeline().parameters.ssl_mode)"
+                }
+              }
+            },
+            {
+              "name": "CopyData",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "BuildJdbc",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Connection string construction with concat and string() type conversion for port.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "BuildConnString",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildJdbc",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CopyData",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "host",
+          "port",
+          "database",
+          "ssl_mode"
+        ],
+        "dependencies": [
+          {
+            "source_task": "BuildConnString",
+            "target_task": "BuildJdbc"
+          },
+          {
+            "source_task": "BuildJdbc",
+            "target_task": "CopyData"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "connection_string_resolver",
+          "properties": {
+            "parameters": {
+              "host": {
+                "type": "String",
+                "defaultValue": "db.example-corp.com"
+              },
+              "port": {
+                "type": "Int",
+                "defaultValue": 5432
+              },
+              "database": {
+                "type": "String",
+                "defaultValue": "analytics"
+              },
+              "ssl_mode": {
+                "type": "String",
+                "defaultValue": "require"
+              }
+            },
+            "variables": {
+              "conn_string": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "jdbc_url": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "BuildConnString",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "conn_string",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('Host=', pipeline().parameters.host, ';Port=', string(pipeline().parameters.port), ';Database=', pipeline().parameters.database, ';SslMode=', pipeline().parameters.ssl_mode)"
+                  }
+                }
+              },
+              {
+                "name": "BuildJdbc",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "BuildConnString",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "jdbc_url",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('jdbc:postgresql://', pipeline().parameters.host, ':', string(pipeline().parameters.port), '/', pipeline().parameters.database, '?sslmode=', pipeline().parameters.ssl_mode)"
+                  }
+                }
+              },
+              {
+                "name": "CopyData",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "BuildJdbc",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "csv_header_builder",
+        "properties": {
+          "parameters": {
+            "column_list": {
+              "type": "String",
+              "defaultValue": "id,name,email,created_at"
+            }
+          },
+          "variables": {
+            "columns": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "header_line": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "column_count": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "current_col": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SplitColumns",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "header_line",
+                "value": {
+                  "type": "Expression",
+                  "value": "@join(createArray('id', 'name', 'email', 'created_at', 'updated_at'), '|')"
+                }
+              }
+            },
+            {
+              "name": "CountColumns",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SplitColumns",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "column_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(length(split(pipeline().parameters.column_list, ',')))"
+                }
+              }
+            },
+            {
+              "name": "BuildHeader",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CountColumns",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "header_line",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('HEADER|', variables('column_count'), '|', replace(pipeline().parameters.column_list, ',', '|'))"
+                }
+              }
+            },
+            {
+              "name": "ProcessColumns",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "BuildHeader",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@split(pipeline().parameters.column_list, ',')"
+                },
+                "activities": [
+                  {
+                    "name": "ProcessCol",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "current_col",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@concat('col_', item())"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "split + join + createArray + length for CSV header construction.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SplitColumns",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CountColumns",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildHeader",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ProcessColumns",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "column_list"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SplitColumns",
+            "target_task": "CountColumns"
+          },
+          {
+            "source_task": "CountColumns",
+            "target_task": "BuildHeader"
+          },
+          {
+            "source_task": "BuildHeader",
+            "target_task": "ProcessColumns"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "csv_header_builder",
+          "properties": {
+            "parameters": {
+              "column_list": {
+                "type": "String",
+                "defaultValue": "id,name,email,created_at"
+              }
+            },
+            "variables": {
+              "columns": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "header_line": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "column_count": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "current_col": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SplitColumns",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "header_line",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@join(createArray('id', 'name', 'email', 'created_at', 'updated_at'), '|')"
+                  }
+                }
+              },
+              {
+                "name": "CountColumns",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SplitColumns",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "column_count",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(length(split(pipeline().parameters.column_list, ',')))"
+                  }
+                }
+              },
+              {
+                "name": "BuildHeader",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CountColumns",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "header_line",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('HEADER|', variables('column_count'), '|', replace(pipeline().parameters.column_list, ',', '|'))"
+                  }
+                }
+              },
+              {
+                "name": "ProcessColumns",
+                "type": "ForEach",
+                "dependsOn": [
+                  {
+                    "activity": "BuildHeader",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@split(pipeline().parameters.column_list, ',')"
+                  },
+                  "activities": [
+                    {
+                      "name": "ProcessCol",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "current_col",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@concat('col_', item())"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "guid_correlation_tracker",
+        "properties": {
+          "parameters": {
+            "app_name": {
+              "type": "String",
+              "defaultValue": "data-pipeline"
+            }
+          },
+          "variables": {
+            "correlation_id": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "trace_id": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "GenerateCorrelationId",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "correlation_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(guid(), '_', utcnow('yyyyMMddHHmmssfff'))"
+                }
+              }
+            },
+            {
+              "name": "GenerateTraceId",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "GenerateCorrelationId",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "trace_id",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(pipeline().parameters.app_name, '#', pipeline().Pipeline, '#', utcnow('yyyy/MM/dd'), '#', pipeline().RunId)"
+                }
+              }
+            },
+            {
+              "name": "RegisterTrace",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "GenerateTraceId",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/traces",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"correlation_id\": \"', variables('correlation_id'), '\", \"trace_id\": \"', variables('trace_id'), '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "guid() + utcnow() + concat for correlation/trace ID generation with pipeline system vars.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "GenerateCorrelationId",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "GenerateTraceId",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RegisterTrace",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "app_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "GenerateCorrelationId",
+            "target_task": "GenerateTraceId"
+          },
+          {
+            "source_task": "GenerateTraceId",
+            "target_task": "RegisterTrace"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "guid_correlation_tracker",
+          "properties": {
+            "parameters": {
+              "app_name": {
+                "type": "String",
+                "defaultValue": "data-pipeline"
+              }
+            },
+            "variables": {
+              "correlation_id": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "trace_id": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "GenerateCorrelationId",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "correlation_id",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(guid(), '_', utcnow('yyyyMMddHHmmssfff'))"
+                  }
+                }
+              },
+              {
+                "name": "GenerateTraceId",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "GenerateCorrelationId",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "trace_id",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(pipeline().parameters.app_name, '#', pipeline().Pipeline, '#', utcnow('yyyy/MM/dd'), '#', pipeline().RunId)"
+                  }
+                }
+              },
+              {
+                "name": "RegisterTrace",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "GenerateTraceId",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v1/traces",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"correlation_id\": \"', variables('correlation_id'), '\", \"trace_id\": \"', variables('trace_id'), '\"}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "multiline_sql_param_builder",
+        "properties": {
+          "parameters": {
+            "schema": {
+              "type": "String",
+              "defaultValue": "dbo"
+            },
+            "table": {
+              "type": "String",
+              "defaultValue": "orders"
+            },
+            "start_date": {
+              "type": "String",
+              "defaultValue": "2024-01-01"
+            },
+            "end_date": {
+              "type": "String",
+              "defaultValue": "2024-12-31"
+            },
+            "status_filter": {
+              "type": "String",
+              "defaultValue": "active"
+            }
+          },
+          "variables": {
+            "dynamic_query": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "BuildComplexQuery",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "dynamic_query",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('SELECT o.id, o.customer_id, o.amount, c.name ', 'FROM ', pipeline().parameters.schema, '.', pipeline().parameters.table, ' o ', 'INNER JOIN ', pipeline().parameters.schema, '.customers c ON o.customer_id = c.id ', 'WHERE o.created_at BETWEEN ''', pipeline().parameters.start_date, ''' AND ''', pipeline().parameters.end_date, ''' ', 'AND o.status = ''', pipeline().parameters.status_filter, ''' ', 'ORDER BY o.created_at DESC')"
+                }
+              }
+            },
+            {
+              "name": "RunQuery",
+              "type": "Lookup",
+              "dependsOn": [
+                {
+                  "activity": "BuildComplexQuery",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@variables('dynamic_query')"
+                  }
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "ExportResults",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "RunQuery",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@variables('dynamic_query')"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Complex multi-part SQL query construction via concat with 5 parameters.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "BuildComplexQuery",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RunQuery",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExportResults",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "schema",
+          "table",
+          "start_date",
+          "end_date",
+          "status_filter"
+        ],
+        "dependencies": [
+          {
+            "source_task": "BuildComplexQuery",
+            "target_task": "RunQuery"
+          },
+          {
+            "source_task": "RunQuery",
+            "target_task": "ExportResults"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "multiline_sql_param_builder",
+          "properties": {
+            "parameters": {
+              "schema": {
+                "type": "String",
+                "defaultValue": "dbo"
+              },
+              "table": {
+                "type": "String",
+                "defaultValue": "orders"
+              },
+              "start_date": {
+                "type": "String",
+                "defaultValue": "2024-01-01"
+              },
+              "end_date": {
+                "type": "String",
+                "defaultValue": "2024-12-31"
+              },
+              "status_filter": {
+                "type": "String",
+                "defaultValue": "active"
+              }
+            },
+            "variables": {
+              "dynamic_query": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "BuildComplexQuery",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "dynamic_query",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT o.id, o.customer_id, o.amount, c.name ', 'FROM ', pipeline().parameters.schema, '.', pipeline().parameters.table, ' o ', 'INNER JOIN ', pipeline().parameters.schema, '.customers c ON o.customer_id = c.id ', 'WHERE o.created_at BETWEEN ''', pipeline().parameters.start_date, ''' AND ''', pipeline().parameters.end_date, ''' ', 'AND o.status = ''', pipeline().parameters.status_filter, ''' ', 'ORDER BY o.created_at DESC')"
+                  }
+                }
+              },
+              {
+                "name": "RunQuery",
+                "type": "Lookup",
+                "dependsOn": [
+                  {
+                    "activity": "BuildComplexQuery",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@variables('dynamic_query')"
+                    }
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "ExportResults",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "RunQuery",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@variables('dynamic_query')"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "email_template_renderer",
+        "properties": {
+          "parameters": {
+            "recipient": {
+              "type": "String",
+              "defaultValue": "team@example-corp.com"
+            },
+            "subject": {
+              "type": "String",
+              "defaultValue": "Pipeline Complete"
+            },
+            "pipeline_name": {
+              "type": "String",
+              "defaultValue": "daily_etl"
+            }
+          },
+          "variables": {
+            "email_body": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "subject_line": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "timestamp": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_text": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetTimestamp",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "timestamp",
+                "value": {
+                  "type": "Expression",
+                  "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'dd/MM/yyyy HH:mm')"
+                }
+              }
+            },
+            {
+              "name": "BuildSubject",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetTimestamp",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "subject_line",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('[', toUpper(pipeline().parameters.pipeline_name), '] ', pipeline().parameters.subject, ' - ', formatDateTime(utcnow(), 'yyyy-MM-dd'))"
+                }
+              }
+            },
+            {
+              "name": "SetStatus",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetTimestamp",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_text",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('Pipeline ', pipeline().parameters.pipeline_name, ' completed at ', variables('timestamp'))"
+                }
+              }
+            },
+            {
+              "name": "BuildBody",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "BuildSubject",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "SetStatus",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "email_body",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('<html><body><h2>', variables('subject_line'), '</h2><p>', variables('status_text'), '</p><p>Run ID: ', pipeline().RunId, '</p></body></html>')"
+                }
+              }
+            },
+            {
+              "name": "SendEmail",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "BuildBody",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/email",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"to\": \"', pipeline().parameters.recipient, '\", \"subject\": \"', variables('subject_line'), '\", \"body\": \"', replace(variables('email_body'), '\"', '\\\\\"'), '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Email template with convertFromUtc, toUpper, concat, replace for HTML body construction.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetTimestamp",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildSubject",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetStatus",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildBody",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SendEmail",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "recipient",
+          "subject",
+          "pipeline_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetTimestamp",
+            "target_task": "BuildSubject"
+          },
+          {
+            "source_task": "SetTimestamp",
+            "target_task": "SetStatus"
+          },
+          {
+            "source_task": "BuildSubject",
+            "target_task": "BuildBody"
+          },
+          {
+            "source_task": "SetStatus",
+            "target_task": "BuildBody"
+          },
+          {
+            "source_task": "BuildBody",
+            "target_task": "SendEmail"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "email_template_renderer",
+          "properties": {
+            "parameters": {
+              "recipient": {
+                "type": "String",
+                "defaultValue": "team@example-corp.com"
+              },
+              "subject": {
+                "type": "String",
+                "defaultValue": "Pipeline Complete"
+              },
+              "pipeline_name": {
+                "type": "String",
+                "defaultValue": "daily_etl"
+              }
+            },
+            "variables": {
+              "email_body": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "subject_line": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "timestamp": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_text": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetTimestamp",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "timestamp",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'dd/MM/yyyy HH:mm')"
+                  }
+                }
+              },
+              {
+                "name": "BuildSubject",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetTimestamp",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "subject_line",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('[', toUpper(pipeline().parameters.pipeline_name), '] ', pipeline().parameters.subject, ' - ', formatDateTime(utcnow(), 'yyyy-MM-dd'))"
+                  }
+                }
+              },
+              {
+                "name": "SetStatus",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetTimestamp",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "status_text",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('Pipeline ', pipeline().parameters.pipeline_name, ' completed at ', variables('timestamp'))"
+                  }
+                }
+              },
+              {
+                "name": "BuildBody",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "BuildSubject",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  },
+                  {
+                    "activity": "SetStatus",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "email_body",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('<html><body><h2>', variables('subject_line'), '</h2><p>', variables('status_text'), '</p><p>Run ID: ', pipeline().RunId, '</p></body></html>')"
+                  }
+                }
+              },
+              {
+                "name": "SendEmail",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "BuildBody",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v1/email",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"to\": \"', pipeline().parameters.recipient, '\", \"subject\": \"', variables('subject_line'), '\", \"body\": \"', replace(variables('email_body'), '\"', '\\\\\"'), '\"}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 5,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "config_driven_path_assembler",
+        "properties": {
+          "parameters": {
+            "env": {
+              "type": "String",
+              "defaultValue": "prod"
+            },
+            "region": {
+              "type": "String",
+              "defaultValue": "us-east"
+            },
+            "app_name": {
+              "type": "String",
+              "defaultValue": "analytics"
+            },
+            "module": {
+              "type": "String",
+              "defaultValue": "ingestion"
+            },
+            "version": {
+              "type": "String",
+              "defaultValue": "v3"
+            },
+            "tenant_id": {
+              "type": "String",
+              "defaultValue": "t-001"
+            },
+            "format": {
+              "type": "String",
+              "defaultValue": "delta"
+            },
+            "compression": {
+              "type": "String",
+              "defaultValue": "snappy"
+            }
+          },
+          "variables": {
+            "base_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "data_path": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "metadata_path": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetBasePath",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "base_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/', pipeline().parameters.tenant_id, '/', pipeline().parameters.app_name, '/', pipeline().parameters.version)"
+                }
+              }
+            },
+            {
+              "name": "SetDataPath",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetBasePath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "data_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('base_path'), '/', pipeline().parameters.module, '/data/', pipeline().parameters.format, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                }
+              }
+            },
+            {
+              "name": "SetMetadataPath",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetBasePath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "metadata_path",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat(variables('base_path'), '/metadata/', pipeline().parameters.module, '_', formatDateTime(utcnow(), 'yyyyMMdd'), '.json')"
+                }
+              }
+            },
+            {
+              "name": "RunIngestion",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "SetDataPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "SetMetadataPath",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/ingestion/main",
+                "baseParameters": {
+                  "data_path": {
+                    "type": "Expression",
+                    "value": "@variables('data_path')"
+                  },
+                  "metadata_path": {
+                    "type": "Expression",
+                    "value": "@variables('metadata_path')"
+                  },
+                  "compression": {
+                    "type": "Expression",
+                    "value": "@pipeline().parameters.compression"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      "description": "8-parameter path assembly with concat, variables, formatDateTime across 3 path components.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetBasePath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetDataPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetMetadataPath",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RunIngestion",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "env",
+          "region",
+          "app_name",
+          "module",
+          "version",
+          "tenant_id",
+          "format",
+          "compression"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetBasePath",
+            "target_task": "SetDataPath"
+          },
+          {
+            "source_task": "SetBasePath",
+            "target_task": "SetMetadataPath"
+          },
+          {
+            "source_task": "SetDataPath",
+            "target_task": "RunIngestion"
+          },
+          {
+            "source_task": "SetMetadataPath",
+            "target_task": "RunIngestion"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "config_driven_path_assembler",
+          "properties": {
+            "parameters": {
+              "env": {
+                "type": "String",
+                "defaultValue": "prod"
+              },
+              "region": {
+                "type": "String",
+                "defaultValue": "us-east"
+              },
+              "app_name": {
+                "type": "String",
+                "defaultValue": "analytics"
+              },
+              "module": {
+                "type": "String",
+                "defaultValue": "ingestion"
+              },
+              "version": {
+                "type": "String",
+                "defaultValue": "v3"
+              },
+              "tenant_id": {
+                "type": "String",
+                "defaultValue": "t-001"
+              },
+              "format": {
+                "type": "String",
+                "defaultValue": "delta"
+              },
+              "compression": {
+                "type": "String",
+                "defaultValue": "snappy"
+              }
+            },
+            "variables": {
+              "base_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "data_path": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "metadata_path": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetBasePath",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "base_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/', pipeline().parameters.tenant_id, '/', pipeline().parameters.app_name, '/', pipeline().parameters.version)"
+                  }
+                }
+              },
+              {
+                "name": "SetDataPath",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetBasePath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "data_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(variables('base_path'), '/', pipeline().parameters.module, '/data/', pipeline().parameters.format, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                  }
+                }
+              },
+              {
+                "name": "SetMetadataPath",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetBasePath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "metadata_path",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat(variables('base_path'), '/metadata/', pipeline().parameters.module, '_', formatDateTime(utcnow(), 'yyyyMMdd'), '.json')"
+                  }
+                }
+              },
+              {
+                "name": "RunIngestion",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                  {
+                    "activity": "SetDataPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  },
+                  {
+                    "activity": "SetMetadataPath",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/ingestion/main",
+                  "baseParameters": {
+                    "data_path": {
+                      "type": "Expression",
+                      "value": "@variables('data_path')"
+                    },
+                    "metadata_path": {
+                      "type": "Expression",
+                      "value": "@variables('metadata_path')"
+                    },
+                    "compression": {
+                      "type": "Expression",
+                      "value": "@pipeline().parameters.compression"
+                    }
+                  }
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 4,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "name": "message_sanitization_pipeline",
+  "properties": {
+    "parameters": {
+      "raw_message": {
+        "type": "String",
+        "defaultValue": "Line1\nLine2\tTab"
+      }
+    },
+    "variables": {
+      "sanitized": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "encoded": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_message": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "EncodeMessage",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "encoded",
+          "value": {
+            "type": "Expression",
+            "value": "@uriComponent(pipeline().parameters.raw_message)"
+          }
+        }
+      },
+      {
+        "name": "SanitizeMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "EncodeMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "sanitized",
+          "value": {
+            "type": "Expression",
+            "value": "@replace(replace(replace(uriComponentToString(replace(replace(replace(uriComponent(pipeline().parameters.raw_message), '%0a', ''), '%0A', ''), '%09', '')), '\"', ''), '\\\\', '/'), 'nvarchar', 'nvar_char')"
+          }
+        }
+      },
+      {
+        "name": "BuildFinalMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SanitizeMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_message",
+          "value": {
+            "type": "Expression",
+            "value": "@if(empty(pipeline().parameters.raw_message), '', variables('sanitized'))"
+          }
+        }
+      },
+      {
+        "name": "LogSanitized",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildFinalMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v1/logs",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"message\": \"', variables('final_message'), '\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

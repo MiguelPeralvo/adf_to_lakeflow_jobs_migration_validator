@@ -1,0 +1,124 @@
+{
+  "name": "join_collected_ids_notifier",
+  "properties": {
+    "parameters": {
+      "batch_size": {
+        "type": "Int",
+        "defaultValue": 10
+      }
+    },
+    "variables": {
+      "collected_ids": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "id_csv": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CollectId1",
+        "type": "AppendVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "collected_ids",
+          "value": {
+            "type": "Expression",
+            "value": "@string('id_001')"
+          }
+        }
+      },
+      {
+        "name": "CollectId2",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "CollectId1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "collected_ids",
+          "value": {
+            "type": "Expression",
+            "value": "@string('id_002')"
+          }
+        }
+      },
+      {
+        "name": "CollectId3",
+        "type": "AppendVariable",
+        "dependsOn": [
+          {
+            "activity": "CollectId2",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "collected_ids",
+          "value": {
+            "type": "Expression",
+            "value": "@string('id_003')"
+          }
+        }
+      },
+      {
+        "name": "BuildCsv",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CollectId3",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "id_csv",
+          "value": {
+            "type": "Expression",
+            "value": "@join(variables('collected_ids'), ',')"
+          }
+        }
+      },
+      {
+        "name": "NotifyWebhook",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildCsv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v1/notifications",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"batch_ids\": \"', variables('id_csv'), '\", \"count\": ', string(length(variables('collected_ids'))), '}')"
+          }
+        }
+      }
+    ]
+  }
+}

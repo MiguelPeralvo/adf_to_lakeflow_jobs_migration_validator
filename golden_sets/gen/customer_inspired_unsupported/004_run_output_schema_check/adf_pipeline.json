@@ -1,0 +1,106 @@
+{
+  "name": "run_output_variant_schema_check",
+  "properties": {
+    "parameters": {
+      "threshold": {
+        "type": "Int",
+        "defaultValue": 1
+      }
+    },
+    "variables": {
+      "check_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ValidateSchema",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/checks/schema_check",
+          "baseParameters": {}
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CheckValidateSchemaResult",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ValidateSchema",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(activity('ValidateSchema').output.runOutput, pipeline().parameters.threshold)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "StoreResult",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckValidateSchemaResult",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "check_result",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('ValidateSchema').output.runOutput)"
+          }
+        }
+      }
+    ]
+  }
+}

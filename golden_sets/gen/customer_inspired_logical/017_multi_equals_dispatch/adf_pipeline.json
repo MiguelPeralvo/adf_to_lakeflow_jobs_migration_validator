@@ -1,0 +1,85 @@
+{
+  "name": "multi_equals_dispatch",
+  "properties": {
+    "parameters": {
+      "source_type": {
+        "type": "String",
+        "defaultValue": "database"
+      }
+    },
+    "variables": {
+      "connector": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "DispatchConnector",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "connector",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.source_type, 'database'), 'jdbc', if(equals(pipeline().parameters.source_type, 'api'), 'rest', if(equals(pipeline().parameters.source_type, 'file'), 'blob', if(equals(pipeline().parameters.source_type, 'stream'), 'kafka', 'unknown'))))"
+          }
+        }
+      },
+      {
+        "name": "ValidateConnector",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "DispatchConnector",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(variables('connector'), 'unknown'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

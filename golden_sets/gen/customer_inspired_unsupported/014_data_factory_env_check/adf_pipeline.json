@@ -1,0 +1,65 @@
+{
+  "name": "data_factory_env_check",
+  "properties": {
+    "parameters": {
+      "expected_factory": {
+        "type": "String",
+        "defaultValue": "data_factory_prod"
+      }
+    },
+    "variables": {
+      "is_prod": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CheckFactory",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(pipeline().DataFactory, pipeline().parameters.expected_factory)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetProd",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_prod",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetNonProd",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "is_prod",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

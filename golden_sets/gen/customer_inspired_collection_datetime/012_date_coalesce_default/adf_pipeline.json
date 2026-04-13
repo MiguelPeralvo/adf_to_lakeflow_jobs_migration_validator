@@ -1,0 +1,62 @@
+{
+  "name": "date_coalesce_default",
+  "properties": {
+    "parameters": {
+      "override_date": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "variables": {
+      "effective_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ResolveDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "effective_date",
+          "value": {
+            "type": "Expression",
+            "value": "@coalesce(pipeline().parameters.override_date, formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+          }
+        }
+      },
+      {
+        "name": "RunWithDate",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "ResolveDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/etl/dated_load",
+          "baseParameters": {
+            "load_date": {
+              "type": "Expression",
+              "value": "@variables('effective_date')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

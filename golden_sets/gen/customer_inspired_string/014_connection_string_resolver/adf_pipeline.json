@@ -1,0 +1,89 @@
+{
+  "name": "connection_string_resolver",
+  "properties": {
+    "parameters": {
+      "host": {
+        "type": "String",
+        "defaultValue": "db.example-corp.com"
+      },
+      "port": {
+        "type": "Int",
+        "defaultValue": 5432
+      },
+      "database": {
+        "type": "String",
+        "defaultValue": "analytics"
+      },
+      "ssl_mode": {
+        "type": "String",
+        "defaultValue": "require"
+      }
+    },
+    "variables": {
+      "conn_string": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "jdbc_url": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildConnString",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "conn_string",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Host=', pipeline().parameters.host, ';Port=', string(pipeline().parameters.port), ';Database=', pipeline().parameters.database, ';SslMode=', pipeline().parameters.ssl_mode)"
+          }
+        }
+      },
+      {
+        "name": "BuildJdbc",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildConnString",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "jdbc_url",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('jdbc:postgresql://', pipeline().parameters.host, ':', string(pipeline().parameters.port), '/', pipeline().parameters.database, '?sslmode=', pipeline().parameters.ssl_mode)"
+          }
+        }
+      },
+      {
+        "name": "CopyData",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "BuildJdbc",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

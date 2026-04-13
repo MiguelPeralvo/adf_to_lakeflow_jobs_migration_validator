@@ -1,0 +1,89 @@
+{
+  "name": "triggered_by_pipeline_id",
+  "properties": {
+    "parameters": {
+      "app_name": {
+        "type": "String",
+        "defaultValue": "orchestrator"
+      },
+      "pipeline_name": {
+        "type": "String",
+        "defaultValue": "main"
+      }
+    },
+    "variables": {
+      "unique_id": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "GenerateUniqueId",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "unique_id",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(pipeline().parameters.app_name, '#$', pipeline().parameters.pipeline_name, '#', utcnow('yyyy/MM/dd'), '#', pipeline().TriggeredByPipelineRunId)"
+          }
+        }
+      },
+      {
+        "name": "HasParent",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "GenerateUniqueId",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(equals(pipeline().TriggeredByPipelineRunId, ''))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

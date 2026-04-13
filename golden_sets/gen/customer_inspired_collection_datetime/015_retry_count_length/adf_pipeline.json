@@ -1,0 +1,95 @@
+{
+  "name": "retry_count_length",
+  "properties": {
+    "parameters": {
+      "max_retries": {
+        "type": "Int",
+        "defaultValue": 3
+      }
+    },
+    "variables": {
+      "retry_attempts": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_count": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "TrackAttempt1",
+        "type": "AppendVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "retry_attempts",
+          "value": {
+            "type": "Expression",
+            "value": "@utcnow()"
+          }
+        }
+      },
+      {
+        "name": "CountRetries",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "TrackAttempt1",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "current_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(length(variables('retry_attempts')))"
+          }
+        }
+      },
+      {
+        "name": "RetryUntilDone",
+        "type": "Until",
+        "dependsOn": [
+          {
+            "activity": "CountRetries",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@equals(length(variables('retry_attempts')), pipeline().parameters.max_retries)"
+          },
+          "activities": [
+            {
+              "name": "TrackAttemptN",
+              "type": "AppendVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "retry_attempts",
+                "value": {
+                  "type": "Expression",
+                  "value": "@utcnow()"
+                }
+              }
+            }
+          ],
+          "timeout": "0.01:00:00"
+        }
+      }
+    ]
+  }
+}

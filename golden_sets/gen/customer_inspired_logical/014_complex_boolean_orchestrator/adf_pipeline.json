@@ -1,0 +1,189 @@
+{
+  "name": "complex_boolean_orchestrator",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "load_type": {
+        "type": "String",
+        "defaultValue": "full"
+      },
+      "modules": {
+        "type": "Array",
+        "defaultValue": [
+          "all"
+        ]
+      },
+      "enable_validation": {
+        "type": "Bool",
+        "defaultValue": true
+      },
+      "run_mode": {
+        "type": "String",
+        "defaultValue": "full"
+      }
+    },
+    "variables": {
+      "should_continue": {
+        "type": "Boolean",
+        "defaultValue": true
+      },
+      "not_skipped": {
+        "type": "Boolean",
+        "defaultValue": true
+      },
+      "validation_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "EnvironmentGate",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'sandbox'))), or(equals(pipeline().parameters.load_type, 'full'), equals(pipeline().parameters.load_type, 'incremental')))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ModuleGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "EnvironmentGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(not(empty(intersection(pipeline().parameters.modules, createArray('all', 'core', 'reporting')))), equals(pipeline().parameters.run_mode, 'full'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CombinedGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ModuleGate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(and(variables('should_continue'), variables('not_skipped')), bool(pipeline().parameters.enable_validation))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

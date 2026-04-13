@@ -1,0 +1,142 @@
+{
+  "name": "email_template_renderer",
+  "properties": {
+    "parameters": {
+      "recipient": {
+        "type": "String",
+        "defaultValue": "team@example-corp.com"
+      },
+      "subject": {
+        "type": "String",
+        "defaultValue": "Pipeline Complete"
+      },
+      "pipeline_name": {
+        "type": "String",
+        "defaultValue": "daily_etl"
+      }
+    },
+    "variables": {
+      "email_body": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "subject_line": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_text": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@convertFromUtc(utcnow(), 'Eastern Standard Time', 'dd/MM/yyyy HH:mm')"
+          }
+        }
+      },
+      {
+        "name": "BuildSubject",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "subject_line",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('[', toUpper(pipeline().parameters.pipeline_name), '] ', pipeline().parameters.subject, ' - ', formatDateTime(utcnow(), 'yyyy-MM-dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetStatus",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "status_text",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Pipeline ', pipeline().parameters.pipeline_name, ' completed at ', variables('timestamp'))"
+          }
+        }
+      },
+      {
+        "name": "BuildBody",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "BuildSubject",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "SetStatus",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "email_body",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('<html><body><h2>', variables('subject_line'), '</h2><p>', variables('status_text'), '</p><p>Run ID: ', pipeline().RunId, '</p></body></html>')"
+          }
+        }
+      },
+      {
+        "name": "SendEmail",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "BuildBody",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": "https://api.example-corp.com/v1/email",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"to\": \"', pipeline().parameters.recipient, '\", \"subject\": \"', variables('subject_line'), '\", \"body\": \"', replace(variables('email_body'), '\"', '\\\\\"'), '\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

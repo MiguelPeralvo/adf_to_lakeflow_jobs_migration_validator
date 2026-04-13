@@ -1,0 +1,72 @@
+{
+  "name": "union_with_return_value",
+  "properties": {
+    "parameters": {},
+    "variables": {
+      "merged_outputs": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "execution_outputs": {
+        "type": "String",
+        "defaultValue": "{}"
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunInternalSwitch",
+        "type": "ExecutePipeline",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "internal_switch_pipeline",
+            "type": "PipelineReference"
+          },
+          "parameters": {},
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "AggregateOutputs",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "RunInternalSwitch",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "type": "Expression",
+            "value": "@createArray('step1', 'step2', 'step3')"
+          },
+          "activities": [
+            {
+              "name": "MergeOutput",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "merged_outputs",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(union(json(if(startswith(activity('RunInternalSwitch').output.pipelineReturnValue.result, '{'), concat('{\"', coalesce(item()?.name, 'unnamed'), '\": ', activity('RunInternalSwitch').output.pipelineReturnValue.result, '}'), '{}')), json(variables('execution_outputs'))))"
+                }
+              }
+            }
+          ],
+          "batchCount": 1
+        }
+      }
+    ]
+  }
+}

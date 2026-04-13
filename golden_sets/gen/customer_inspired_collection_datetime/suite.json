@@ -1,0 +1,4267 @@
+{
+  "pipelines": [
+    {
+      "adf_json": {
+        "name": "intersection_variant_000",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckCoreAnalytics",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'core', 'analytics', 'core_analytics'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'core', 'analytics', 'core_analytics')))) \u2014 module check variant 0.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckCoreAnalytics",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_000",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckCoreAnalytics",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'core', 'analytics', 'core_analytics'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_001",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckCoreReporting",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'core', 'reporting', 'core_reporting'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'core', 'reporting', 'core_reporting')))) \u2014 module check variant 1.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckCoreReporting",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_001",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckCoreReporting",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'core', 'reporting', 'core_reporting'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_002",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckDataIngestion",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'data', 'ingestion', 'data_ingestion'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'data', 'ingestion', 'data_ingestion')))) \u2014 module check variant 2.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckDataIngestion",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_002",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckDataIngestion",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'data', 'ingestion', 'data_ingestion'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_003",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckDataTransform",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'data', 'transform', 'data_transform'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'data', 'transform', 'data_transform')))) \u2014 module check variant 3.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckDataTransform",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_003",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckDataTransform",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'data', 'transform', 'data_transform'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_004",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckMlTraining",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'ml', 'training', 'ml_training'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'ml', 'training', 'ml_training')))) \u2014 module check variant 4.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckMlTraining",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_004",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckMlTraining",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'ml', 'training', 'ml_training'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_005",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckMlInference",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'ml', 'inference', 'ml_inference'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'ml', 'inference', 'ml_inference')))) \u2014 module check variant 5.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckMlInference",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_005",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckMlInference",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'ml', 'inference', 'ml_inference'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_006",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckExportBatch",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'export', 'batch', 'export_batch'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'export', 'batch', 'export_batch')))) \u2014 module check variant 6.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckExportBatch",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_006",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckExportBatch",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'export', 'batch', 'export_batch'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "intersection_variant_007",
+        "properties": {
+          "parameters": {
+            "requested_modules": {
+              "type": "Array",
+              "defaultValue": [
+                "all"
+              ]
+            },
+            "run_flag": {
+              "type": "String",
+              "defaultValue": "enabled"
+            }
+          },
+          "variables": {
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CheckExportStream",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'export', 'stream', 'export_stream'))))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "not(empty(intersection(param, createArray('all', 'export', 'stream', 'export_stream')))) \u2014 module check variant 7.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CheckExportStream",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "requested_modules",
+          "run_flag"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "intersection_variant_007",
+          "properties": {
+            "parameters": {
+              "requested_modules": {
+                "type": "Array",
+                "defaultValue": [
+                  "all"
+                ]
+              },
+              "run_flag": {
+                "type": "String",
+                "defaultValue": "enabled"
+              }
+            },
+            "variables": {
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CheckExportStream",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.requested_modules, createArray('all', 'export', 'stream', 'export_stream'))))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "empty_intersection_guard",
+        "properties": {
+          "parameters": {
+            "user_roles": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "required_roles": {
+              "type": "Array",
+              "defaultValue": [
+                "admin",
+                "editor"
+              ]
+            }
+          },
+          "variables": {
+            "has_access": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "AccessCheck",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@empty(intersection(pipeline().parameters.user_roles, pipeline().parameters.required_roles))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "DenyAccess",
+                    "type": "Fail",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "message": {
+                        "type": "Expression",
+                        "value": "@concat('No matching roles. Required: ', string(pipeline().parameters.required_roles))"
+                      },
+                      "errorCode": {
+                        "type": "Expression",
+                        "value": "@string('ACCESS_DENIED')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "GrantAccess",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "has_access",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "empty(intersection(param, param)) \u2014 role-based access control with intersection.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "AccessCheck",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "user_roles",
+          "required_roles"
+        ],
+        "dependencies": [],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "empty_intersection_guard",
+          "properties": {
+            "parameters": {
+              "user_roles": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "required_roles": {
+                "type": "Array",
+                "defaultValue": [
+                  "admin",
+                  "editor"
+                ]
+              }
+            },
+            "variables": {
+              "has_access": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "AccessCheck",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@empty(intersection(pipeline().parameters.user_roles, pipeline().parameters.required_roles))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "DenyAccess",
+                      "type": "Fail",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "message": {
+                          "type": "Expression",
+                          "value": "@concat('No matching roles. Required: ', string(pipeline().parameters.required_roles))"
+                        },
+                        "errorCode": {
+                          "type": "Expression",
+                          "value": "@string('ACCESS_DENIED')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "GrantAccess",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "has_access",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 0,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "union_config_merger",
+        "properties": {
+          "parameters": {
+            "override_config": {
+              "type": "String",
+              "defaultValue": "{}"
+            }
+          },
+          "variables": {
+            "base_config": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "merged_config": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "FetchBaseConfig",
+              "type": "Lookup",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource"
+                },
+                "firstRowOnly": true
+              }
+            },
+            {
+              "name": "StoreBase",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "FetchBaseConfig",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "base_config",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(activity('FetchBaseConfig').output.firstRow)"
+                }
+              }
+            },
+            {
+              "name": "MergeConfigs",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "StoreBase",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "merged_config",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(union(json(pipeline().parameters.override_config), json(variables('base_config'))))"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "string(union(json(param), json(variables(...)))) \u2014 config merging with union + json.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "FetchBaseConfig",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "StoreBase",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "MergeConfigs",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "override_config"
+        ],
+        "dependencies": [
+          {
+            "source_task": "FetchBaseConfig",
+            "target_task": "StoreBase"
+          },
+          {
+            "source_task": "StoreBase",
+            "target_task": "MergeConfigs"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "union_config_merger",
+          "properties": {
+            "parameters": {
+              "override_config": {
+                "type": "String",
+                "defaultValue": "{}"
+              }
+            },
+            "variables": {
+              "base_config": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "merged_config": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "FetchBaseConfig",
+                "type": "Lookup",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource"
+                  },
+                  "firstRowOnly": true
+                }
+              },
+              {
+                "name": "StoreBase",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "FetchBaseConfig",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "base_config",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(activity('FetchBaseConfig').output.firstRow)"
+                  }
+                }
+              },
+              {
+                "name": "MergeConfigs",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "StoreBase",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "merged_config",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(union(json(pipeline().parameters.override_config), json(variables('base_config'))))"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "json_variable_parser",
+        "properties": {
+          "parameters": {
+            "serialized_payload": {
+              "type": "String",
+              "defaultValue": "{\"key\": \"value\", \"count\": 42}"
+            }
+          },
+          "variables": {
+            "parsed_data": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "extracted_key": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "current_entry": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ParsePayload",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "parsed_data",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(json(pipeline().parameters.serialized_payload))"
+                }
+              }
+            },
+            {
+              "name": "ExtractKey",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ParsePayload",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "extracted_key",
+                "value": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.serialized_payload).key"
+                }
+              }
+            },
+            {
+              "name": "ProcessEntries",
+              "type": "ForEach",
+              "dependsOn": [
+                {
+                  "activity": "ExtractKey",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "isSequential": true,
+                "items": {
+                  "type": "Expression",
+                  "value": "@json(pipeline().parameters.serialized_payload)"
+                },
+                "activities": [
+                  {
+                    "name": "ProcessEntry",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "current_entry",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string(item())"
+                      }
+                    }
+                  }
+                ],
+                "batchCount": 1
+              }
+            }
+          ]
+        }
+      },
+      "description": "json(param) for deserialization + property access and ForEach iteration.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ParsePayload",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ExtractKey",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ProcessEntries",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "serialized_payload"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ParsePayload",
+            "target_task": "ExtractKey"
+          },
+          {
+            "source_task": "ExtractKey",
+            "target_task": "ProcessEntries"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "json_variable_parser",
+          "properties": {
+            "parameters": {
+              "serialized_payload": {
+                "type": "String",
+                "defaultValue": "{\"key\": \"value\", \"count\": 42}"
+              }
+            },
+            "variables": {
+              "parsed_data": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "extracted_key": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "current_entry": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ParsePayload",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "parsed_data",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(json(pipeline().parameters.serialized_payload))"
+                  }
+                }
+              },
+              {
+                "name": "ExtractKey",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ParsePayload",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "extracted_key",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.serialized_payload).key"
+                  }
+                }
+              },
+              {
+                "name": "ProcessEntries",
+                "type": "ForEach",
+                "dependsOn": [
+                  {
+                    "activity": "ExtractKey",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "isSequential": true,
+                  "items": {
+                    "type": "Expression",
+                    "value": "@json(pipeline().parameters.serialized_payload)"
+                  },
+                  "activities": [
+                    {
+                      "name": "ProcessEntry",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "current_entry",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string(item())"
+                        }
+                      }
+                    }
+                  ],
+                  "batchCount": 1
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "timezone_conversion_reporter",
+        "properties": {
+          "parameters": {
+            "target_timezone": {
+              "type": "String",
+              "defaultValue": "Eastern Standard Time"
+            }
+          },
+          "variables": {
+            "local_datetime": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "local_time_only": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "utc_timestamp": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ConvertFull",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "local_datetime",
+                "value": {
+                  "type": "Expression",
+                  "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'dd/MM/yyyy HH:mm')"
+                }
+              }
+            },
+            {
+              "name": "ConvertTimeOnly",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ConvertFull",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "local_time_only",
+                "value": {
+                  "type": "Expression",
+                  "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'HH:mm')"
+                }
+              }
+            },
+            {
+              "name": "SetUtc",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ConvertFull",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "utc_timestamp",
+                "value": {
+                  "type": "Expression",
+                  "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                }
+              }
+            },
+            {
+              "name": "ReportTimes",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "ConvertTimeOnly",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "SetUtc",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/metrics",
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "type": "Expression",
+                  "value": "@concat('{\"local\": \"', variables('local_datetime'), '\", \"utc\": \"', variables('utc_timestamp'), '\"}')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "convertFromUtc(utcnow(), timezone, format) \u2014 timezone conversion with multiple formats.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ConvertFull",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ConvertTimeOnly",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetUtc",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ReportTimes",
+            "is_placeholder": true
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "target_timezone"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ConvertFull",
+            "target_task": "ConvertTimeOnly"
+          },
+          {
+            "source_task": "ConvertFull",
+            "target_task": "SetUtc"
+          },
+          {
+            "source_task": "ConvertTimeOnly",
+            "target_task": "ReportTimes"
+          },
+          {
+            "source_task": "SetUtc",
+            "target_task": "ReportTimes"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "timezone_conversion_reporter",
+          "properties": {
+            "parameters": {
+              "target_timezone": {
+                "type": "String",
+                "defaultValue": "Eastern Standard Time"
+              }
+            },
+            "variables": {
+              "local_datetime": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "local_time_only": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "utc_timestamp": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ConvertFull",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "local_datetime",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'dd/MM/yyyy HH:mm')"
+                  }
+                }
+              },
+              {
+                "name": "ConvertTimeOnly",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ConvertFull",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "local_time_only",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@convertFromUtc(utcnow(), pipeline().parameters.target_timezone, 'HH:mm')"
+                  }
+                }
+              },
+              {
+                "name": "SetUtc",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ConvertFull",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "utc_timestamp",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                  }
+                }
+              },
+              {
+                "name": "ReportTimes",
+                "type": "WebActivity",
+                "dependsOn": [
+                  {
+                    "activity": "ConvertTimeOnly",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  },
+                  {
+                    "activity": "SetUtc",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "url": "https://api.example-corp.com/v1/metrics",
+                  "method": "POST",
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "type": "Expression",
+                    "value": "@concat('{\"local\": \"', variables('local_datetime'), '\", \"utc\": \"', variables('utc_timestamp'), '\"}')"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 4,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "date_coalesce_default",
+        "properties": {
+          "parameters": {
+            "override_date": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "variables": {
+            "effective_date": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ResolveDate",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_date",
+                "value": {
+                  "type": "Expression",
+                  "value": "@coalesce(pipeline().parameters.override_date, formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                }
+              }
+            },
+            {
+              "name": "RunWithDate",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "ResolveDate",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/etl/dated_load",
+                "baseParameters": {
+                  "load_date": {
+                    "type": "Expression",
+                    "value": "@variables('effective_date')"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ]
+        }
+      },
+      "description": "coalesce(param, formatDateTime(utcnow(), format)) \u2014 date parameter with utcnow fallback.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ResolveDate",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RunWithDate",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "override_date"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ResolveDate",
+            "target_task": "RunWithDate"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "date_coalesce_default",
+          "properties": {
+            "parameters": {
+              "override_date": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "variables": {
+              "effective_date": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ResolveDate",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "effective_date",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@coalesce(pipeline().parameters.override_date, formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+                  }
+                }
+              },
+              {
+                "name": "RunWithDate",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                  {
+                    "activity": "ResolveDate",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "notebookPath": "/pipelines/etl/dated_load",
+                  "baseParameters": {
+                    "load_date": {
+                      "type": "Expression",
+                      "value": "@variables('effective_date')"
+                    }
+                  }
+                },
+                "linkedServiceName": {
+                  "referenceName": "ls_databricks",
+                  "type": "LinkedServiceReference"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 1,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "utcnow_formatted_partition",
+        "properties": {
+          "parameters": {
+            "table_name": {
+              "type": "String",
+              "defaultValue": "events"
+            }
+          },
+          "variables": {
+            "partition_key": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "record_timestamp": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "SetPartitionKey",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "partition_key",
+                "value": {
+                  "type": "Expression",
+                  "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+                }
+              }
+            },
+            {
+              "name": "SetRecordTimestamp",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "SetPartitionKey",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "record_timestamp",
+                "value": {
+                  "type": "Expression",
+                  "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                }
+              }
+            },
+            {
+              "name": "CopyPartitioned",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "SetRecordTimestamp",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT *, ''', variables('record_timestamp'), ''' AS load_timestamp FROM ', pipeline().parameters.table_name)"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "utcnow('yyyy-MM-dd HH:mm:ss.fff') and formatDateTime(utcnow(), ...) for timestamp partitioning.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "SetPartitionKey",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "SetRecordTimestamp",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CopyPartitioned",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "table_name"
+        ],
+        "dependencies": [
+          {
+            "source_task": "SetPartitionKey",
+            "target_task": "SetRecordTimestamp"
+          },
+          {
+            "source_task": "SetRecordTimestamp",
+            "target_task": "CopyPartitioned"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "utcnow_formatted_partition",
+          "properties": {
+            "parameters": {
+              "table_name": {
+                "type": "String",
+                "defaultValue": "events"
+              }
+            },
+            "variables": {
+              "partition_key": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "record_timestamp": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "SetPartitionKey",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "partition_key",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+                  }
+                }
+              },
+              {
+                "name": "SetRecordTimestamp",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "SetPartitionKey",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "record_timestamp",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+                  }
+                }
+              },
+              {
+                "name": "CopyPartitioned",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "SetRecordTimestamp",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT *, ''', variables('record_timestamp'), ''' AS load_timestamp FROM ', pipeline().parameters.table_name)"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "numeric_param_subtraction",
+        "properties": {
+          "parameters": {
+            "total_workers": {
+              "type": "Int",
+              "defaultValue": 8
+            },
+            "reserved_workers": {
+              "type": "Int",
+              "defaultValue": 2
+            }
+          },
+          "variables": {
+            "available_workers": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "adjusted_count": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CalcAvailable",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "available_workers",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers))"
+                }
+              }
+            },
+            {
+              "name": "AdjustCount",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CalcAvailable",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "adjusted_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(pipeline().parameters.total_workers, 4))"
+                }
+              }
+            },
+            {
+              "name": "CheckMinWorkers",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "AdjustCount",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greater(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers), 0)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "sub(param, N) \u2014 numeric parameter subtraction with type coercion.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CalcAvailable",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "AdjustCount",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckMinWorkers",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "total_workers",
+          "reserved_workers"
+        ],
+        "dependencies": [
+          {
+            "source_task": "CalcAvailable",
+            "target_task": "AdjustCount"
+          },
+          {
+            "source_task": "AdjustCount",
+            "target_task": "CheckMinWorkers"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "numeric_param_subtraction",
+          "properties": {
+            "parameters": {
+              "total_workers": {
+                "type": "Int",
+                "defaultValue": 8
+              },
+              "reserved_workers": {
+                "type": "Int",
+                "defaultValue": 2
+              }
+            },
+            "variables": {
+              "available_workers": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "adjusted_count": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CalcAvailable",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "available_workers",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers))"
+                  }
+                }
+              },
+              {
+                "name": "AdjustCount",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CalcAvailable",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "adjusted_count",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(sub(pipeline().parameters.total_workers, 4))"
+                  }
+                }
+              },
+              {
+                "name": "CheckMinWorkers",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "AdjustCount",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@greater(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers), 0)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "retry_count_length",
+        "properties": {
+          "parameters": {
+            "max_retries": {
+              "type": "Int",
+              "defaultValue": 3
+            }
+          },
+          "variables": {
+            "retry_attempts": {
+              "type": "Array",
+              "defaultValue": []
+            },
+            "current_count": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "TrackAttempt1",
+              "type": "AppendVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "retry_attempts",
+                "value": {
+                  "type": "Expression",
+                  "value": "@utcnow()"
+                }
+              }
+            },
+            {
+              "name": "CountRetries",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "TrackAttempt1",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "current_count",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(length(variables('retry_attempts')))"
+                }
+              }
+            },
+            {
+              "name": "RetryUntilDone",
+              "type": "Until",
+              "dependsOn": [
+                {
+                  "activity": "CountRetries",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@equals(length(variables('retry_attempts')), pipeline().parameters.max_retries)"
+                },
+                "activities": [
+                  {
+                    "name": "TrackAttemptN",
+                    "type": "AppendVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "retry_attempts",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@utcnow()"
+                      }
+                    }
+                  }
+                ],
+                "timeout": "0.01:00:00"
+              }
+            }
+          ]
+        }
+      },
+      "description": "length(variables('array')) + equals for retry count tracking in Until loop.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "TrackAttempt1",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CountRetries",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "RetryUntilDone",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "max_retries"
+        ],
+        "dependencies": [
+          {
+            "source_task": "TrackAttempt1",
+            "target_task": "CountRetries"
+          },
+          {
+            "source_task": "CountRetries",
+            "target_task": "RetryUntilDone"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "retry_count_length",
+          "properties": {
+            "parameters": {
+              "max_retries": {
+                "type": "Int",
+                "defaultValue": 3
+              }
+            },
+            "variables": {
+              "retry_attempts": {
+                "type": "Array",
+                "defaultValue": []
+              },
+              "current_count": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "TrackAttempt1",
+                "type": "AppendVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "retry_attempts",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@utcnow()"
+                  }
+                }
+              },
+              {
+                "name": "CountRetries",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "TrackAttempt1",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "current_count",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(length(variables('retry_attempts')))"
+                  }
+                }
+              },
+              {
+                "name": "RetryUntilDone",
+                "type": "Until",
+                "dependsOn": [
+                  {
+                    "activity": "CountRetries",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@equals(length(variables('retry_attempts')), pipeline().parameters.max_retries)"
+                  },
+                  "activities": [
+                    {
+                      "name": "TrackAttemptN",
+                      "type": "AppendVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "retry_attempts",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@utcnow()"
+                        }
+                      }
+                    }
+                  ],
+                  "timeout": "0.01:00:00"
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "date_range_partitioned_copy",
+        "properties": {
+          "parameters": {
+            "start_date": {
+              "type": "String",
+              "defaultValue": "2024-01-01"
+            },
+            "days_back": {
+              "type": "Int",
+              "defaultValue": 7
+            }
+          },
+          "variables": {
+            "computed_end_date": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "date_filter": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ComputeEndDate",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "computed_end_date",
+                "value": {
+                  "type": "Expression",
+                  "value": "@formatDateTime(addDays(utcnow(), mul(pipeline().parameters.days_back, -1)), 'yyyy-MM-dd')"
+                }
+              }
+            },
+            {
+              "name": "BuildDateFilter",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ComputeEndDate",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "date_filter",
+                "value": {
+                  "type": "Expression",
+                  "value": "@concat('created_at BETWEEN ''', variables('computed_end_date'), ''' AND ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+                }
+              }
+            },
+            {
+              "name": "CopyDateRange",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "BuildDateFilter",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM orders WHERE ', variables('date_filter'))"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "addDays + formatDateTime + mul for computed date range filtering.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ComputeEndDate",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "BuildDateFilter",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CopyDateRange",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "start_date",
+          "days_back"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ComputeEndDate",
+            "target_task": "BuildDateFilter"
+          },
+          {
+            "source_task": "BuildDateFilter",
+            "target_task": "CopyDateRange"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "date_range_partitioned_copy",
+          "properties": {
+            "parameters": {
+              "start_date": {
+                "type": "String",
+                "defaultValue": "2024-01-01"
+              },
+              "days_back": {
+                "type": "Int",
+                "defaultValue": 7
+              }
+            },
+            "variables": {
+              "computed_end_date": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "date_filter": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ComputeEndDate",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "computed_end_date",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(addDays(utcnow(), mul(pipeline().parameters.days_back, -1)), 'yyyy-MM-dd')"
+                  }
+                }
+              },
+              {
+                "name": "BuildDateFilter",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ComputeEndDate",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "date_filter",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@concat('created_at BETWEEN ''', variables('computed_end_date'), ''' AND ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+                  }
+                }
+              },
+              {
+                "name": "CopyDateRange",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "BuildDateFilter",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT * FROM orders WHERE ', variables('date_filter'))"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 2,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "collection_operations_full",
+        "properties": {
+          "parameters": {
+            "config_a": {
+              "type": "String",
+              "defaultValue": "{\"key1\": \"val1\"}"
+            },
+            "config_b": {
+              "type": "String",
+              "defaultValue": "{\"key2\": \"val2\"}"
+            },
+            "required_keys": {
+              "type": "Array",
+              "defaultValue": [
+                "key1",
+                "key2"
+              ]
+            },
+            "available_keys": {
+              "type": "Array",
+              "defaultValue": [
+                "key1",
+                "key3"
+              ]
+            }
+          },
+          "variables": {
+            "merged": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "common_keys": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "has_all_keys": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "MergeConfigs",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "merged",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(union(json(pipeline().parameters.config_a), json(pipeline().parameters.config_b)))"
+                }
+              }
+            },
+            {
+              "name": "FindCommonKeys",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "MergeConfigs",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "common_keys",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys))"
+                }
+              }
+            },
+            {
+              "name": "CheckAllPresent",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "FindCommonKeys",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "has_all_keys",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+                }
+              }
+            },
+            {
+              "name": "ValidateKeys",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CheckAllPresent",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@not(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "union + intersection + empty + json + createArray combined in one pipeline.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "MergeConfigs",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "FindCommonKeys",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckAllPresent",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ValidateKeys",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "config_a",
+          "config_b",
+          "required_keys",
+          "available_keys"
+        ],
+        "dependencies": [
+          {
+            "source_task": "MergeConfigs",
+            "target_task": "FindCommonKeys"
+          },
+          {
+            "source_task": "FindCommonKeys",
+            "target_task": "CheckAllPresent"
+          },
+          {
+            "source_task": "CheckAllPresent",
+            "target_task": "ValidateKeys"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "collection_operations_full",
+          "properties": {
+            "parameters": {
+              "config_a": {
+                "type": "String",
+                "defaultValue": "{\"key1\": \"val1\"}"
+              },
+              "config_b": {
+                "type": "String",
+                "defaultValue": "{\"key2\": \"val2\"}"
+              },
+              "required_keys": {
+                "type": "Array",
+                "defaultValue": [
+                  "key1",
+                  "key2"
+                ]
+              },
+              "available_keys": {
+                "type": "Array",
+                "defaultValue": [
+                  "key1",
+                  "key3"
+                ]
+              }
+            },
+            "variables": {
+              "merged": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "common_keys": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "has_all_keys": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "MergeConfigs",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "merged",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(union(json(pipeline().parameters.config_a), json(pipeline().parameters.config_b)))"
+                  }
+                }
+              },
+              {
+                "name": "FindCommonKeys",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "MergeConfigs",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "common_keys",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys))"
+                  }
+                }
+              },
+              {
+                "name": "CheckAllPresent",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "FindCommonKeys",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "has_all_keys",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+                  }
+                }
+              },
+              {
+                "name": "ValidateKeys",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "CheckAllPresent",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "datetime_watermark_manager",
+        "properties": {
+          "parameters": {
+            "watermark_override": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "timezone": {
+              "type": "String",
+              "defaultValue": "Eastern Standard Time"
+            }
+          },
+          "variables": {
+            "effective_watermark": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "local_watermark": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "formatted_watermark": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "ResolveWatermark",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "effective_watermark",
+                "value": {
+                  "type": "Expression",
+                  "value": "@coalesce(pipeline().parameters.watermark_override, formatDateTime(utcnow(), 'yyyy-MM-ddTHH:mm:ss'))"
+                }
+              }
+            },
+            {
+              "name": "ConvertToLocal",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ResolveWatermark",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "local_watermark",
+                "value": {
+                  "type": "Expression",
+                  "value": "@convertFromUtc(utcnow(), pipeline().parameters.timezone, 'yyyy-MM-dd HH:mm:ss')"
+                }
+              }
+            },
+            {
+              "name": "FormatWatermark",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "ConvertToLocal",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "formatted_watermark",
+                "value": {
+                  "type": "Expression",
+                  "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+                }
+              }
+            },
+            {
+              "name": "IncrementalCopy",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "FormatWatermark",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "type": "Expression",
+                    "value": "@concat('SELECT * FROM events WHERE updated_at > ''', variables('effective_watermark'), '''')"
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "coalesce + convertFromUtc + formatDateTime combined for watermark management.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "ResolveWatermark",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "ConvertToLocal",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "FormatWatermark",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "IncrementalCopy",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "watermark_override",
+          "timezone"
+        ],
+        "dependencies": [
+          {
+            "source_task": "ResolveWatermark",
+            "target_task": "ConvertToLocal"
+          },
+          {
+            "source_task": "ConvertToLocal",
+            "target_task": "FormatWatermark"
+          },
+          {
+            "source_task": "FormatWatermark",
+            "target_task": "IncrementalCopy"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "datetime_watermark_manager",
+          "properties": {
+            "parameters": {
+              "watermark_override": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "timezone": {
+                "type": "String",
+                "defaultValue": "Eastern Standard Time"
+              }
+            },
+            "variables": {
+              "effective_watermark": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "local_watermark": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "formatted_watermark": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "ResolveWatermark",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "effective_watermark",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@coalesce(pipeline().parameters.watermark_override, formatDateTime(utcnow(), 'yyyy-MM-ddTHH:mm:ss'))"
+                  }
+                }
+              },
+              {
+                "name": "ConvertToLocal",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ResolveWatermark",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "local_watermark",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@convertFromUtc(utcnow(), pipeline().parameters.timezone, 'yyyy-MM-dd HH:mm:ss')"
+                  }
+                }
+              },
+              {
+                "name": "FormatWatermark",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "ConvertToLocal",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "formatted_watermark",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+                  }
+                }
+              },
+              {
+                "name": "IncrementalCopy",
+                "type": "Copy",
+                "dependsOn": [
+                  {
+                    "activity": "FormatWatermark",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureSqlSource",
+                    "sqlReaderQuery": {
+                      "type": "Expression",
+                      "value": "@concat('SELECT * FROM events WHERE updated_at > ''', variables('effective_watermark'), '''')"
+                    }
+                  },
+                  "sink": {
+                    "type": "ParquetSink"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 3,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    },
+    {
+      "adf_json": {
+        "name": "math_expression_batch_sizer",
+        "properties": {
+          "parameters": {
+            "total_records": {
+              "type": "Int",
+              "defaultValue": 10000
+            },
+            "num_partitions": {
+              "type": "Int",
+              "defaultValue": 4
+            },
+            "overhead_factor": {
+              "type": "Int",
+              "defaultValue": 2
+            },
+            "min_batch": {
+              "type": "Int",
+              "defaultValue": 100
+            }
+          },
+          "variables": {
+            "batch_size": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "adjusted_size": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "partition_size": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "remainder": {
+              "type": "String",
+              "defaultValue": ""
+            },
+            "status_flag": {
+              "type": "String",
+              "defaultValue": ""
+            }
+          },
+          "activities": [
+            {
+              "name": "CalcBatchSize",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "batch_size",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+                }
+              }
+            },
+            {
+              "name": "CalcAdjusted",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CalcBatchSize",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "adjusted_size",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), mul(pipeline().parameters.overhead_factor, pipeline().parameters.num_partitions)))"
+                }
+              }
+            },
+            {
+              "name": "CalcRemainder",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CalcBatchSize",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "remainder",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+                }
+              }
+            },
+            {
+              "name": "CalcPartition",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "CalcAdjusted",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "partition_size",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(sub(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.overhead_factor))"
+                }
+              }
+            },
+            {
+              "name": "CheckMinBatch",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "CalcPartition",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "userProperties": [],
+              "typeProperties": {
+                "expression": {
+                  "type": "Expression",
+                  "value": "@greater(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.min_batch)"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "SetTrueFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('true')"
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "SetFalseFlag",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "userProperties": [],
+                    "typeProperties": {
+                      "variableName": "status_flag",
+                      "value": {
+                        "type": "Expression",
+                        "value": "@string('false')"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "description": "add + sub + mul + div + mod on parameters for batch size calculation.",
+      "difficulty": "complex",
+      "expected_snapshot": {
+        "tasks": [
+          {
+            "task_key": "CalcBatchSize",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CalcAdjusted",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CalcRemainder",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CalcPartition",
+            "is_placeholder": false
+          },
+          {
+            "task_key": "CheckMinBatch",
+            "is_placeholder": false
+          }
+        ],
+        "notebooks": [],
+        "secrets": [],
+        "parameters": [
+          "total_records",
+          "num_partitions",
+          "overhead_factor",
+          "min_batch"
+        ],
+        "dependencies": [
+          {
+            "source_task": "CalcBatchSize",
+            "target_task": "CalcAdjusted"
+          },
+          {
+            "source_task": "CalcBatchSize",
+            "target_task": "CalcRemainder"
+          },
+          {
+            "source_task": "CalcAdjusted",
+            "target_task": "CalcPartition"
+          },
+          {
+            "source_task": "CalcPartition",
+            "target_task": "CheckMinBatch"
+          }
+        ],
+        "resolved_expressions": [],
+        "source_pipeline": {
+          "name": "math_expression_batch_sizer",
+          "properties": {
+            "parameters": {
+              "total_records": {
+                "type": "Int",
+                "defaultValue": 10000
+              },
+              "num_partitions": {
+                "type": "Int",
+                "defaultValue": 4
+              },
+              "overhead_factor": {
+                "type": "Int",
+                "defaultValue": 2
+              },
+              "min_batch": {
+                "type": "Int",
+                "defaultValue": 100
+              }
+            },
+            "variables": {
+              "batch_size": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "adjusted_size": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "partition_size": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "remainder": {
+                "type": "String",
+                "defaultValue": ""
+              },
+              "status_flag": {
+                "type": "String",
+                "defaultValue": ""
+              }
+            },
+            "activities": [
+              {
+                "name": "CalcBatchSize",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "batch_size",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+                  }
+                }
+              },
+              {
+                "name": "CalcAdjusted",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CalcBatchSize",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "adjusted_size",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), mul(pipeline().parameters.overhead_factor, pipeline().parameters.num_partitions)))"
+                  }
+                }
+              },
+              {
+                "name": "CalcRemainder",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CalcBatchSize",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "remainder",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+                  }
+                }
+              },
+              {
+                "name": "CalcPartition",
+                "type": "SetVariable",
+                "dependsOn": [
+                  {
+                    "activity": "CalcAdjusted",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "variableName": "partition_size",
+                  "value": {
+                    "type": "Expression",
+                    "value": "@string(sub(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.overhead_factor))"
+                  }
+                }
+              },
+              {
+                "name": "CheckMinBatch",
+                "type": "IfCondition",
+                "dependsOn": [
+                  {
+                    "activity": "CalcPartition",
+                    "dependencyConditions": [
+                      "Succeeded"
+                    ]
+                  }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                  "expression": {
+                    "type": "Expression",
+                    "value": "@greater(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.min_batch)"
+                  },
+                  "ifTrueActivities": [
+                    {
+                      "name": "SetTrueFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('true')"
+                        }
+                      }
+                    }
+                  ],
+                  "ifFalseActivities": [
+                    {
+                      "name": "SetFalseFlag",
+                      "type": "SetVariable",
+                      "dependsOn": [],
+                      "userProperties": [],
+                      "typeProperties": {
+                        "variableName": "status_flag",
+                        "value": {
+                          "type": "Expression",
+                          "value": "@string('false')"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "total_source_dependencies": 4,
+        "expected_outputs": {},
+        "adf_run_outputs": {},
+        "not_translatable": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "name": "multiline_sql_param_builder",
+  "properties": {
+    "parameters": {
+      "schema": {
+        "type": "String",
+        "defaultValue": "dbo"
+      },
+      "table": {
+        "type": "String",
+        "defaultValue": "orders"
+      },
+      "start_date": {
+        "type": "String",
+        "defaultValue": "2024-01-01"
+      },
+      "end_date": {
+        "type": "String",
+        "defaultValue": "2024-12-31"
+      },
+      "status_filter": {
+        "type": "String",
+        "defaultValue": "active"
+      }
+    },
+    "variables": {
+      "dynamic_query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildComplexQuery",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "dynamic_query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT o.id, o.customer_id, o.amount, c.name ', 'FROM ', pipeline().parameters.schema, '.', pipeline().parameters.table, ' o ', 'INNER JOIN ', pipeline().parameters.schema, '.customers c ON o.customer_id = c.id ', 'WHERE o.created_at BETWEEN ''', pipeline().parameters.start_date, ''' AND ''', pipeline().parameters.end_date, ''' ', 'AND o.status = ''', pipeline().parameters.status_filter, ''' ', 'ORDER BY o.created_at DESC')"
+          }
+        }
+      },
+      {
+        "name": "RunQuery",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "BuildComplexQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@variables('dynamic_query')"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "ExportResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "RunQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@variables('dynamic_query')"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

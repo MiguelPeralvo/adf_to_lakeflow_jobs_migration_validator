@@ -1,0 +1,92 @@
+{
+  "name": "triple_nested_validation",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "load_type": {
+        "type": "String",
+        "defaultValue": "full"
+      },
+      "factory_name": {
+        "type": "String",
+        "defaultValue": "data_factory_prod"
+      }
+    },
+    "variables": {
+      "validation_passed": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunDataValidation",
+        "type": "Lookup",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "TripleGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "RunDataValidation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(and(equals(activity('RunDataValidation').output.firstRow.is_valid, '1'), not(or(equals(pipeline().parameters.env, 'dev'), equals(pipeline().parameters.env, 'test')))), equals(pipeline().parameters.factory_name, 'data_factory_prod'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetValidated",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "validation_passed",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetNotValidated",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "validation_passed",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

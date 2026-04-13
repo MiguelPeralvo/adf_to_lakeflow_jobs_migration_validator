@@ -1,0 +1,116 @@
+{
+  "name": "env_branching_url_builder",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "endpoint": {
+        "type": "String",
+        "defaultValue": "status"
+      }
+    },
+    "variables": {
+      "api_url": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "response": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildUrl",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "api_url",
+          "value": {
+            "type": "Expression",
+            "value": "@if(equals(pipeline().parameters.env, 'prod'), concat('https://api.example-corp.com/v2/', pipeline().parameters.endpoint), concat('https://api-', pipeline().parameters.env, '.example-corp.com/v2/', pipeline().parameters.endpoint))"
+          }
+        }
+      },
+      {
+        "name": "CheckEnv",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "BuildUrl",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(equals(pipeline().parameters.env, 'prod'), equals(pipeline().parameters.env, 'staging'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetProdFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "response",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('production_mode')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "CallApi",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "CheckEnv",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "url": {
+            "type": "Expression",
+            "value": "@variables('api_url')"
+          },
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "type": "Expression",
+            "value": "@concat('{\"pipeline\": \"', pipeline().Pipeline, '\"}')"
+          }
+        }
+      }
+    ]
+  }
+}

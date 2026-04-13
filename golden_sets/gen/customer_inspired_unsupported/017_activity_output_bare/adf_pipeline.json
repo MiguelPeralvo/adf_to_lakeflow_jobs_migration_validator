@@ -1,0 +1,76 @@
+{
+  "name": "activity_output_bare",
+  "properties": {
+    "parameters": {},
+    "variables": {
+      "has_error": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "output_data": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunProcess",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/process/main",
+          "baseParameters": {}
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CheckForError",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RunProcess",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "has_error",
+          "value": {
+            "type": "Expression",
+            "value": "@string(contains(activity('RunProcess').output, 'runError'))"
+          }
+        }
+      },
+      {
+        "name": "CaptureOutput",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CheckForError",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "output_data",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('result##', if(contains(activity('RunProcess').output, 'runError'), '', activity('RunProcess').output.runOutput))"
+          }
+        }
+      }
+    ]
+  }
+}

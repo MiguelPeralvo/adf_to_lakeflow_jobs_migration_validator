@@ -1,0 +1,75 @@
+{
+  "name": "base64_config_decoder",
+  "properties": {
+    "parameters": {
+      "encoded_config": {
+        "type": "String",
+        "defaultValue": "eyJrZXkiOiAidmFsdWUifQ=="
+      }
+    },
+    "variables": {
+      "decoded_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "parsed_key": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "FetchEncodedConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "DecodeConfig",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FetchEncodedConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "decoded_config",
+          "value": {
+            "type": "Expression",
+            "value": "@base64ToString(pipeline().parameters.encoded_config)"
+          }
+        }
+      },
+      {
+        "name": "ExtractKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "DecodeConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "parsed_key",
+          "value": {
+            "type": "Expression",
+            "value": "@split(split(variables('decoded_config'), '\"key\":')[1], '\"')[1]"
+          }
+        }
+      }
+    ]
+  }
+}

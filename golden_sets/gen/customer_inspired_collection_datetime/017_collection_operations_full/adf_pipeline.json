@@ -1,0 +1,151 @@
+{
+  "name": "collection_operations_full",
+  "properties": {
+    "parameters": {
+      "config_a": {
+        "type": "String",
+        "defaultValue": "{\"key1\": \"val1\"}"
+      },
+      "config_b": {
+        "type": "String",
+        "defaultValue": "{\"key2\": \"val2\"}"
+      },
+      "required_keys": {
+        "type": "Array",
+        "defaultValue": [
+          "key1",
+          "key2"
+        ]
+      },
+      "available_keys": {
+        "type": "Array",
+        "defaultValue": [
+          "key1",
+          "key3"
+        ]
+      }
+    },
+    "variables": {
+      "merged": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "common_keys": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "has_all_keys": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "MergeConfigs",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "merged",
+          "value": {
+            "type": "Expression",
+            "value": "@string(union(json(pipeline().parameters.config_a), json(pipeline().parameters.config_b)))"
+          }
+        }
+      },
+      {
+        "name": "FindCommonKeys",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "MergeConfigs",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "common_keys",
+          "value": {
+            "type": "Expression",
+            "value": "@string(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys))"
+          }
+        }
+      },
+      {
+        "name": "CheckAllPresent",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FindCommonKeys",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "has_all_keys",
+          "value": {
+            "type": "Expression",
+            "value": "@string(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+          }
+        }
+      },
+      {
+        "name": "ValidateKeys",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CheckAllPresent",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@not(empty(intersection(pipeline().parameters.required_keys, pipeline().parameters.available_keys)))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

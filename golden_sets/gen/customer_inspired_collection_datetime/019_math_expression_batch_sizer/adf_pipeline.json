@@ -1,0 +1,169 @@
+{
+  "name": "math_expression_batch_sizer",
+  "properties": {
+    "parameters": {
+      "total_records": {
+        "type": "Int",
+        "defaultValue": 10000
+      },
+      "num_partitions": {
+        "type": "Int",
+        "defaultValue": 4
+      },
+      "overhead_factor": {
+        "type": "Int",
+        "defaultValue": 2
+      },
+      "min_batch": {
+        "type": "Int",
+        "defaultValue": 100
+      }
+    },
+    "variables": {
+      "batch_size": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "adjusted_size": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "partition_size": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "remainder": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcBatchSize",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "batch_size",
+          "value": {
+            "type": "Expression",
+            "value": "@string(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+          }
+        }
+      },
+      {
+        "name": "CalcAdjusted",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcBatchSize",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "adjusted_size",
+          "value": {
+            "type": "Expression",
+            "value": "@string(add(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), mul(pipeline().parameters.overhead_factor, pipeline().parameters.num_partitions)))"
+          }
+        }
+      },
+      {
+        "name": "CalcRemainder",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcBatchSize",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "remainder",
+          "value": {
+            "type": "Expression",
+            "value": "@string(mod(pipeline().parameters.total_records, pipeline().parameters.num_partitions))"
+          }
+        }
+      },
+      {
+        "name": "CalcPartition",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcAdjusted",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_size",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.overhead_factor))"
+          }
+        }
+      },
+      {
+        "name": "CheckMinBatch",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "CalcPartition",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(div(pipeline().parameters.total_records, pipeline().parameters.num_partitions), pipeline().parameters.min_batch)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "name": "dual_variable_gate",
+  "properties": {
+    "parameters": {
+      "enable_processing": {
+        "type": "Bool",
+        "defaultValue": true
+      }
+    },
+    "variables": {
+      "should_continue": {
+        "type": "Boolean",
+        "defaultValue": true
+      },
+      "not_skipped": {
+        "type": "Boolean",
+        "defaultValue": true
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "InitContinue",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "should_continue",
+          "value": {
+            "type": "Expression",
+            "value": "@bool(pipeline().parameters.enable_processing)"
+          }
+        }
+      },
+      {
+        "name": "ContinuationGate",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "InitContinue",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@and(variables('should_continue'), variables('not_skipped'))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

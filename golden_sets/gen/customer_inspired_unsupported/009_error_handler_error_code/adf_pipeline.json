@@ -1,0 +1,99 @@
+{
+  "name": "error_handler_error_code",
+  "properties": {
+    "parameters": {},
+    "variables": {
+      "error_detail": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "error_code": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunBatchProcess",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/jobs/error_code_job",
+          "baseParameters": {}
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CaptureError",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RunBatchProcess",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "error_detail",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('RunBatchProcess').error.errorCode"
+          }
+        }
+      },
+      {
+        "name": "BuildErrorMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CaptureError",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "error_code",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Error: ', activity('RunBatchProcess').error.errorCode)"
+          }
+        }
+      },
+      {
+        "name": "ReportError",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "BuildErrorMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "message": {
+            "type": "Expression",
+            "value": "@concat('Pipeline failed: ', activity('RunBatchProcess').error.errorCode)"
+          },
+          "errorCode": {
+            "type": "Expression",
+            "value": "@concat('ERR_', activity('RunBatchProcess').error.errorCode)"
+          }
+        }
+      }
+    ]
+  }
+}

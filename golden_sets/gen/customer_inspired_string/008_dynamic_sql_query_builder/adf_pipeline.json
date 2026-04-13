@@ -1,0 +1,88 @@
+{
+  "name": "dynamic_sql_query_builder",
+  "properties": {
+    "parameters": {
+      "table_name": {
+        "type": "String",
+        "defaultValue": "orders"
+      },
+      "date_filter": {
+        "type": "String",
+        "defaultValue": "2024-01-01"
+      },
+      "limit": {
+        "type": "Int",
+        "defaultValue": 1000
+      }
+    },
+    "variables": {
+      "query": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "BuildQuery",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "query",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('SELECT TOP ', string(pipeline().parameters.limit), ' * FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''' ORDER BY created_at DESC')"
+          }
+        }
+      },
+      {
+        "name": "ExecuteQuery",
+        "type": "Lookup",
+        "dependsOn": [
+          {
+            "activity": "BuildQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@variables('query')"
+            }
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "ExportResults",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "ExecuteQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM dbo.', pipeline().parameters.table_name, ' WHERE id IN (SELECT id FROM dbo.', pipeline().parameters.table_name, ' WHERE created_at >= ''', pipeline().parameters.date_filter, ''')')"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

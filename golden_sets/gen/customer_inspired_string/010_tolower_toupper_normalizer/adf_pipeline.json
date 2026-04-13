@@ -1,0 +1,114 @@
+{
+  "name": "tolower_toupper_normalizer",
+  "properties": {
+    "parameters": {
+      "input_code": {
+        "type": "String",
+        "defaultValue": " ABC-123 "
+      },
+      "category": {
+        "type": "String",
+        "defaultValue": "Premium"
+      }
+    },
+    "variables": {
+      "normalized_code": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "upper_category": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "trimmed_code": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "final_key": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "TrimCode",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "trimmed_code",
+          "value": {
+            "type": "Expression",
+            "value": "@trim(pipeline().parameters.input_code)"
+          }
+        }
+      },
+      {
+        "name": "NormalizeCode",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "TrimCode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "normalized_code",
+          "value": {
+            "type": "Expression",
+            "value": "@toLower(trim(pipeline().parameters.input_code))"
+          }
+        }
+      },
+      {
+        "name": "UpperCategory",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "TrimCode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "upper_category",
+          "value": {
+            "type": "Expression",
+            "value": "@toUpper(pipeline().parameters.category)"
+          }
+        }
+      },
+      {
+        "name": "BuildKey",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "NormalizeCode",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "UpperCategory",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "final_key",
+          "value": {
+            "type": "Expression",
+            "value": "@concat(variables('normalized_code'), ':', variables('upper_category'))"
+          }
+        }
+      }
+    ]
+  }
+}

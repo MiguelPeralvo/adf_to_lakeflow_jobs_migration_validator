@@ -1,0 +1,123 @@
+{
+  "name": "multi_arg_concat_path_builder",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "region": {
+        "type": "String",
+        "defaultValue": "us-east"
+      },
+      "dataset_name": {
+        "type": "String",
+        "defaultValue": "customers"
+      },
+      "version": {
+        "type": "String",
+        "defaultValue": "v2"
+      }
+    },
+    "variables": {
+      "full_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "archive_path": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "log_path": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetFullPath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "full_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/gold/', pipeline().parameters.dataset_name, '/', formatDateTime(utcnow(), 'yyyy/MM/dd'))"
+          }
+        }
+      },
+      {
+        "name": "SetArchivePath",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "archive_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/', pipeline().parameters.env, '/archive/', pipeline().parameters.dataset_name, '_', pipeline().parameters.version, '_', formatDateTime(utcnow(), 'yyyyMMdd'))"
+          }
+        }
+      },
+      {
+        "name": "SetLogPath",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetFullPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "log_path",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('/volumes/', pipeline().parameters.env, '/', pipeline().parameters.region, '/logs/', pipeline().Pipeline, '/', pipeline().RunId)"
+          }
+        }
+      },
+      {
+        "name": "ProcessData",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "SetLogPath",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/data_loader/process",
+          "baseParameters": {
+            "input_path": {
+              "type": "Expression",
+              "value": "@variables('full_path')"
+            },
+            "output_path": {
+              "type": "Expression",
+              "value": "@variables('archive_path')"
+            },
+            "log_path": {
+              "type": "Expression",
+              "value": "@variables('log_path')"
+            },
+            "run_date": {
+              "type": "Expression",
+              "value": "@formatDateTime(utcnow(), 'yyyy-MM-dd')"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      }
+    ]
+  }
+}

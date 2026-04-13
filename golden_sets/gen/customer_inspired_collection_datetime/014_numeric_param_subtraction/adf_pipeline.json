@@ -1,0 +1,113 @@
+{
+  "name": "numeric_param_subtraction",
+  "properties": {
+    "parameters": {
+      "total_workers": {
+        "type": "Int",
+        "defaultValue": 8
+      },
+      "reserved_workers": {
+        "type": "Int",
+        "defaultValue": 2
+      }
+    },
+    "variables": {
+      "available_workers": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "adjusted_count": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "CalcAvailable",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "available_workers",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers))"
+          }
+        }
+      },
+      {
+        "name": "AdjustCount",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CalcAvailable",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "adjusted_count",
+          "value": {
+            "type": "Expression",
+            "value": "@string(sub(pipeline().parameters.total_workers, 4))"
+          }
+        }
+      },
+      {
+        "name": "CheckMinWorkers",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "AdjustCount",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@greater(sub(pipeline().parameters.total_workers, pipeline().parameters.reserved_workers), 0)"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "SetTrueFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SetFalseFlag",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "status_flag",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('false')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

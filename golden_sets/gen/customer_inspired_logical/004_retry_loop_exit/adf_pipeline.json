@@ -1,0 +1,72 @@
+{
+  "name": "retry_loop_exit",
+  "properties": {
+    "parameters": {
+      "max_retries": {
+        "type": "Int",
+        "defaultValue": 5
+      }
+    },
+    "variables": {
+      "is_complete": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "retry_attempts": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "current_result": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RetryLoop",
+        "type": "Until",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@or(variables('is_complete'), equals(length(variables('retry_attempts')), pipeline().parameters.max_retries))"
+          },
+          "activities": [
+            {
+              "name": "AttemptCall",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "url": "https://api.example-corp.com/v1/check",
+                "method": "GET",
+                "headers": {
+                  "Content-Type": "application/json"
+                }
+              }
+            },
+            {
+              "name": "TrackAttempt",
+              "type": "AppendVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "retry_attempts",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string(utcnow())"
+                }
+              }
+            }
+          ],
+          "timeout": "0.01:00:00"
+        }
+      }
+    ]
+  }
+}

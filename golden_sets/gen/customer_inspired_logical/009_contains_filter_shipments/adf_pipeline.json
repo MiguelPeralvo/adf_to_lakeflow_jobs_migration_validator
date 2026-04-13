@@ -1,0 +1,70 @@
+{
+  "name": "contains_filter_variant_009",
+  "properties": {
+    "parameters": {
+      "target_tables": {
+        "type": "String",
+        "defaultValue": "shipments,accounts,reports"
+      },
+      "enable_filter": {
+        "type": "Bool",
+        "defaultValue": true
+      }
+    },
+    "variables": {
+      "should_process": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "FilterShipments",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@contains(pipeline().parameters.target_tables, 'shipments')"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ProcessShipments",
+              "type": "DatabricksNotebook",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "notebookPath": "/pipelines/etl/shipments/load",
+                "baseParameters": {}
+              },
+              "linkedServiceName": {
+                "referenceName": "ls_databricks",
+                "type": "LinkedServiceReference"
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "SkipProcessing",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "should_process",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('skipped')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

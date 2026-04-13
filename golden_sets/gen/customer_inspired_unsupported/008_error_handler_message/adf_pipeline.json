@@ -1,0 +1,99 @@
+{
+  "name": "error_handler_message",
+  "properties": {
+    "parameters": {},
+    "variables": {
+      "error_detail": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "error_code": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "RunCriticalJob",
+        "type": "DatabricksNotebook",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "notebookPath": "/pipelines/jobs/message_job",
+          "baseParameters": {}
+        },
+        "linkedServiceName": {
+          "referenceName": "ls_databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "CaptureError",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "RunCriticalJob",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "error_detail",
+          "value": {
+            "type": "Expression",
+            "value": "@activity('RunCriticalJob').error.message"
+          }
+        }
+      },
+      {
+        "name": "BuildErrorMessage",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "CaptureError",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "error_code",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('Error: ', activity('RunCriticalJob').error.message)"
+          }
+        }
+      },
+      {
+        "name": "ReportError",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "BuildErrorMessage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "message": {
+            "type": "Expression",
+            "value": "@concat('Pipeline failed: ', activity('RunCriticalJob').error.message)"
+          },
+          "errorCode": {
+            "type": "Expression",
+            "value": "@concat('ERR_', activity('RunCriticalJob').error.errorCode)"
+          }
+        }
+      }
+    ]
+  }
+}

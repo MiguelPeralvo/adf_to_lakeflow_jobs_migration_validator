@@ -1,0 +1,75 @@
+{
+  "name": "empty_intersection_guard",
+  "properties": {
+    "parameters": {
+      "user_roles": {
+        "type": "Array",
+        "defaultValue": []
+      },
+      "required_roles": {
+        "type": "Array",
+        "defaultValue": [
+          "admin",
+          "editor"
+        ]
+      }
+    },
+    "variables": {
+      "has_access": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "AccessCheck",
+        "type": "IfCondition",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "expression": {
+            "type": "Expression",
+            "value": "@empty(intersection(pipeline().parameters.user_roles, pipeline().parameters.required_roles))"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "DenyAccess",
+              "type": "Fail",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "message": {
+                  "type": "Expression",
+                  "value": "@concat('No matching roles. Required: ', string(pipeline().parameters.required_roles))"
+                },
+                "errorCode": {
+                  "type": "Expression",
+                  "value": "@string('ACCESS_DENIED')"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "GrantAccess",
+              "type": "SetVariable",
+              "dependsOn": [],
+              "userProperties": [],
+              "typeProperties": {
+                "variableName": "has_access",
+                "value": {
+                  "type": "Expression",
+                  "value": "@string('true')"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

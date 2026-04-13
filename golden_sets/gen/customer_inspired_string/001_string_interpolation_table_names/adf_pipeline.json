@@ -1,0 +1,89 @@
+{
+  "name": "string_interpolation_table_names",
+  "properties": {
+    "parameters": {
+      "env": {
+        "type": "String",
+        "defaultValue": "prod"
+      },
+      "table_name": {
+        "type": "String",
+        "defaultValue": "orders"
+      },
+      "schema_name": {
+        "type": "String",
+        "defaultValue": "analytics"
+      }
+    },
+    "variables": {
+      "qualified_name": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "staging_name": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetQualifiedName",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "qualified_name",
+          "value": {
+            "type": "Expression",
+            "value": "@{concat(pipeline().parameters.env, '_', pipeline().parameters.schema_name, '.', pipeline().parameters.table_name)}"
+          }
+        }
+      },
+      {
+        "name": "SetStagingName",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetQualifiedName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "staging_name",
+          "value": {
+            "type": "Expression",
+            "value": "@{concat('stg_', pipeline().parameters.table_name, '_', formatDateTime(utcnow(), 'yyyyMMdd'))}"
+          }
+        }
+      },
+      {
+        "name": "CopyToStaging",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetStagingName",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM ', variables('qualified_name'), ' WHERE load_date >= ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

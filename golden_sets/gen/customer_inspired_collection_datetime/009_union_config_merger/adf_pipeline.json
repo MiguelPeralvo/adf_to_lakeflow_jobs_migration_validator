@@ -1,0 +1,79 @@
+{
+  "name": "union_config_merger",
+  "properties": {
+    "parameters": {
+      "override_config": {
+        "type": "String",
+        "defaultValue": "{}"
+      }
+    },
+    "variables": {
+      "base_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "merged_config": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "FetchBaseConfig",
+        "type": "Lookup",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource"
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "StoreBase",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "FetchBaseConfig",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "base_config",
+          "value": {
+            "type": "Expression",
+            "value": "@string(activity('FetchBaseConfig').output.firstRow)"
+          }
+        }
+      },
+      {
+        "name": "MergeConfigs",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "StoreBase",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "merged_config",
+          "value": {
+            "type": "Expression",
+            "value": "@string(union(json(pipeline().parameters.override_config), json(variables('base_config'))))"
+          }
+        }
+      }
+    ]
+  }
+}

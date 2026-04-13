@@ -1,0 +1,89 @@
+{
+  "name": "date_range_partitioned_copy",
+  "properties": {
+    "parameters": {
+      "start_date": {
+        "type": "String",
+        "defaultValue": "2024-01-01"
+      },
+      "days_back": {
+        "type": "Int",
+        "defaultValue": 7
+      }
+    },
+    "variables": {
+      "computed_end_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "date_filter": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "ComputeEndDate",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "computed_end_date",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(addDays(utcnow(), mul(pipeline().parameters.days_back, -1)), 'yyyy-MM-dd')"
+          }
+        }
+      },
+      {
+        "name": "BuildDateFilter",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "ComputeEndDate",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "date_filter",
+          "value": {
+            "type": "Expression",
+            "value": "@concat('created_at BETWEEN ''', variables('computed_end_date'), ''' AND ''', formatDateTime(utcnow(), 'yyyy-MM-dd'), '''')"
+          }
+        }
+      },
+      {
+        "name": "CopyDateRange",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "BuildDateFilter",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT * FROM orders WHERE ', variables('date_filter'))"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}

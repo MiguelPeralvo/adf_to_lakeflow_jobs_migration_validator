@@ -1,0 +1,85 @@
+{
+  "name": "utcnow_formatted_partition",
+  "properties": {
+    "parameters": {
+      "table_name": {
+        "type": "String",
+        "defaultValue": "events"
+      }
+    },
+    "variables": {
+      "partition_key": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "record_timestamp": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "status_flag": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    },
+    "activities": [
+      {
+        "name": "SetPartitionKey",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "partition_key",
+          "value": {
+            "type": "Expression",
+            "value": "@formatDateTime(utcnow(), 'yyyy/MM/dd')"
+          }
+        }
+      },
+      {
+        "name": "SetRecordTimestamp",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "SetPartitionKey",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "variableName": "record_timestamp",
+          "value": {
+            "type": "Expression",
+            "value": "@utcnow('yyyy-MM-dd HH:mm:ss.fff')"
+          }
+        }
+      },
+      {
+        "name": "CopyPartitioned",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "SetRecordTimestamp",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "userProperties": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": {
+              "type": "Expression",
+              "value": "@concat('SELECT *, ''', variables('record_timestamp'), ''' AS load_timestamp FROM ', pipeline().parameters.table_name)"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink"
+          }
+        }
+      }
+    ]
+  }
+}
