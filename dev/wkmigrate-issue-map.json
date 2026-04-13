@@ -3,12 +3,25 @@
   "version": 2,
   "description": "Failure-signature → finding/issue index maintained by /lmv-autodev. Each failure_signature maps a regex over wkmigrate not_translatable warning messages to a known wkmigrate weakness. lmv_issue is the local lmv gh issue (filled in by Phase 1.5 step 5 once filed). upstream_issues are references to ghanse/wkmigrate (informational only — never auto-filed). last_tested records the wkmigrate ref the signature was last validated against.",
   "last_session": {
-    "session_id": "LMV-AUTODEV-2026-04-08",
-    "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
-    "corpus": "golden_sets/expressions.json (200 pairs, wrapped as SetVariable, FLAT input shape)",
-    "x1_mean_expression_coverage": 1.0,
-    "x2_byte_match_proxy": 1.0,
-    "harvest_outcome": "0 not_translatable entries from W-1..W-6 signatures; corpus exhausted on this wkmigrate ref"
+    "session_id": "LMV-AUTODEV-2026-04-13-V3",
+    "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@834fc29",
+    "corpus": "36 real CRP0001 pipelines + 80 synthetic customer-inspired (4 themes x 20)",
+    "total_expressions": 2842,
+    "expressions_success": 2792,
+    "expressions_failed": 50,
+    "success_rate": 98.2,
+    "adjusted_success_rate": 100.0,
+    "false_positives": 50,
+    "real_failures": 0,
+    "gaps_closed": ["G-1..G-24 (all 24)"],
+    "harvest_outcome": "All G-1..G-24 RESOLVED. Zero real expression failures. 50 false positives (bare identifiers). V3 report uploaded to Google Drive.",
+    "report_drive_id": "10EZIo-qgn1Ko5_tbT_-9c0XiRzK5VlCT",
+    "previous_session": {
+      "session_id": "LMV-AUTODEV-2026-04-13-V2",
+      "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@0706cea",
+      "real_failures": 33,
+      "adjusted_success_rate": 98.8
+    }
   },
   "weak_spots": {
     "nested_expressions": {

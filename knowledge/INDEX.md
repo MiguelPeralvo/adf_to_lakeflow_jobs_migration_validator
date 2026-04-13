@@ -27,6 +27,11 @@
 | [wkmigrate-fix-spec-W23-W24-W25-semantic-clusters.md](wkmigrate-fix-spec-W23-W24-W25-semantic-clusters.md) | W-23/W-24/W-25 remove json.loads, integer division, extend coercion | Key semantic fixes: biggest impact on X-2 scores |
 | [wkmigrate-fix-spec-W26-if-condition-bugs.md](wkmigrate-fix-spec-W26-if-condition-bugs.md) | W-26 IfCondition string quoting and not(equals) fallback | IfCondition predicate emission fixes |
 | [wkmigrate-fix-spec-W27-missing-datetime-utility-functions.md](wkmigrate-fix-spec-W27-missing-datetime-utility-functions.md) | W-27 missing DateTime & utility functions | 11 new function emitters: dayOfWeek, ticks, guid, etc. |
+| [wkmigrate-fix-spec-CRP1-emitter-registry.md](wkmigrate-fix-spec-CRP1-emitter-registry.md) | CRP-1: Expression emitter + function registry (G-2..G-10) | 9 gaps: globalParameters, runOutput, pipelineReturnValue, error, convertFromUtc |
+| [wkmigrate-fix-spec-CRP2-optional-chaining.md](wkmigrate-fix-spec-CRP2-optional-chaining.md) | CRP-2: Optional chaining `?.` tokenizer/parser (G-1) | New OPTIONAL_DOT token, null-safe property access for item()?.prop |
+| [wkmigrate-fix-spec-CRP3-control-flow-translators.md](wkmigrate-fix-spec-CRP3-control-flow-translators.md) | CRP-3: Control-flow translators (G-12, G-13, G-15) | ExecutePipeline, Switch, Until — 3 new activity translators |
+| [wkmigrate-fix-spec-CRP4-leaf-translators.md](wkmigrate-fix-spec-CRP4-leaf-translators.md) | CRP-4: Leaf translators + behavior fixes (G-11..G-18) | AppendVariable, Fail, setSystemVariable, isSequential, inactive state |
+| [wkmigrate-fix-spec-CRP5-crp0001-integration-tests.md](wkmigrate-fix-spec-CRP5-crp0001-integration-tests.md) | CRP-5: Integration tests for all 18 CRP0001 gaps | Golden tests against 8 real Repsol pipeline JSONs |
 
 ## Usage Protocol
 

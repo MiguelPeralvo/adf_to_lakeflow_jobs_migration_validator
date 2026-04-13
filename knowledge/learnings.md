@@ -52,3 +52,80 @@
 **Actionable for next session:**
 - When /wkmigrate-autodev runs for pr/27-N, use `dev/wkmigrate-alpha1-replay-handoff.md` as input
 - The 10 commits to port are classified as Group A (emission), B (resolver), C (bugfix)
+
+---
+
+## 2026-04-13 — CRP0001 V2 Re-Validation (Post CRP-1 through CRP-5)
+
+**Session:** lmv-autodev V2 re-validation after all 18 G-series gaps fixed
+**Key insight:** The 97.1% expression success rate (2,759/2,842) masks a significant false-positive problem — 50 of the 83 "failures" are actually bare identifiers and dataset names that ADF marks as `{"type": "Expression"}` but aren't real expressions. Adjusted real success rate is 98.8%.
+
+**Specific findings:**
+- All 18 G-series gaps (G-1 through G-18) confirmed RESOLVED on `pr/27-4-integration-tests@0706cea`
+- All 36 CRP0001 pipelines translate end-to-end without exception (100% pipeline-level success)
+- Synthetic logical (100%) and collection/datetime (100%) corpora are fully covered
+- 6 new gaps discovered (G-19 through G-24):
+  - G-21 (`runOutPut` case sensitivity) is P0 — the ADF JSON uses capital P but `_SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES` has lowercase
+  - G-22 (`runPageUrl`) affects 14 expressions in Arquetipo — high impact, easy fix (add to set)
+  - G-19 (`uriComponent`/`uriComponentToString`) blocks 2 operational logging pipelines
+  - G-20 (`char`), G-23 (deep chain), G-24 (`substring` 2-arg) are P2
+- Expression extraction heuristic (bare `@`-prefix strings) produces false positives. ADF stores literal table names like `GLB` and `estrategdato_ap_bfc_*` inside `{"type": "Expression", "value": "..."}` nodes — these are ADF authoring artifacts, not real expressions
+
+**Cost observation:** Translation sweep of 116 pipelines (36 real + 80 synthetic, 2,842 expressions) completed in ~15 seconds. No LLM calls needed — pure programmatic translation.
+
+**Actionable for next session:**
+- Fix G-21 immediately (case-insensitive output type lookup) — trivial 1-line fix, unblocks 4 expressions
+- Add `runPageUrl` to supported types (G-22) — unblocks 14 Arquetipo expressions
+- Register `uriComponent`/`uriComponentToString` (G-19) — unblocks operational logging
+- The expression extraction script should filter out bare identifiers (no `@` prefix, no function calls, no operators) to reduce false-positive noise
+- Consider adding `char()` to function registry for completeness (maps to Python `chr()`)
+
+---
+
+## 2026-04-13 — CRP0001 V3 Re-Validation (Post CRP-6, All 24 Gaps Closed)
+
+**Session:** lmv-autodev V3 re-validation after G-19..G-24 fixes (PR #14, commit `834fc29`)
+**Key insight:** Removing the output type whitelist in `_SUPPORTED_ACTIVITY_OUTPUT_REFERENCE_TYPES` was the right architectural decision. It fixed G-21 (case sensitivity), G-22 (runPageUrl), and G-23 (deep chains) all at once -- a single 15-line change resolved 22 of 33 real failures from V2. Whitelists create maintenance burden; validating at the semantic level is better.
+
+**Specific findings:**
+- **100% adjusted success rate** achieved: 2,792/2,792 real expressions translate successfully
+- All 80 synthetic pipelines (4 themes) now at 100% success across all categories
+- 22/36 CRP0001 pipelines have zero failures of any kind; remaining 14 have only false positives (bare identifiers)
+- The V1->V2->V3 journey closed 24 gaps in a single day via 6 CRP fix specs
+- False positive rate (50/2842 = 1.8%) is acceptable and not actionable -- caused by ADF authoring artifacts
+
+**Cost observation:** V3 sweep of 116 pipelines (2,842 expressions) completes in ~15 seconds. No LLM calls. Total cost of 3 sweep iterations: negligible.
+
+**Actionable for next session:**
+- Expression-level translation is now complete for CRP0001. Focus shifts to **semantic correctness** (does the generated Python produce the same runtime result?)
+- Run `lmv batch` with the synthetic golden sets to get X-series KPI scores
+- The `_wkmigrate_*` helper functions need implementation validation (do they handle `'Romance Standard Time'` correctly? does the format string mapping match ADF behavior?)
+- Consider creating a CRP-7 spec for end-to-end notebook generation validation
+
+---
+
+## 2026-04-13 — CRP0001 V4 Deep Validation (Semantic + Notebooks + DateTime)
+
+**Session:** lmv-autodev V4 deep validation -- 5 parallel workstreams
+**Key insight:** "100% expression translation" masks three runtime bugs and a structural gap. The expression parser/emitter is complete, but the notebook preparation pipeline has a P1 dependency parsing bug that blocks 41.7% of CRP0001 pipelines. Also, the CCS score (64.4%) is artificially low because the wkmigrate adapter doesn't wire resolved expressions back into the ConversionSnapshot.
+
+**Specific findings:**
+- **Semantic correctness: 99.5%** (2,778/2,792) -- 5 unique real bugs out of 513 unique expression patterns
+- **W-25 (HIGH)**: `datetime_helpers.py` `convert_time_zone()` has NO Windows-to-IANA timezone mapping despite docstring claiming it. `"Romance Standard Time"` raises ValueError. Affects 3+ CRP0001 pipelines, 20 expressions in full corpus.
+- **W-26 (HIGH)**: `is_conditional_task` flag in `_parse_dependency()` incorrectly rejects `Succeeded` conditions for sibling activities within IfCondition branches. `prepare_workflow()` crashes on the resulting `UnsupportedValue` objects. 15/36 CRP0001 pipelines blocked.
+- **W-27 (MEDIUM)**: `_wkmigrate_format_datetime()` assumes datetime input but `dbutils.widgets.get()` returns strings. 4 expressions affected.
+- **Notebook syntax: 100%** (125/125 generated notebooks compile without error)
+- **Helper injection: 100%** -- datetime helpers correctly inlined in all notebooks that need them
+- **Format tokens: 100%** -- all 15 ADF format token patterns (yyyy-MM-dd, dd/MM/yyyy, fff, etc.) map correctly to strftime
+- **X-1 = 100%** across all 4 synthetic golden sets (568/568 expressions)
+- **X-CCS = 64.4%** -- low because `adf_to_snapshot()` doesn't populate resolved_expressions from Pipeline IR
+- **50 false positives** fully traced to ADF authoring artifacts at specific JSON paths (ExecutePipeline parameters, DatabricksNotebook baseParameters)
+
+**Cost observation:** 5 parallel workstreams completed in ~7 minutes wall-clock. No LLM calls for translation/validation -- all programmatic. Semantic validator tested 2,792 expressions via eval() in <10 seconds.
+
+**Actionable for next session:**
+- **CRP-8 spec**: Fix W-25 (Windows TZ mapping), W-26 (dependency parser), W-27 (string-to-datetime parsing)
+- W-25 is trivial (add a dict), W-26 requires careful refactoring of `is_conditional_task` logic, W-27 needs `datetime.fromisoformat()` fallback
+- **Adapter wiring**: Wire resolved expressions from `translate_pipeline()` into `ConversionSnapshot` to lift CCS from 64% to 80%+
+- **Dependency conditions**: Add support for ADF `Completed` (ALL_DONE) and `Failed` (ALL_FAILED)
+- **Runtime validation**: Deploy generated notebooks to Databricks workspace for actual execution testing
