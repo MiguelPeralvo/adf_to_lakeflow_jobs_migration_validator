@@ -129,3 +129,28 @@
 - **Adapter wiring**: Wire resolved expressions from `translate_pipeline()` into `ConversionSnapshot` to lift CCS from 64% to 80%+
 - **Dependency conditions**: Add support for ADF `Completed` (ALL_DONE) and `Failed` (ALL_FAILED)
 - **Runtime validation**: Deploy generated notebooks to Databricks workspace for actual execution testing
+
+---
+
+## 2026-04-14 — CRP0001 V5 Re-Validation (Post CRP-8 + CRP-9, All 27 Findings Closed)
+
+**Session:** lmv-autodev V5 re-validation after CRP-8 (PR #15, `5ee2e1c`) and CRP-9 (PR #16, `6f498bd`)
+**Key insight:** The V4→V5 delta was clean: CRP-8 fixed all 14 semantic correctness failures (10 W-25 Windows TZ + 4 W-27 formatDateTime string), CRP-9 unblocked all 15 notebook preparation failures (W-26 dependency parser). Zero regressions. The wkmigrate expression + notebook pipeline is now fully validated for CRP0001.
+
+**Specific findings:**
+- **100% semantic correctness** (0 real bugs): V5 semantic validator shows 2,322 EXEC_OK (+10 from V4), 470 EXEC_ERROR (all mock limitations)
+- **36/36 CRP0001 notebook preparation** (was 21/36): W-26 fix unblocked all 15 pipelines
+- **152 total notebooks generated** (was 125): 27 new notebooks from previously-blocked pipelines, all 100% syntax valid
+- **100% expression translation** maintained: 2,792/2,792 real expressions, 50 false positives unchanged
+- **35/35 datetime helper tests pass**: Romance Standard Time, Eastern Standard Time, all format tokens, DST transitions
+- **25 remaining unsupported dependency conditions** (P2): `Completed`/`Failed` conditions in 12 pipelines — deps are gracefully dropped with a warning, not a crash
+- **752/752 wkmigrate unit tests pass** on `6f498bd`
+- Knowledge base committed to lmv repo (`3f9a977`): 8 CRP specs + V4 learnings
+
+**Cost observation:** V5 re-validation of 116 pipelines (2,842 expressions, 152 notebooks) completed in <5 minutes. No LLM calls.
+
+**Actionable for next session:**
+- **Adapter wiring**: Wire resolved expressions from Pipeline IR into `ConversionSnapshot` — the CCS (64.4%) gap is now the #1 priority
+- **Dependency conditions (P2)**: Map ADF `Completed`→`ALL_DONE`, `Failed`→`ALL_FAILED` in `_parse_dependency()`
+- **Runtime validation**: Deploy generated notebooks to a Databricks workspace and validate actual execution
+- **Push lmv KB commit** (`3f9a977`) to remote when ready

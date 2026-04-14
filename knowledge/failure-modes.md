@@ -112,16 +112,18 @@ Used by `dspy_judge.py` `FAILURE_MODES`:
 - **Impact:** Any ADF pipeline using Windows TZ names (e.g., `Romance Standard Time`, `Eastern Standard Time`) fails at runtime
 - **Upstream:** ghanse/wkmigrate#27
 - **Discovered:** 2026-04-13 (V4 deep validation)
-- **Status:** OPEN
+- **Fix:** Added `_WINDOWS_TO_IANA` mapping dict + `_resolve_timezone()` helper (PR #15, commit `5ee2e1c`)
+- **Status:** FIXED
 
-### W-26: `is_conditional_task` dependency parser bug
+### W-26: `is_conditional_task` dependency parser bug -- FIXED
 - **Regex:** `(?i)UnsupportedValue.*task_key|is_conditional_task.*Succeeded`
 - **Signature key:** `conditional_task_dependency_parser_bug`
 - **Root cause:** `_parse_dependency()` in `activity_translator.py` uses `is_conditional_task=True` for all inner activities of IfCondition branches, rejecting valid `Succeeded` dependency conditions as unsupported
 - **Impact:** 15/36 CRP0001 pipelines cannot complete notebook preparation (41.7%)
 - **Upstream:** ghanse/wkmigrate#27
 - **Discovered:** 2026-04-13 (V4 deep validation)
-- **Status:** OPEN
+- **Fix:** Rewrote `_parse_dependency()` to branch on `outcome` field presence instead of `is_conditional_task` flag; added `UnsupportedValue` guard in `get_base_task()` (PR #16, commit `6f498bd`)
+- **Status:** FIXED
 
 ### W-27: `formatDateTime` on string input
 - **Regex:** `(?i)strftime.*str.*has no attribute|format_datetime.*string`
@@ -130,7 +132,8 @@ Used by `dspy_judge.py` `FAILURE_MODES`:
 - **Impact:** 4 CRP0001 expressions using `formatDateTime(pipeline().parameters.dataDate, ...)`
 - **Upstream:** ghanse/wkmigrate#27
 - **Discovered:** 2026-04-13 (V4 deep validation)
-- **Status:** OPEN
+- **Fix:** Added `datetime.fromisoformat()` fallback when input is a string (PR #15, commit `5ee2e1c`)
+- **Status:** FIXED
 
 ## Discovery Log
 
@@ -140,3 +143,4 @@ Used by `dspy_judge.py` `FAILURE_MODES`:
 | 2026-04-13 | CRP0001 V2 re-validation | G-19 (8), G-20 (2), G-21 (4), G-22 (14), G-23 (4), G-24 (1) | 33/2842 real failures (98.8% adjusted success) |
 | 2026-04-13 | CRP0001 V3 re-validation | All G-19..G-24 FIXED | **0/2792 real failures (100% adjusted success)** |
 | 2026-04-13 | CRP0001 V4 deep validation | W-25 (20 exprs), W-26 (15 pipelines), W-27 (4 exprs) | 99.5% semantic correctness, 87.1% notebook prep |
+| 2026-04-14 | CRP0001 V5 re-validation | All W-25..W-27 FIXED (CRP-8 PR#15 + CRP-9 PR#16) | **100% semantic, 100% notebook prep (36/36), 152 notebooks** |
