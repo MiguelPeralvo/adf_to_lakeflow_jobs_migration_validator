@@ -43,7 +43,12 @@ def compute_expression_coverage(snapshot: ConversionSnapshot) -> tuple[float, di
       is False the score is reported as ``0.0`` and ``details["reason"]``
       explains why.
     """
-    unsupported = [entry for entry in snapshot.not_translatable if "expression" in entry.get("message", "").lower()]
+    unsupported = [
+        entry
+        for entry in snapshot.not_translatable
+        if "expression" in entry.get("message", "").lower()
+        and "emitted as python expression" not in entry.get("message", "").lower()
+    ]
     resolved = len(snapshot.resolved_expressions)
     total = resolved + len(unsupported)
 

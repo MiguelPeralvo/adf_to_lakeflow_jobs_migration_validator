@@ -144,3 +144,4 @@ Used by `dspy_judge.py` `FAILURE_MODES`:
 | 2026-04-13 | CRP0001 V3 re-validation | All G-19..G-24 FIXED | **0/2792 real failures (100% adjusted success)** |
 | 2026-04-13 | CRP0001 V4 deep validation | W-25 (20 exprs), W-26 (15 pipelines), W-27 (4 exprs) | 99.5% semantic correctness, 87.1% notebook prep |
 | 2026-04-14 | CRP0001 V5 re-validation | All W-25..W-27 FIXED (CRP-8 PR#15 + CRP-9 PR#16) | **100% semantic, 100% notebook prep (36/36), 152 notebooks** |
+| 2026-04-14 | CRP-10 + CCS fix | CRP-10: Completed/Failed deps → ALL_DONE/ALL_FAILED; CCS: L-F17 compound predicate fix + expression_coverage filter fix | **100% expression_coverage (21 measurable), 70 resolved exprs** |

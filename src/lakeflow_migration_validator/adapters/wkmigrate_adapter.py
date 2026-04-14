@@ -371,18 +371,21 @@ def _extract_resolved_expression_pairs(
             # expression on the IR side and pair it with the original ADF
             # expression captured from the source dict (when available).
             #
-            # All three operands must be non-empty strings — otherwise the
-            # f-string would silently embed the literal "None" (or "") into
-            # python_code, and that bogus pair would inflate X-1/X-2
-            # coverage metrics. Defensive validation matches every other
-            # handler in this walker (each of which goes through
-            # _coerce_resolved_value or an isinstance check before emitting).
+            # Two shapes exist in wkmigrate's IR:
+            # 1. Standard: op + left + right all non-empty → "(left op right)"
+            # 2. Compound predicate: op + left non-empty, right="" → the entire
+            #    resolved expression lives in left (e.g. @contains() emitted as
+            #    "('x' in str(...))" with op=EQUAL_TO, right="")
             op = getattr(task, "op", None)
             left = getattr(task, "left", None)
             right = getattr(task, "right", None)
-            if isinstance(op, str) and op and isinstance(left, str) and left and isinstance(right, str) and right:
-                python_op = _IR_OP_TO_PYTHON.get(op, op)
-                python_code = f"({left} {python_op} {right})"
+            if isinstance(op, str) and op and isinstance(left, str) and left:
+                if isinstance(right, str) and right:
+                    python_op = _IR_OP_TO_PYTHON.get(op, op)
+                    python_code = f"({left} {python_op} {right})"
+                else:
+                    # Compound predicate: entire expression in left
+                    python_code = left
                 adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code, context="if_condition"))
             continue

@@ -150,7 +150,30 @@
 **Cost observation:** V5 re-validation of 116 pipelines (2,842 expressions, 152 notebooks) completed in <5 minutes. No LLM calls.
 
 **Actionable for next session:**
-- **Adapter wiring**: Wire resolved expressions from Pipeline IR into `ConversionSnapshot` — the CCS (64.4%) gap is now the #1 priority
-- **Dependency conditions (P2)**: Map ADF `Completed`→`ALL_DONE`, `Failed`→`ALL_FAILED` in `_parse_dependency()`
+- **Adapter wiring**: Wire resolved expressions from Pipeline IR into `ConversionSnapshot` — the CCS (64.4%) gap is now the #1 priority ✅ DONE (2026-04-14)
+- **Dependency conditions (P2)**: Map ADF `Completed`→`ALL_DONE`, `Failed`→`ALL_FAILED` in `_parse_dependency()` ✅ DONE (2026-04-14, CRP-10)
 - **Runtime validation**: Deploy generated notebooks to a Databricks workspace and validate actual execution
 - **Push lmv KB commit** (`3f9a977`) to remote when ready
+
+---
+
+## 2026-04-14 — CRP-10 + CCS Adapter Wiring Fix
+
+**Session:** lmv-autodev CRP-10 dependency conditions + CCS diagnostic
+**Key insight:** The CCS 64.4% gap had TWO root causes, both in the lmv adapter — not a stale measurement. (1) The L-F17 IfCondition walker required `right` to be non-empty, but wkmigrate's compound predicates (e.g., `@contains()`) put the entire resolved expression in `left` with `right=""`. (2) The `expression_coverage` dimension's unsupported filter matched ANY not_translatable entry with "expression" in the message, including informational "IfCondition compound predicate emitted as Python expression" warnings that are SUCCESS notifications, not failures.
+
+**Specific findings:**
+- **CRP-10 implemented**: `_parse_dependency()` now maps `Completed`→`ALL_DONE`, `Failed`→`ALL_FAILED` via `_ADF_CONDITION_TO_OUTCOME` dict. 803/803 wkmigrate tests pass. 5 new test methods added.
+- **CCS diagnostic**: Before fix — 14 resolved expressions, 235 not_translatable, mean expression_coverage = 34.9% across 21 measurable CRP0001 pipelines
+- **CCS fix A (adapter walker)**: Accept compound predicates where `right=""` — `left` contains the full resolved Python expression. Added 56 new `if_condition` expression pairs.
+- **CCS fix B (dimension filter)**: Exclude "emitted as python expression" messages from unsupported count — these are informational, not failures.
+- **After fixes**: 70 resolved expressions, 0 unsupported, mean expression_coverage = **100%** across 21 measurable CRP0001 pipelines
+- **43/43 lmv adapter + expression_coverage tests pass** with both fixes
+
+**Cost observation:** No LLM calls. Diagnostic + fix took ~15 minutes of programmatic validation.
+
+**Actionable for next session:**
+- Re-measure full CCS (all 8 dimensions) on CRP0001 — expression_coverage is now 100%, expect CCS >> 64.4%
+- Push CRP-10 as PR to wkmigrate
+- Push lmv adapter fix as commit on lmv main
+- Runtime validation: Deploy generated notebooks to a Databricks workspace

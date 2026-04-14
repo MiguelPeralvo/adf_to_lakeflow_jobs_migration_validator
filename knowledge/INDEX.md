@@ -32,6 +32,7 @@
 | [wkmigrate-fix-spec-CRP3-control-flow-translators.md](wkmigrate-fix-spec-CRP3-control-flow-translators.md) | CRP-3: Control-flow translators (G-12, G-13, G-15) | ExecutePipeline, Switch, Until — 3 new activity translators |
 | [wkmigrate-fix-spec-CRP4-leaf-translators.md](wkmigrate-fix-spec-CRP4-leaf-translators.md) | CRP-4: Leaf translators + behavior fixes (G-11..G-18) | AppendVariable, Fail, setSystemVariable, isSequential, inactive state |
 | [wkmigrate-fix-spec-CRP5-crp0001-integration-tests.md](wkmigrate-fix-spec-CRP5-crp0001-integration-tests.md) | CRP-5: Integration tests for all 18 CRP0001 gaps | Golden tests against 8 real Repsol pipeline JSONs |
+| [wkmigrate-fix-spec-CRP10-dependency-conditions.md](wkmigrate-fix-spec-CRP10-dependency-conditions.md) | CRP-10: Support Completed/Failed dependency conditions | When invoking /wkmigrate-autodev for remaining P2 dependency gaps |
 
 ## Usage Protocol
 
