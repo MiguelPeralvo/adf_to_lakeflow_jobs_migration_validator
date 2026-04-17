@@ -16,7 +16,7 @@ upstream_issues:
 
 Step-3 audit (wkmigrate `6e0a3f5`, authored as part of CRP-11) documented a known limitation: when a `SetVariable` producer lives inside a multi-activity `ForEach` body and its consumer (an `IfCondition` referencing `@variables('X')`) sits at the outer scope, wkmigrate emits a **best-effort task key** that does not exist at Databricks runtime.
 
-```
+```text
 ForEach
   └── SetVariable X, ...          # producer (nested)
 IfCondition @variables('X') == Y  # consumer (outer, reads via taskValues.get)
