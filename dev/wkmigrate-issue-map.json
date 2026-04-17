@@ -3,24 +3,36 @@
   "version": 2,
   "description": "Failure-signature → finding/issue index maintained by /lmv-autodev. Each failure_signature maps a regex over wkmigrate not_translatable warning messages to a known wkmigrate weakness. lmv_issue is the local lmv gh issue (filled in by Phase 1.5 step 5 once filed). upstream_issues are references to ghanse/wkmigrate (informational only — never auto-filed). last_tested records the wkmigrate ref the signature was last validated against.",
   "last_session": {
-    "session_id": "LMV-AUTODEV-2026-04-13-V3",
-    "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@834fc29",
-    "corpus": "36 real CRP0001 pipelines + 80 synthetic customer-inspired (4 themes x 20)",
-    "total_expressions": 2842,
-    "expressions_success": 2792,
-    "expressions_failed": 50,
-    "success_rate": 98.2,
-    "adjusted_success_rate": 100.0,
-    "false_positives": 50,
-    "real_failures": 0,
-    "gaps_closed": ["G-1..G-24 (all 24)"],
-    "harvest_outcome": "All G-1..G-24 RESOLVED. Zero real expression failures. 50 false positives (bare identifiers). V3 report uploaded to Google Drive.",
-    "report_drive_id": "10EZIo-qgn1Ko5_tbT_-9c0XiRzK5VlCT",
+    "session_id": "LMV-AUTODEV-2026-04-17-kpi-convergence",
+    "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@e21c1e3",
+    "corpus": "golden_sets/expressions.json (208 pairs, 6 categories) across 7 activity contexts via lmv sweep-activity-contexts",
+    "harvest_outcome": "CRP-11 (wrapper notebook emitter, wkmigrate PR #19) post-merge harvest. Surfaced one lmv-side finding (L-F20) and one wkmigrate-side follow-up (W-32). L-F20 fixed same-day via lmv PR #30 (merged 87a5ecf). W-32 awaits Repsol/Lorenzo semantics confirmation.",
+    "new_findings_this_session": [
+      "L-F20 — adapter surfaces CRP-11 wrapper_notebook_content as resolved Python (lmv #31, fixed PR #30 @ 87a5ecf)",
+      "W-32 — @variables() producer inside multi-activity ForEach body emits runtime-wrong best-effort task key (lmv #32, upstream ghanse/wkmigrate#27 Step 3)"
+    ],
+    "x_series_snapshot": {
+      "X-1_weighted_7_contexts": 0.86,
+      "X-2_eval_proxy_208_pairs": 1.0,
+      "X-6.logical_if_condition": 1.0,
+      "X-6.nested_if_condition": 1.0,
+      "X-6.collection_if_condition": 1.0,
+      "notes": "X-1 bounded at 0.86 by ForEach W-10 corpus-mismatch; see W-10 diagnosis_correction."
+    },
     "previous_session": {
-      "session_id": "LMV-AUTODEV-2026-04-13-V2",
-      "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@0706cea",
-      "real_failures": 33,
-      "adjusted_success_rate": 98.8
+      "session_id": "LMV-AUTODEV-2026-04-13-V3",
+      "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@834fc29",
+      "corpus": "36 real CRP0001 pipelines + 80 synthetic customer-inspired (4 themes x 20)",
+      "total_expressions": 2842,
+      "expressions_success": 2792,
+      "expressions_failed": 50,
+      "success_rate": 98.2,
+      "adjusted_success_rate": 100.0,
+      "false_positives": 50,
+      "real_failures": 0,
+      "gaps_closed": ["G-1..G-24 (all 24)"],
+      "harvest_outcome": "All G-1..G-24 RESOLVED. Zero real expression failures. 50 false positives (bare identifiers). V3 report uploaded to Google Drive.",
+      "report_drive_id": "10EZIo-qgn1Ko5_tbT_-9c0XiRzK5VlCT"
     }
   },
   "weak_spots": {
@@ -310,6 +322,13 @@
         "wkmigrate_action_required": "None for W-10 itself. W-6 (structured failure_mode tags) covers the messaging improvement separately."
       },
       "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-17-kpi-convergence",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@e21c1e3",
+        "corpus": "golden_sets/expressions.json (208 pairs) via lmv sweep-activity-contexts for_each context",
+        "result": "Corpus sweep: 200/208 placeholders (unchanged from alpha_1 baseline; correct behavior per diagnosis_correction). 8/208 resolve — the literal @createArray entries. CRP-11 did not touch ForEachActivity; shape unchanged. Status remains mis-diagnosed-corpus-mismatch; no wkmigrate action required. Session-stamped in dev/findings/W-10-revalidation-2026-04-17.md.",
+        "raw_artifact": "/tmp/lmv_sweep_post_lf20.json"
+      },
+      "previous_last_tested": {
         "session": "WKMIGRATE-AUTODEV-2026-04-08",
         "wkmigrate_ref": "MiguelPeralvo/wkmigrate@alpha_1@969e74d",
         "corpus": "golden_sets/expressions.json (200 pairs) + manual bare @createArray('a','b','c') probe",
@@ -326,8 +345,7 @@
       "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
       "fix_sketch": "wkmigrate's ForEach translator should use get_literal_or_expression() for the items property and emit either a resolved Python list (when the expression statically evaluates to a literal array) or a runtime expression that produces an array. The pr/27-3-translator-adoption work covered the items field on the IR side but the placeholder fallback indicates the preparer never got the integration.",
       "weak_spots": ["nested_expressions"]
-    }
-  ],
+    },
     {
       "id": "W-11",
       "signature_key": "generic_activity_placeholder",
@@ -350,6 +368,56 @@
       "labels": ["wkmigrate-feedback", "area:translators", "kind:structural"],
       "fix_sketch": "Two-pronged: (1) Teach the adversarial generator to produce structurally valid Copy/Lookup/ForEach activities with proper dataset definitions. (2) In wkmigrate, improve error messages to distinguish 'activity type not supported' from 'activity structure incomplete'.",
       "weak_spots": ["unsupported_types"]
+    },
+    {
+      "id": "L-F20",
+      "signature_key": "crp11_wrapper_body_unread_by_adapter",
+      "regex": "(?i)\\{\\{tasks\\.[^}]+__crp11_wrap\\.values\\.branch\\}\\}",
+      "match_target": "resolved_expressions.python_code",
+      "title": "[adapters] lmv walker collapses CRP-11 compound IfCondition predicates to the wrapper-template reference",
+      "category": "logical",
+      "kind": "bug",
+      "area": "adapters",
+      "priority": "P1",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#31",
+      "status": "fixed-in:lmv#30@87a5ecf",
+      "discovered_via": "lmv sweep-activity-contexts (post CRP-11 merge, e21c1e3)",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-17-kpi-convergence",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@e21c1e3",
+        "corpus": "golden_sets/expressions.json (208 pairs, if_condition context)",
+        "pre_fix_result": "195/208 compound predicates collapsed to the {{tasks.<wrap>.values.branch}} == True template reference; 13 native (INV-1 simple binary).",
+        "post_fix_result": "0/208 template collapses; 208/208 surface real Python via _extract_wrapper_branch_expression(). X-6.logical/nested/collection all 1.00. 107/107 eval match (100%) on wrapper-relevant subset via wkmigrate scripts/check_wrapper_semantic_equivalence.py.",
+        "raw_artifact": "/tmp/lmv_sweep_post_lf20.json"
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
+      "fix_sketch": "In src/lakeflow_migration_validator/adapters/wkmigrate_adapter.py, detect IfConditionActivity.wrapper_notebook_key (new in CRP-11) and extract the `_branch = bool(<expr>)` payload from IfConditionActivity.wrapper_notebook_content via a deterministic single-pass parser. Skip pair emission on the INV-5 `raise NotImplementedError` branch so not_translatable speaks for itself.",
+      "weak_spots": ["nested_expressions", "complex_conditions"]
+    },
+    {
+      "id": "W-32",
+      "signature_key": "variables_fanin_foreach_nested_best_effort_task_key",
+      "regex": "(?i)variables.*producer.*not in context|taskKey='set_variable_",
+      "match_target": "not_translatable.message",
+      "title": "[expressions] @variables() producer inside multi-activity ForEach body emits runtime-wrong best-effort task key",
+      "category": "logical",
+      "kind": "bug",
+      "area": "expressions",
+      "priority": "P1",
+      "upstream_issues": ["ghanse/wkmigrate#27"],
+      "lmv_issue": "MiguelPeralvo/adf_to_lakeflow_jobs_migration_validator#32",
+      "status": "open",
+      "discovered_via": "CRP-11 Step 3 audit (wkmigrate dev/step-3-variables-fanin.md)",
+      "last_tested": {
+        "session": "LMV-AUTODEV-2026-04-17-kpi-convergence",
+        "wkmigrate_ref": "MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@e21c1e3",
+        "corpus": "CRP0001 PARTIAL cases per Lorenzo master analysis (11/62 variables-fan-in pattern)",
+        "result": "PythonEmitter emits taskKey='set_variable_X' fallback + NotTranslatableWarning when SetVariable producer is inside multi-activity ForEach. Runtime lookup silently fails (key does not exist AND task-values don't cross RunJob boundaries). Strict improvement over pre-CRP-11 silent-True, but still incorrect at runtime."
+      },
+      "labels": ["wkmigrate-feedback", "filed-by:lmv-autodev", "area:expressions", "kind:bug", "priority:P1"],
+      "fix_sketch": "Add a fan-in notebook task between the inner RunJob (ForEach body) and the outer IfCondition wrapper. The fan-in reads RunJob.output.task_values['X'] and re-publishes under the outer job's taskValues so the outer wrapper can dbutils.jobs.taskValues.get(taskKey='<fan-in-task>', key='X'). Requires Repsol/Lorenzo confirmation of iteration-aggregation semantics (last-wins vs all/any). Tracked at wkmigrate:dev/step-3-variables-fanin.md.",
+      "weak_spots": ["complex_conditions"]
     }
   ],
   "notes": [
