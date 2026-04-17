@@ -264,9 +264,9 @@ def test_adapter_maps_ir_op_enum_to_python_operators():
         prepared = _build_minimal_prepared_for_task(task)
         snap = from_wkmigrate(source, prepared)
         assert len(snap.resolved_expressions) == 1
-        assert f"(a {py_op} b)" == snap.resolved_expressions[0].python_code, (
-            f"IR op {ir_op!r} should map to Python {py_op!r}"
-        )
+        assert (
+            f"(a {py_op} b)" == snap.resolved_expressions[0].python_code
+        ), f"IR op {ir_op!r} should map to Python {py_op!r}"
 
 
 def test_adapter_uses_synthetic_label_when_source_expression_missing():
@@ -622,3 +622,157 @@ def test_adapter_skips_if_condition_with_missing_operands():
     # No pair emitted because left is empty
     if_pairs = [p for p in snap.resolved_expressions if "if_condition" in p.adf_expression or "==" in p.python_code]
     assert len(if_pairs) == 0
+
+
+# ---- L-F20: CRP-11 wrapper-notebook body extraction ---------------------------
+
+
+def _build_crp11_wrapper_body(python_expression: str) -> str:
+    """Reproduce the deterministic wrapper-notebook body shape emitted by
+    ``wkmigrate.code_generator.get_condition_wrapper_notebook_content``.
+    Kept local to these tests (not imported) so the adapter's extractor is
+    exercised against the same byte shape lmv would see at runtime.
+    """
+    return "\n".join(
+        [
+            "# Databricks notebook source",
+            "",
+            "# Declare widgets for pipeline parameters referenced by the predicate.",
+            "",
+            "# Evaluate compound predicate once.",
+            f"_branch = bool({python_expression})",
+            "",
+            "# Publish boolean result for the downstream condition_task.",
+            'dbutils.jobs.taskValues.set(key="branch", value=str(_branch))',
+        ]
+    )
+
+
+def test_lf20_adapter_extracts_wrapper_body_for_compound_if_condition():
+    """L-F20: when CRP-11 emits a wrapper notebook, the adapter must surface
+    the `_branch = bool(<X>)` body as the resolved python_code, not the
+    Jobs template reference in ``left``."""
+    python_expr = "(not (len(set(str(dbutils.widgets.get('module'))) & set(['all','bal'])) == 0))"
+    source = {
+        "activities": [
+            {
+                "name": "If BAL",
+                "type": "IfCondition",
+                "depends_on": [],
+                "expression": {
+                    "type": "Expression",
+                    "value": "@not(empty(intersection(pipeline().parameters.module, createArray('all','bal'))))",
+                },
+            }
+        ]
+    }
+    task = IfConditionActivity(
+        name="If BAL",
+        task_key="If_BAL",
+        op="EQUAL_TO",
+        left="{{tasks.If_BAL__crp11_wrap.values.branch}}",
+        right="True",
+        wrapper_notebook_key="If_BAL__crp11_wrap",
+        wrapper_notebook_content=_build_crp11_wrapper_body(python_expr),
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    pairs = [p for p in snap.resolved_expressions if p.context == "if_condition"]
+    assert len(pairs) == 1
+    assert pairs[0].python_code == python_expr
+    # The template ref must NOT appear as the resolved Python.
+    assert "__crp11_wrap" not in pairs[0].python_code
+    # ADF side preserved from source dict.
+    assert pairs[0].adf_expression.startswith("@not(empty(intersection(")
+
+
+def test_lf20_adapter_preserves_native_binary_when_no_wrapper():
+    """L-F17 native-preferred path must continue to work when
+    wrapper_notebook_key is absent (INV-1: simple binary comparisons stay
+    native post-CRP-11)."""
+    source = {
+        "activities": [
+            {
+                "name": "ifc",
+                "type": "IfCondition",
+                "depends_on": [],
+                "expression": {"type": "Expression", "value": "@equals(pipeline().parameters.x, 1)"},
+            }
+        ]
+    }
+    task = IfConditionActivity(
+        name="ifc",
+        task_key="ifc",
+        op="EQUAL_TO",
+        left="dbutils.widgets.get('x')",
+        right="1",
+        # No wrapper_notebook_key / _content → native binary path.
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    pairs = [p for p in snap.resolved_expressions if p.context == "if_condition"]
+    assert len(pairs) == 1
+    assert pairs[0].python_code == "(dbutils.widgets.get('x') == 1)"
+
+
+def test_lf20_adapter_skips_if_condition_when_wrapper_body_malformed():
+    """INV-5 path: when wkmigrate's PythonEmitter returned UnsupportedValue,
+    the wrapper body contains ``raise NotImplementedError(...)`` and no
+    ``_branch = bool(`` line. The adapter must emit NO pair rather than
+    mislead the judge with the ``{{tasks…}} == True`` template reference."""
+    malformed_body = "\n".join(
+        [
+            "# Databricks notebook source",
+            "",
+            "# wkmigrate could not translate this ADF expression.",
+            'raise NotImplementedError("wkmigrate cannot translate compound IfCondition predicate @xml(...)")',
+        ]
+    )
+    source = {
+        "activities": [
+            {
+                "name": "bad",
+                "type": "IfCondition",
+                "depends_on": [],
+                "expression": {"type": "Expression", "value": "@xml('<r/>')"},
+            }
+        ]
+    }
+    task = IfConditionActivity(
+        name="bad",
+        task_key="bad",
+        op="EQUAL_TO",
+        left="{{tasks.bad__crp11_wrap.values.branch}}",
+        right="True",
+        wrapper_notebook_key="bad__crp11_wrap",
+        wrapper_notebook_content=malformed_body,
+    )
+    prepared = _build_minimal_prepared_for_task(task)
+
+    snap = from_wkmigrate(source, prepared)
+
+    if_pairs = [p for p in snap.resolved_expressions if p.context == "if_condition"]
+    assert if_pairs == []
+
+
+def test_lf20_wrapper_extractor_unit():
+    """Direct unit coverage of the ``_extract_wrapper_branch_expression`` helper."""
+    from lakeflow_migration_validator.adapters.wkmigrate_adapter import _extract_wrapper_branch_expression
+
+    body = _build_crp11_wrapper_body("(1 == 1) and (3 > 2)")
+    assert _extract_wrapper_branch_expression(body) == "(1 == 1) and (3 > 2)"
+
+    # Nested parens in the predicate must survive.
+    nested = _build_crp11_wrapper_body("((not (len(set(['x']) & set(['y'])) == 0)))")
+    assert _extract_wrapper_branch_expression(nested) == "((not (len(set(['x']) & set(['y'])) == 0)))"
+
+    # Missing content → None.
+    assert _extract_wrapper_branch_expression(None) is None
+    assert _extract_wrapper_branch_expression("") is None
+
+    # Malformed (no ``_branch = bool(`` line) → None.
+    assert _extract_wrapper_branch_expression("raise NotImplementedError('x')") is None

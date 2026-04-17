@@ -177,3 +177,26 @@
 - Push CRP-10 as PR to wkmigrate
 - Push lmv adapter fix as commit on lmv main
 - Runtime validation: Deploy generated notebooks to a Databricks workspace
+
+---
+
+## 2026-04-17 — CRP-11 Wrapper Adapter (L-F20) + Harvest
+
+**Session:** LMV-AUTODEV-2026-04-17-{crp11-harvest, kpi-convergence, issue-27-no-handoff}
+**wkmigrate_version_under_test:** `MiguelPeralvo/wkmigrate@pr/27-4-integration-tests@e21c1e3` (PR #19 merge commit)
+**Key insight:** Each wkmigrate shape change in the IfCondition output silently invalidates the adapter walker. CRP-10 taught the walker to handle compound `right=""` (predicate-in-`left`); CRP-11 moved the predicate out of `left` entirely into `wrapper_notebook_content`, and the walker defaulted back to emitting the Jobs template reference as "resolved Python". The lmv adapter must be updated at every wkmigrate output-shape change *in the same release cycle* — otherwise X-2 silently collapses while X-1 stays high (resolution counts are still ~1.0 because the template reference is a non-empty string).
+
+**Specific findings:**
+- **L-F20 (lmv-side, P1):** Walker misses `IfConditionActivity.wrapper_notebook_content`. Fix: `_extract_wrapper_branch_expression()` parses deterministic `_branch = bool(<X>)` line. Returns None on the INV-5 `raise NotImplementedError` wrapper body so adapter emits no pair (avoid misleading the judge with the template ref). Filed as PR #30.
+- **W-10 re-validation (wkmigrate-side, open):** ForEach items remain placeholder for 200/208 golden-set expressions in `for_each` context. Status unchanged since V3; CRP-11 did not touch ForEach. `last_tested` should be updated to `e21c1e3`.
+- **W-32 (wkmigrate-side, P1):** `@variables()` resolver emits best-effort `set_variable_<X>` task key when the SetVariable producer lives inside a multi-activity ForEach body (Case B of wkmigrate `dev/step-3-variables-fanin.md`). Runtime lookup fails (key does not exist AND task-values don't cross RunJob boundaries). Impacts 11/62 CRP0001 PARTIAL cases per Lorenzo's master analysis. Proper fix requires a fan-in notebook task between inner RunJob and outer wrapper.
+- **Post-L-F20 X-series (same ref):** X-6.logical 0.39→1.00, X-6.nested 0.00→1.00, X-6.collection 0.00→1.00, X-2 eval proxy 208/208 (100%), LR-1 421/421, LR-3 421/421, LA-1/LA-2 clean. X-1 still ~0.86 weighted across 7 contexts, bounded by the ForEach W-10 gap.
+
+**Cost observation:** Sweep runs ~30 s for 7 contexts × 208 expressions (pure Python, no LLM). Semantic-equivalence eval via wkmigrate's `check_wrapper_semantic_equivalence.py` runs ~3 s on 208 pairs (Python `eval()` in isolated namespace — no LLM judge needed for the categories the golden set covers). Env bootstrap on lmv via `UV_INDEX_URL=https://pypi-proxy.dev.databricks.com/simple uv pip install ...` because pypi.org is blocked from Databricks corp network.
+
+**Actionable for next session:**
+- Merge PR #30 once CI is green, then update `dev/wkmigrate-issue-map.json` with `lmv_issue` field pointing to the filed L-F20 issue (blocked this session by semi-auto CHECKPOINT — hook correctly paused on external writes).
+- File L-F20 + W-32 as gh issues (drafts already in `dev/findings/`).
+- Once L-F20 merges, the harvest against the full CRP0001 + DataFactory corpora should produce measurable X-2 scores for every compound IfCondition — lmv can finally score CRP-11 faithfully.
+- For W-32 (variables fan-in), run `/wkmigrate-autodev https://github.com/ghanse/wkmigrate/issues/27` after Repsol/Lorenzo confirm iteration-aggregation semantics (last-wins vs all/any).
+- Consider extending L-F17 regression coverage to include a sentinel test that asserts the walker handles *every* activity type present in `wkmigrate.models.ir.pipeline` — CRP-11 surprised us precisely because IfCondition sprouted a new output shape without an adapter update.
