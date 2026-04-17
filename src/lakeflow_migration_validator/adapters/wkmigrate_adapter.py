@@ -35,6 +35,44 @@ _IR_OP_TO_PYTHON: dict[str, str] = {
     "LESS_THAN_OR_EQUAL": "<=",
 }
 
+_WRAPPER_BRANCH_PREFIX = "_branch = bool("
+
+
+def _extract_wrapper_branch_expression(content: str | None) -> str | None:
+    """L-F20: pull the predicate Python out of a CRP-11 wrapper-notebook body.
+
+    CRP-11 (wkmigrate PR #19) routes compound IfCondition predicates through
+    a wrapper Databricks notebook whose body is deterministic:
+
+        _branch = bool(<python_expression>)
+        dbutils.jobs.taskValues.set(key="branch", value=str(_branch))
+
+    The outer ``condition_task.left`` then becomes the Jobs template reference
+    ``{{tasks.<wrapper>.values.branch}}`` and ``right`` becomes ``"True"``.
+    Without this extractor, the L-F17 walker would pair that template string
+    as the resolved Python, which is useless for X-2 semantic-equivalence.
+
+    Returns the inner Python expression string (everything between
+    ``_branch = bool(`` and the matching closing paren on the same line), or
+    ``None`` if the wrapper content is missing, malformed, or represents the
+    INV-5 ``raise NotImplementedError`` branch (no ``_branch = bool`` line).
+    """
+    if not isinstance(content, str) or not content:
+        return None
+    for line in content.splitlines():
+        stripped = line.lstrip()
+        if not stripped.startswith(_WRAPPER_BRANCH_PREFIX):
+            continue
+        # The emitter produces exactly ``_branch = bool(<expr>)`` on a single
+        # physical line (deterministic, INV-4). Slice off the known prefix and
+        # the trailing ``)``.
+        payload = stripped[len(_WRAPPER_BRANCH_PREFIX) :]
+        if not payload.endswith(")"):
+            return None
+        inner = payload[:-1].strip()
+        return inner or None
+    return None
+
 
 def _coerce_resolved_value(value: Any) -> str | None:
     """Coerce a wkmigrate IR value into a plain Python source string.
@@ -321,7 +359,9 @@ def _extract_resolved_expression_pairs(
             if headers_code is not None:
                 headers_adf = _source_expression_at(source_activity, "headers")
                 if headers_adf is not None:
-                    pairs.append(ExpressionPair(adf_expression=headers_adf, python_code=headers_code, context="web_headers"))
+                    pairs.append(
+                        ExpressionPair(adf_expression=headers_adf, python_code=headers_code, context="web_headers")
+                    )
             elif isinstance(task.headers, dict):
                 for header_name, header_value in task.headers.items():
                     code = _coerce_resolved_value(header_value)
@@ -371,22 +411,41 @@ def _extract_resolved_expression_pairs(
             # expression on the IR side and pair it with the original ADF
             # expression captured from the source dict (when available).
             #
-            # Two shapes exist in wkmigrate's IR:
-            # 1. Standard: op + left + right all non-empty → "(left op right)"
-            # 2. Compound predicate: op + left non-empty, right="" → the entire
-            #    resolved expression lives in left (e.g. @contains() emitted as
-            #    "('x' in str(...))" with op=EQUAL_TO, right="")
+            # Three shapes exist in wkmigrate's IR post-CRP-11:
+            # 1. Standard binary: op + left + right all non-empty, no wrapper →
+            #    "(left op right)". The INV-1 native-preferred path.
+            # 2. Pre-CRP-11 compound: op + left non-empty, right="", no wrapper
+            #    → entire resolved expression in left (historical shape, kept
+            #    for backward compat with IR produced before PR #19).
+            # 3. CRP-11 wrapper: left="{{tasks.<wrap>.values.branch}}",
+            #    right="True", wrapper_notebook_content holds
+            #    "_branch = bool(<python_expression>)". L-F20 extracts the
+            #    inner python_expression so X-2 judges against the real
+            #    predicate body, not the Jobs template reference.
             op = getattr(task, "op", None)
             left = getattr(task, "left", None)
             right = getattr(task, "right", None)
+            wrapper_key = getattr(task, "wrapper_notebook_key", None)
+            wrapper_content = getattr(task, "wrapper_notebook_content", None)
+            adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
+
+            if isinstance(wrapper_key, str) and wrapper_key:
+                extracted = _extract_wrapper_branch_expression(wrapper_content)
+                if extracted is not None:
+                    pairs.append(ExpressionPair(adf_expression=adf, python_code=extracted, context="if_condition"))
+                # If wrapper body is missing or represents the INV-5
+                # NotImplementedError path, skip pair emission — the
+                # not_translatable warning already captures the failure and
+                # emitting the ``{{tasks…}} == True`` template would mislead
+                # the judge.
+                continue
+
             if isinstance(op, str) and op and isinstance(left, str) and left:
                 if isinstance(right, str) and right:
                     python_op = _IR_OP_TO_PYTHON.get(op, op)
                     python_code = f"({left} {python_op} {right})"
                 else:
-                    # Compound predicate: entire expression in left
                     python_code = left
-                adf = _source_expression_at(source_activity, "expression") or f"@if_condition('{task_name}').expression"
                 pairs.append(ExpressionPair(adf_expression=adf, python_code=python_code, context="if_condition"))
             continue
 
