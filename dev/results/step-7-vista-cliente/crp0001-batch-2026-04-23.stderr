@@ -1,6 +1,6 @@
 warning: No `requires-python` value found in the workspace. Defaulting to `>=3.12`.
 ╭───────────────────── Traceback (most recent call last) ──────────────────────╮
-│ /Users/miguel.peralvo/Code/adf_to_lakeflow_jobs_migration_validator/src/lake │
+│ <REPO>/src/lake │
 │ flow_migration_validator/cli.py:291 in batch_command                         │
 │                                                                              │
 │    288 ) -> None:                                                            │
@@ -11,7 +11,7 @@ warning: No `requires-python` value found in the workspace. Defaulting to `>=3.1
 │    293 │   _emit(report.to_dict())                                           │
 │    294                                                                       │
 │                                                                              │
-│ /Users/miguel.peralvo/Code/adf_to_lakeflow_jobs_migration_validator/src/lake │
+│ <REPO>/src/lake │
 │ flow_migration_validator/synthetic/ground_truth.py:34 in from_json           │
 │                                                                              │
 │    31 │   │   """Load a previously generated suite from disk."""             │

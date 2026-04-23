@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
-import re
+import sys
 from pathlib import Path
 
 # 9 VC buckets -> canonical categories (keep X-6 reporting stable)
@@ -103,22 +102,31 @@ def _walk_activities(activities, pipeline_name: str, out: list, depth: int = 0, 
             if act_type == "IfCondition" and child_key in ("ifTrueActivities", "ifFalseActivities"):
                 continue
             if child_key in tp:
-                _walk_activities(tp.get(child_key) or [], pipeline_name, out, depth, path)
+                _walk_activities(tp.get(child_key) or [], pipeline_name, out, depth + 1, path)
         for case in tp.get("cases") or []:
             if isinstance(case, dict):
-                _walk_activities(case.get("activities") or [], pipeline_name, out, depth, path)
+                _walk_activities(case.get("activities") or [], pipeline_name, out, depth + 1, path)
 
 
 def _extract_all(corpus_dir: Path) -> list[dict]:
     records: list[dict] = []
+    skipped: list[tuple[str, str]] = []
     for fp in sorted(corpus_dir.glob("*.json")):
         try:
             d = json.loads(fp.read_text())
-        except Exception:
+        except (OSError, json.JSONDecodeError) as exc:
+            # Surface parse/read failures instead of silently dropping — an
+            # extractor whose "coverage" number silently excludes N% of files
+            # is worse than one that's loud about skips.
+            skipped.append((fp.name, f"{type(exc).__name__}: {exc}"))
             continue
         props = d.get("properties") or {}
         activities = props.get("activities") or d.get("activities") or []
         _walk_activities(activities, fp.stem, records)
+    if skipped:
+        print(f"[warn] skipped {len(skipped)} unreadable/malformed pipeline file(s):", file=sys.stderr)
+        for name, reason in skipped:
+            print(f"  {name}: {reason}", file=sys.stderr)
     return records
 
 
@@ -175,8 +183,10 @@ def main():
     hist = Counter(r["vc_category"] for r in records)
     total_raw = len(records)
 
+    # Log only the basename of the corpus dir — the full path may leak a
+    # machine-local /Users/... layout in committed artifacts.
     hist_payload = {
-        "corpus_dir": str(corpus),
+        "corpus_dir": corpus.name,
         "total_if_condition_expressions": total_raw,
         "per_vc_category": dict(hist),
         "per_canonical_category": dict(Counter(VC_TO_CANONICAL[r["vc_category"]] for r in records)),

@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from pathlib import Path
 
 RESULTS_DIR = Path("dev/results/step-7-vista-cliente")
@@ -58,13 +57,13 @@ def main():
 
     out = []
     out.append("# Step 7 — Vista Cliente Sweep KPI Table\n")
-    out.append(f"Generated: 2026-04-23  |  wkmigrate SHA: cfb49e6\n\n")
+    out.append("Generated: 2026-04-23  |  wkmigrate SHA: cfb49e6\n\n")
     out.append("## X-1 Expression Coverage (if_condition)\n")
     out.append("| Corpus | Resolved | Total | Coverage | Baseline | Delta | Within +/-5% |\n")
     out.append("|---|---|---|---|---|---|---|\n")
     delta_crp = crp_x1 - baseline_x1
     delta_vc = vc_x1 - baseline_x1
-    out.append(f"| CRP0001 baseline (pinned) | — | — | 0.8317 | 0.8317 | 0.0000 | yes |\n")
+    out.append("| CRP0001 baseline (pinned) | — | — | 0.8317 | 0.8317 | 0.0000 | yes |\n")
     gate_crp = "yes" if abs(delta_crp) <= 0.05 else "NO (hard-gate flag)"
     out.append(f"| CRP0001 replay @ cfb49e6 | {crp_context['resolved']} | {crp_context['total']} | {crp_x1:.4f} | 0.8317 | {delta_crp:+.4f} | {gate_crp} |\n")
     gate_vc = "yes" if abs(delta_vc) <= 0.05 else "NO (expected: different corpus)"
