@@ -1,0 +1,2574 @@
+{
+  "by_cell": {
+    "collection,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 41,
+      "placeholder_count": 0,
+      "resolved": 41,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@coalesce(null, 'x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+        },
+        {
+          "adf_expression": "@empty(createArray())",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(len([]) == 0)"
+        },
+        {
+          "adf_expression": "@string(42)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "str(42)"
+        },
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@coalesce(null, 'x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+        },
+        {
+          "adf_expression": "@empty(createArray())",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(len([]) == 0)"
+        },
+        {
+          "adf_expression": "@string(42)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "str(42)"
+        },
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@coalesce(null, 'x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+        },
+        {
+          "adf_expression": "@empty(createArray())",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(len([]) == 0)"
+        },
+        {
+          "adf_expression": "@string(42)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "str(42)"
+        },
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@coalesce(null, 'x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+        },
+        {
+          "adf_expression": "@empty(createArray())",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(len([]) == 0)"
+        },
+        {
+          "adf_expression": "@string(42)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "str(42)"
+        },
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@coalesce(null, 'x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+        },
+        {
+          "adf_expression": "@empty(createArray())",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(len([]) == 0)"
+        },
+        {
+          "adf_expression": "@string(42)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "str(42)"
+        },
+        {
+          "adf_expression": "@length(createArray(1, 2, 3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "len([1, 2, 3])"
+        },
+        {
+          "adf_expression": "@first(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[0]"
+        },
+        {
+          "adf_expression": "@last(createArray('a', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "(['a', 'b'])[-1]"
+        },
+        {
+          "adf_expression": "@createArray('a', 'b', 'c')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "['a', 'b', 'c']"
+        },
+        {
+          "adf_expression": "@createArray(1, 2, 3)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "[1, 2, 3]"
+        },
+        {
+          "adf_expression": "@createArray('only_one')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "['only_one']"
+        },
+        {
+          "adf_expression": "@createArray('alpha', 'beta', 'gamma', 'delta')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "['alpha', 'beta', 'gamma', 'delta']"
+        },
+        {
+          "adf_expression": "@createArray(string(1), string(2), string(3))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "[str(1), str(2), str(3)]"
+        },
+        {
+          "adf_expression": "@createArray(true, false, true)",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "[True, False, True]"
+        },
+        {
+          "adf_expression": "@createArray(concat('item_', 'a'), concat('item_', 'b'))",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "[str('item_') + str('a'), str('item_') + str('b')]"
+        },
+        {
+          "adf_expression": "@createArray('x')",
+          "category": "collection",
+          "context": "if_condition",
+          "python_code": "['x']"
+        }
+      ],
+      "sample_failures": [],
+      "total": 41
+    },
+    "datetime,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 33,
+      "placeholder_count": 0,
+      "resolved": 33,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        },
+        {
+          "adf_expression": "@utcNow()",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_utc_now()"
+        },
+        {
+          "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+          "category": "datetime",
+          "context": "if_condition",
+          "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+        }
+      ],
+      "sample_failures": [],
+      "total": 33
+    },
+    "logical,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 20,
+      "placeholder_count": 0,
+      "resolved": 33,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@equals(1, 1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(1 == 1)"
+        },
+        {
+          "adf_expression": "@greater(3, 2)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(3 > 2)"
+        },
+        {
+          "adf_expression": "@less(2, 3)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(2 < 3)"
+        },
+        {
+          "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 == 1) and (3 > 2))"
+        },
+        {
+          "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 < 0) or ('x' == 'x'))"
+        },
+        {
+          "adf_expression": "@not(false)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(not False)"
+        },
+        {
+          "adf_expression": "@bool(1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "bool(1)"
+        },
+        {
+          "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "('yes' if (1 == 1) else 'no')"
+        },
+        {
+          "adf_expression": "@equals(1, 1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(1 == 1)"
+        },
+        {
+          "adf_expression": "@greater(3, 2)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(3 > 2)"
+        },
+        {
+          "adf_expression": "@less(2, 3)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(2 < 3)"
+        },
+        {
+          "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 == 1) and (3 > 2))"
+        },
+        {
+          "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 < 0) or ('x' == 'x'))"
+        },
+        {
+          "adf_expression": "@not(false)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(not False)"
+        },
+        {
+          "adf_expression": "@bool(1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "bool(1)"
+        },
+        {
+          "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "('yes' if (1 == 1) else 'no')"
+        },
+        {
+          "adf_expression": "@equals(1, 1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(1 == 1)"
+        },
+        {
+          "adf_expression": "@greater(3, 2)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(3 > 2)"
+        },
+        {
+          "adf_expression": "@less(2, 3)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(2 < 3)"
+        },
+        {
+          "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 == 1) and (3 > 2))"
+        },
+        {
+          "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 < 0) or ('x' == 'x'))"
+        },
+        {
+          "adf_expression": "@not(false)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(not False)"
+        },
+        {
+          "adf_expression": "@bool(1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "bool(1)"
+        },
+        {
+          "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "('yes' if (1 == 1) else 'no')"
+        },
+        {
+          "adf_expression": "@equals(1, 1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(1 == 1)"
+        },
+        {
+          "adf_expression": "@greater(3, 2)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(3 > 2)"
+        },
+        {
+          "adf_expression": "@less(2, 3)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(2 < 3)"
+        },
+        {
+          "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 == 1) and (3 > 2))"
+        },
+        {
+          "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "((1 < 0) or ('x' == 'x'))"
+        },
+        {
+          "adf_expression": "@not(false)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(not False)"
+        },
+        {
+          "adf_expression": "@bool(1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "bool(1)"
+        },
+        {
+          "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "('yes' if (1 == 1) else 'no')"
+        },
+        {
+          "adf_expression": "@equals(1, 1)",
+          "category": "logical",
+          "context": "if_condition",
+          "python_code": "(1 == 1)"
+        }
+      ],
+      "sample_failures": [],
+      "total": 33
+    },
+    "math,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 34,
+      "placeholder_count": 0,
+      "resolved": 34,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@add(1, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(1 + 2)"
+        },
+        {
+          "adf_expression": "@sub(10, 4)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(10 - 4)"
+        },
+        {
+          "adf_expression": "@mul(3, 7)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(3 * 7)"
+        },
+        {
+          "adf_expression": "@div(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 // 2)"
+        },
+        {
+          "adf_expression": "@mod(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 % 2)"
+        },
+        {
+          "adf_expression": "@int('42')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "int('42')"
+        },
+        {
+          "adf_expression": "@float('3.14')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "float('3.14')"
+        },
+        {
+          "adf_expression": "@add(1, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(1 + 2)"
+        },
+        {
+          "adf_expression": "@sub(10, 4)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(10 - 4)"
+        },
+        {
+          "adf_expression": "@mul(3, 7)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(3 * 7)"
+        },
+        {
+          "adf_expression": "@div(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 // 2)"
+        },
+        {
+          "adf_expression": "@mod(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 % 2)"
+        },
+        {
+          "adf_expression": "@int('42')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "int('42')"
+        },
+        {
+          "adf_expression": "@float('3.14')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "float('3.14')"
+        },
+        {
+          "adf_expression": "@add(1, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(1 + 2)"
+        },
+        {
+          "adf_expression": "@sub(10, 4)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(10 - 4)"
+        },
+        {
+          "adf_expression": "@mul(3, 7)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(3 * 7)"
+        },
+        {
+          "adf_expression": "@div(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 // 2)"
+        },
+        {
+          "adf_expression": "@mod(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 % 2)"
+        },
+        {
+          "adf_expression": "@int('42')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "int('42')"
+        },
+        {
+          "adf_expression": "@float('3.14')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "float('3.14')"
+        },
+        {
+          "adf_expression": "@add(1, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(1 + 2)"
+        },
+        {
+          "adf_expression": "@sub(10, 4)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(10 - 4)"
+        },
+        {
+          "adf_expression": "@mul(3, 7)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(3 * 7)"
+        },
+        {
+          "adf_expression": "@div(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 // 2)"
+        },
+        {
+          "adf_expression": "@mod(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 % 2)"
+        },
+        {
+          "adf_expression": "@int('42')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "int('42')"
+        },
+        {
+          "adf_expression": "@float('3.14')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "float('3.14')"
+        },
+        {
+          "adf_expression": "@add(1, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(1 + 2)"
+        },
+        {
+          "adf_expression": "@sub(10, 4)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(10 - 4)"
+        },
+        {
+          "adf_expression": "@mul(3, 7)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(3 * 7)"
+        },
+        {
+          "adf_expression": "@div(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 // 2)"
+        },
+        {
+          "adf_expression": "@mod(9, 2)",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "(9 % 2)"
+        },
+        {
+          "adf_expression": "@int('42')",
+          "category": "math",
+          "context": "if_condition",
+          "python_code": "int('42')"
+        }
+      ],
+      "sample_failures": [],
+      "total": 34
+    },
+    "nested,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 33,
+      "placeholder_count": 0,
+      "resolved": 33,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        },
+        {
+          "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+        },
+        {
+          "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+        },
+        {
+          "adf_expression": "@string(length(split('a-b-c', '-')))",
+          "category": "nested",
+          "context": "if_condition",
+          "python_code": "str(len(str('a-b-c').split('-')))"
+        }
+      ],
+      "sample_failures": [],
+      "total": 33
+    },
+    "string,if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 34,
+      "placeholder_count": 0,
+      "resolved": 34,
+      "resolved_pairs": [
+        {
+          "adf_expression": "@concat('hello', 'world')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('hello') + str('world')"
+        },
+        {
+          "adf_expression": "@replace('abc', 'a', 'z')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abc').replace('a', 'z')"
+        },
+        {
+          "adf_expression": "@toUpper('abc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('abc') is None else str('abc').upper())"
+        },
+        {
+          "adf_expression": "@toLower('ABC')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+        },
+        {
+          "adf_expression": "@trim('  hi  ')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+        },
+        {
+          "adf_expression": "@substring('abcdef', 1, 3)",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcdef')[1:1 + 3]"
+        },
+        {
+          "adf_expression": "@indexOf('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').find('bc')"
+        },
+        {
+          "adf_expression": "@startsWith('abcd', 'ab')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').startswith('ab')"
+        },
+        {
+          "adf_expression": "@endsWith('abcd', 'cd')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').endswith('cd')"
+        },
+        {
+          "adf_expression": "@contains('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "('bc' in str('abcd'))"
+        },
+        {
+          "adf_expression": "@concat('hello', 'world')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('hello') + str('world')"
+        },
+        {
+          "adf_expression": "@replace('abc', 'a', 'z')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abc').replace('a', 'z')"
+        },
+        {
+          "adf_expression": "@toUpper('abc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('abc') is None else str('abc').upper())"
+        },
+        {
+          "adf_expression": "@toLower('ABC')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+        },
+        {
+          "adf_expression": "@trim('  hi  ')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+        },
+        {
+          "adf_expression": "@substring('abcdef', 1, 3)",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcdef')[1:1 + 3]"
+        },
+        {
+          "adf_expression": "@indexOf('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').find('bc')"
+        },
+        {
+          "adf_expression": "@startsWith('abcd', 'ab')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').startswith('ab')"
+        },
+        {
+          "adf_expression": "@endsWith('abcd', 'cd')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').endswith('cd')"
+        },
+        {
+          "adf_expression": "@contains('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "('bc' in str('abcd'))"
+        },
+        {
+          "adf_expression": "@concat('hello', 'world')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('hello') + str('world')"
+        },
+        {
+          "adf_expression": "@replace('abc', 'a', 'z')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abc').replace('a', 'z')"
+        },
+        {
+          "adf_expression": "@toUpper('abc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('abc') is None else str('abc').upper())"
+        },
+        {
+          "adf_expression": "@toLower('ABC')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+        },
+        {
+          "adf_expression": "@trim('  hi  ')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+        },
+        {
+          "adf_expression": "@substring('abcdef', 1, 3)",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcdef')[1:1 + 3]"
+        },
+        {
+          "adf_expression": "@indexOf('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').find('bc')"
+        },
+        {
+          "adf_expression": "@startsWith('abcd', 'ab')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').startswith('ab')"
+        },
+        {
+          "adf_expression": "@endsWith('abcd', 'cd')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abcd').endswith('cd')"
+        },
+        {
+          "adf_expression": "@contains('abcd', 'bc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "('bc' in str('abcd'))"
+        },
+        {
+          "adf_expression": "@concat('hello', 'world')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('hello') + str('world')"
+        },
+        {
+          "adf_expression": "@replace('abc', 'a', 'z')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "str('abc').replace('a', 'z')"
+        },
+        {
+          "adf_expression": "@toUpper('abc')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('abc') is None else str('abc').upper())"
+        },
+        {
+          "adf_expression": "@toLower('ABC')",
+          "category": "string",
+          "context": "if_condition",
+          "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+        }
+      ],
+      "sample_failures": [],
+      "total": 34
+    }
+  },
+  "by_context": {
+    "if_condition": {
+      "error_count": 0,
+      "not_translatable_count": 195,
+      "placeholder_count": 0,
+      "resolved": 208,
+      "total": 208
+    }
+  },
+  "contexts_run": [
+    "if_condition"
+  ],
+  "resolved_pairs": [
+    {
+      "adf_expression": "@concat('hello', 'world')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('hello') + str('world')"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('abc') is None else str('abc').upper())"
+    },
+    {
+      "adf_expression": "@toLower('ABC')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+    },
+    {
+      "adf_expression": "@trim('  hi  ')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+    },
+    {
+      "adf_expression": "@substring('abcdef', 1, 3)",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcdef')[1:1 + 3]"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').find('bc')"
+    },
+    {
+      "adf_expression": "@startsWith('abcd', 'ab')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').startswith('ab')"
+    },
+    {
+      "adf_expression": "@endsWith('abcd', 'cd')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').endswith('cd')"
+    },
+    {
+      "adf_expression": "@contains('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "('bc' in str('abcd'))"
+    },
+    {
+      "adf_expression": "@concat('hello', 'world')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('hello') + str('world')"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('abc') is None else str('abc').upper())"
+    },
+    {
+      "adf_expression": "@toLower('ABC')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+    },
+    {
+      "adf_expression": "@trim('  hi  ')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+    },
+    {
+      "adf_expression": "@substring('abcdef', 1, 3)",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcdef')[1:1 + 3]"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').find('bc')"
+    },
+    {
+      "adf_expression": "@startsWith('abcd', 'ab')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').startswith('ab')"
+    },
+    {
+      "adf_expression": "@endsWith('abcd', 'cd')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').endswith('cd')"
+    },
+    {
+      "adf_expression": "@contains('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "('bc' in str('abcd'))"
+    },
+    {
+      "adf_expression": "@concat('hello', 'world')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('hello') + str('world')"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('abc') is None else str('abc').upper())"
+    },
+    {
+      "adf_expression": "@toLower('ABC')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+    },
+    {
+      "adf_expression": "@trim('  hi  ')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('  hi  ') is None else str('  hi  ').strip())"
+    },
+    {
+      "adf_expression": "@substring('abcdef', 1, 3)",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcdef')[1:1 + 3]"
+    },
+    {
+      "adf_expression": "@indexOf('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').find('bc')"
+    },
+    {
+      "adf_expression": "@startsWith('abcd', 'ab')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').startswith('ab')"
+    },
+    {
+      "adf_expression": "@endsWith('abcd', 'cd')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abcd').endswith('cd')"
+    },
+    {
+      "adf_expression": "@contains('abcd', 'bc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "('bc' in str('abcd'))"
+    },
+    {
+      "adf_expression": "@concat('hello', 'world')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('hello') + str('world')"
+    },
+    {
+      "adf_expression": "@replace('abc', 'a', 'z')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "str('abc').replace('a', 'z')"
+    },
+    {
+      "adf_expression": "@toUpper('abc')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('abc') is None else str('abc').upper())"
+    },
+    {
+      "adf_expression": "@toLower('ABC')",
+      "category": "string",
+      "context": "if_condition",
+      "python_code": "(None if ('ABC') is None else str('ABC').lower())"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@mul(3, 7)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(3 * 7)"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 // 2)"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "int('42')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "float('3.14')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@mul(3, 7)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(3 * 7)"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 // 2)"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "int('42')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "float('3.14')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@mul(3, 7)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(3 * 7)"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 // 2)"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "int('42')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "float('3.14')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@mul(3, 7)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(3 * 7)"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 // 2)"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "int('42')"
+    },
+    {
+      "adf_expression": "@float('3.14')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "float('3.14')"
+    },
+    {
+      "adf_expression": "@add(1, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(1 + 2)"
+    },
+    {
+      "adf_expression": "@sub(10, 4)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(10 - 4)"
+    },
+    {
+      "adf_expression": "@mul(3, 7)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(3 * 7)"
+    },
+    {
+      "adf_expression": "@div(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 // 2)"
+    },
+    {
+      "adf_expression": "@mod(9, 2)",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "(9 % 2)"
+    },
+    {
+      "adf_expression": "@int('42')",
+      "category": "math",
+      "context": "if_condition",
+      "python_code": "int('42')"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@utcNow()",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_utc_now()"
+    },
+    {
+      "adf_expression": "@formatDateTime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')",
+      "category": "datetime",
+      "context": "if_condition",
+      "python_code": "_wkmigrate_format_datetime('2024-01-01T00:00:00Z', 'yyyy-MM-dd')"
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@greater(3, 2)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(2 < 3)"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(not False)"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "bool(1)"
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "('yes' if (1 == 1) else 'no')"
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@greater(3, 2)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(2 < 3)"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(not False)"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "bool(1)"
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "('yes' if (1 == 1) else 'no')"
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@greater(3, 2)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(2 < 3)"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(not False)"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "bool(1)"
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "('yes' if (1 == 1) else 'no')"
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@greater(3, 2)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(3 > 2)"
+    },
+    {
+      "adf_expression": "@less(2, 3)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(2 < 3)"
+    },
+    {
+      "adf_expression": "@and(equals(1, 1), greater(3, 2))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 == 1) and (3 > 2))"
+    },
+    {
+      "adf_expression": "@or(less(1, 0), equals('x', 'x'))",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "((1 < 0) or ('x' == 'x'))"
+    },
+    {
+      "adf_expression": "@not(false)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(not False)"
+    },
+    {
+      "adf_expression": "@bool(1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "bool(1)"
+    },
+    {
+      "adf_expression": "@if(equals(1, 1), 'yes', 'no')",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "('yes' if (1 == 1) else 'no')"
+    },
+    {
+      "adf_expression": "@equals(1, 1)",
+      "category": "logical",
+      "context": "if_condition",
+      "python_code": "(1 == 1)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "str(42)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "str(42)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "str(42)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "str(42)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@coalesce(null, 'x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "next((v for v in [None, 'x'] if v is not None), None)"
+    },
+    {
+      "adf_expression": "@empty(createArray())",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(len([]) == 0)"
+    },
+    {
+      "adf_expression": "@string(42)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "str(42)"
+    },
+    {
+      "adf_expression": "@length(createArray(1, 2, 3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "len([1, 2, 3])"
+    },
+    {
+      "adf_expression": "@first(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[0]"
+    },
+    {
+      "adf_expression": "@last(createArray('a', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "(['a', 'b'])[-1]"
+    },
+    {
+      "adf_expression": "@createArray('a', 'b', 'c')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "['a', 'b', 'c']"
+    },
+    {
+      "adf_expression": "@createArray(1, 2, 3)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "[1, 2, 3]"
+    },
+    {
+      "adf_expression": "@createArray('only_one')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "['only_one']"
+    },
+    {
+      "adf_expression": "@createArray('alpha', 'beta', 'gamma', 'delta')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "['alpha', 'beta', 'gamma', 'delta']"
+    },
+    {
+      "adf_expression": "@createArray(string(1), string(2), string(3))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "[str(1), str(2), str(3)]"
+    },
+    {
+      "adf_expression": "@createArray(true, false, true)",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "[True, False, True]"
+    },
+    {
+      "adf_expression": "@createArray(concat('item_', 'a'), concat('item_', 'b'))",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "[str('item_') + str('a'), str('item_') + str('b')]"
+    },
+    {
+      "adf_expression": "@createArray('x')",
+      "category": "collection",
+      "context": "if_condition",
+      "python_code": "['x']"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    },
+    {
+      "adf_expression": "@concat(toUpper('x'), string(add(1, 2)))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str((None if ('x') is None else str('x').upper())) + str(str((1 + 2)))"
+    },
+    {
+      "adf_expression": "@if(equals(mod(5, 2), 1), 'odd', 'even')",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "('odd' if ((5 % 2) == 1) else 'even')"
+    },
+    {
+      "adf_expression": "@string(length(split('a-b-c', '-')))",
+      "category": "nested",
+      "context": "if_condition",
+      "python_code": "str(len(str('a-b-c').split('-')))"
+    }
+  ]
+}

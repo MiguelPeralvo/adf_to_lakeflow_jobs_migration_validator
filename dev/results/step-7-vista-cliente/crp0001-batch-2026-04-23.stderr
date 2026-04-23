@@ -1,0 +1,25 @@
+warning: No `requires-python` value found in the workspace. Defaulting to `>=3.12`.
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ <REPO>/src/lake │
+│ flow_migration_validator/cli.py:291 in batch_command                         │
+│                                                                              │
+│    288 ) -> None:                                                            │
+│    289 │   """Evaluate a converter against a golden-set suite."""            │
+│    290 │   _auto_configure()                                                 │
+│ ❱  291 │   suite = GroundTruthSuite.from_json(str(golden_set))               │
+│    292 │   report = evaluate_batch(suite, _CONVERT_FN, threshold=threshold)  │
+│    293 │   _emit(report.to_dict())                                           │
+│    294                                                                       │
+│                                                                              │
+│ <REPO>/src/lake │
+│ flow_migration_validator/synthetic/ground_truth.py:34 in from_json           │
+│                                                                              │
+│    31 │   │   """Load a previously generated suite from disk."""             │
+│    32 │   │   with open(path, encoding="utf-8") as handle:                   │
+│    33 │   │   │   payload = json.load(handle)                                │
+│ ❱  34 │   │   pipelines = tuple(_synthetic_pipeline_from_dict(item) for item │
+│    35 │   │   return cls(pipelines=pipelines)                                │
+│    36 │                                                                      │
+│    37 │   def to_json(self, path: str) -> None:                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+KeyError: 'pipelines'

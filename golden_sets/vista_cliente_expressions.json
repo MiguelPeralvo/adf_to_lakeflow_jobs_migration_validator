@@ -1,0 +1,2224 @@
+{
+  "count": 200,
+  "origin": "vista_cliente_if_condition_sweep_2026_04_23",
+  "corpus": "<CORPUS_DIR>",
+  "sampling": {
+    "seed": 42,
+    "floor_per_vc_category": 12,
+    "total_target": 200,
+    "strategy": "stratified_by_vc_category_with_floor_then_proportional_fill"
+  },
+  "vc_to_canonical_mapping": {
+    "compound_and": "logical",
+    "compound_or": "logical",
+    "nested_predicate": "logical",
+    "equals_binary": "logical",
+    "contains_intersection_empty": "collection",
+    "concat_string": "string",
+    "variables_ref": "nested",
+    "bare_activity_output": "nested",
+    "pipeline_param_ref": "nested"
+  },
+  "expressions": [
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_centro_cos_cpred",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_may",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_tot",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_end_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_tot",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_camp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_pt_dim_pos7",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_jerarquias",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_trn_gen_e_t_l_prod_cli",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_conceptos",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_pocess_totaldg_cliente_icv",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_min",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('testPassed'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_switch2_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(\n    and(\n        or(\n            or(\n                equals(item().type, 'NOTEBOOK'), \n                equals(item().type, 'SIMPLE')),\n            equals(item().type, 'DELTA')),\n        pipeline().parameters.testing),\n    not(equals(coalesce(item()?.test?.targets_init, '[]'), '[]')))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/init_tests",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('testPassed'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_switch_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('nonSkipCondition'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_internal",
+        "activity_name": "ForEach1/continue",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('nonSkipCondition'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_internal",
+        "activity_name": "ForEach1/continue",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('testPassed'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_switch_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('nonSkipCondition'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('nonSkipCondition'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(\n    and(\n        or(\n            or(\n                equals(item().type, 'NOTEBOOK'), \n                equals(item().type, 'SIMPLE')),\n            equals(item().type, 'DELTA')),\n        pipeline().parameters.testing),\n    not(equals(coalesce(item()?.test?.targets_init, '[]'), '[]')))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/init_tests",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(variables('continue'), variables('testPassed'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_switch2_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(not(empty(pipeline().parameters.message)),contains(json(variables('messageMap')), replace(string(pipeline().parameters.message), '''', '')))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_log_aria",
+        "activity_name": "SetMessageFromDictIfExists",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(\n    and(\n        or(\n            or(\n                equals(item().type, 'NOTEBOOK'), \n                equals(item().type, 'SIMPLE')),\n            equals(item().type, 'DELTA')),\n        pipeline().parameters.testing),\n    variables('continue'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/tests",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(and(equals(int(pipeline().parameters.escenario), 2),less(int(variables('max_periodo')),int(pipeline().parameters.periodo))), true, false)\n\n",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_anl_edw_vistacliente",
+        "activity_name": "Condicional con max_periodo",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_cdg_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_nested_par_internal",
+        "activity_name": "Ejecucion Paralela/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_nested_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones_ees'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_ees_automation",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_mmex_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_nested_par_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('esCuartoDiaHabil'),'True'), true, false)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_laae_business_day_orq",
+        "activity_name": "If esCuartoDiaHabil",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_nested_par_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_cmi_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_prc_anl_process_glp_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.config,' ')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_sendmail_internal",
+        "activity_name": "sendMail",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.configNotebook,' ')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_sendmail_internal",
+        "activity_name": "notebook",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.nivel, 'ERROR')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_log",
+        "activity_name": "LogTypeConditionError",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.configNotebook,' ')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_sendmail_internal",
+        "activity_name": "notebook",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.config,' ')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_sendmail_internal",
+        "activity_name": "sendMail",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@equals(pipeline().parameters.nivel, 'ERROR')",
+      "category": "logical",
+      "vc_category": "equals_binary",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_log_aria",
+        "activity_name": "LogTypeConditionError",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(pipeline().parameters.escenario,''),\nor(empty(pipeline().parameters.escenario),\nequals(pipeline().parameters.escenario,'RE')\n))",
+      "category": "logical",
+      "vc_category": "compound_or",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_process_glp_mensual_seleccion_escenarios",
+        "activity_name": "Comprobador lanzamiento REAL",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(pipeline().parameters.escenario,' '),\nor(empty(pipeline().parameters.escenario),\nequals(pipeline().parameters.escenario,'EST')))",
+      "category": "logical",
+      "vc_category": "compound_or",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_prc_anl_process_glp_iterative",
+        "activity_name": "Busqueda rutas est",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(pipeline().parameters.escenario,' '),\nor(empty(pipeline().parameters.escenario),\nor(equals(pipeline().parameters.escenario,'EST'),\nor(equals(pipeline().parameters.escenario,'PA'),\nor(equals(pipeline().parameters.escenario,'UPA'),\nequals(pipeline().parameters.escenario,'PA-UPA')\n)))))",
+      "category": "logical",
+      "vc_category": "compound_or",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_process_glp_mensual_seleccion_escenarios",
+        "activity_name": "Comprobador lanzamiento EST PA UPA",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@or( \n    or(\n        equals(pipeline().parameters.applicationName, ''),\n        empty(pipeline().parameters.applicationName)\n    ),\n    equals(pipeline().parameters.applicationName, '@pipeline().parameters.applicationName')\n)",
+      "category": "logical",
+      "vc_category": "compound_or",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_sendMail",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@or(equals(pipeline().parameters.escenario,' '),\nor(empty(pipeline().parameters.escenario),\nor(equals(pipeline().parameters.escenario,'PA'),\nor(equals(pipeline().parameters.escenario,'UPA'),\nequals(pipeline().parameters.escenario,'PA-UPA')\n))))",
+      "category": "logical",
+      "vc_category": "compound_or",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_prc_anl_process_glp_iterative",
+        "activity_name": "Busqueda rutas pa",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@activity('cli0010_nb_gen_trn_t_f_manuales_movil_portugal').output.runOutput\n",
+      "category": "nested",
+      "vc_category": "bare_activity_output",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_trn_gen_e_t_l_manualespt",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@activity('cli0010_nb_prc_trn_t_ret_manuales').output.runOutput",
+      "category": "nested",
+      "vc_category": "bare_activity_output",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_retail_v2",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_tot",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('escenario'), 'RE'), false, true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_pt_automation_for",
+        "activity_name": "ForEach1/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(not(empty(pipeline().parameters.message)),contains(json(variables('messageMap')), replace(string(pipeline().parameters.message), '''', '')))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_log",
+        "activity_name": "SetMessageFromDictIfExists",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_producto_lae",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_nested_internal",
+        "activity_name": "ForEach1/continue",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@and(\n    and(\n        or(\n            or(\n                equals(item().type, 'NOTEBOOK'), \n                equals(item().type, 'SIMPLE')),\n            equals(item().type, 'DELTA')),\n        pipeline().parameters.testing),\n    variables('continue'))",
+      "category": "logical",
+      "vc_category": "compound_and",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo_switch_internal",
+        "activity_name": "Ejecucion Paralela/tests",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_tot",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_retail_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_est",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_nested_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_conceptos",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones_vvdd'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_automation",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_produ_lae_txt",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_nested_internal",
+        "activity_name": "ForEach1/continue",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_retail_dim_jerarquia",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('escenario'), 'RE'), false, true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_cdg_automation_for",
+        "activity_name": "ForEach/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_pa_upa",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('escenario'), 'RE'), false, true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_cmi_automation_for",
+        "activity_name": "ForEach1/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_process_mae_negocios_totaldg",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_laae_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_maestros",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_nested_par_internal",
+        "activity_name": "Ejecucion Paralela/If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orquestador_fich",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@variables('continue')",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo_internal",
+        "activity_name": "Return error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_pet",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(variables('ejecuciones'), ''), false,true)",
+      "category": "nested",
+      "vc_category": "variables_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_pt_automation",
+        "activity_name": "Check if datos tabla de control",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_destinata_lae",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_producto_lae",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_edw_edw_edd",
+        "activity_name": "If ParentUId Ok",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_pa_upa",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_matgru_grupo_articulos",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_end_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_pet",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralDG_real",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_destinata_lae",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_mp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_update_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_pocess_totaldg_cliente_v2",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.negocio,'ALL'),true,false)",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_automatizacion_upa_main",
+        "activity_name": "Select ALL o Negocio",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_oficina_venta",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orq_control",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_retail_dim_jerarquia",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_gen_prd_lae",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_cliente",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_tot",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_maestros_laae",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_conceptos",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_mp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_may",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_cliente",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_produ_lae_txt",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_gesp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_productos",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orquestador_fich",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_uunn",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_tot",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_jerprod",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_cuotas_real_fich",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_tot",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_pet",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_process_mae_dim1_totaldg",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_ccanal",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_min",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_zonaventas",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_pet",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.parentUid,null))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_anl_log_end_ok_aria",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_retail_dim_conceptos",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_trn_gen_e_t_l_prod_cli",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_destinatario",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_pet",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_min",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_update_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_pt_dim_pos7",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_mp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_cuotas_real_BW",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_may",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_may",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_pocess_totaldg_cliente_icv",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralMI_real",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_producto_txt",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_est",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_informes",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_gesp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_process_mae_concepto_totaldg",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orquestador_BW",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_real_v2",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_init_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_producto_txt",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralDG_pa_upa_est",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_camp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_cuotas_real_BW",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_arquetipo",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralMI_pa_upa_est",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_laae_real_v2",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_may",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralMI_pa_upa_est",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralDG_real",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_may",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_pocess_totaldg_cliente",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_camp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_cuotas_real_fich",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_pet",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_min",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_uunn",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(equals(pipeline().parameters.parentUid,null))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_anl_log_end_ko_aria",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_gen_x_producto",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_camp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.escenario, 'PA'), true, false)",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_informes_pa_mvcv",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_process_mae_dim1_totaldg",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.enable",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_init_control",
+        "activity_name": "Control enabled",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_jerarquias",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orq_control",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_oficina_venta",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_matgru_grupo_articulos",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim2",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_mp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_destinatario",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_pet",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_pocess_totaldg_cliente_v2",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_edw_edw_edd",
+        "activity_name": "If ParentUId KO",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_gen_prd_lae",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(or(equals(pipeline().parameters.escenario,'pa'),equals(pipeline().parameters.escenario,'real')), true, false )",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_retail_v2",
+        "activity_name": "Si Real o PA ejecuta SDG y BPC-BFC",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_gen_x_producto",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_jerprod",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_maestros_laae",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_min",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_update_data",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_gesp",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_may",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_anl_process_mae_negocios_totaldg",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_marg_ven_may",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_eess_marg_ven_gesp",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_pet",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_arquetipo",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_conceptos",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_maestros",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_centralMI_real",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim1",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@if(equals(pipeline().parameters.escenario,'PA'), true,false)",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_informes_pa_upa",
+        "activity_name": "If Condition1",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_vvdd_update_data",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_retail_dim_conceptos",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@pipeline().parameters.debug",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "lakeh_a_pl_operational_log_debug",
+        "activity_name": "ConditionDebug",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_c_pl_main_orquestador_BW",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim_ccanal",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_vvdd_dim1",
+        "activity_name": "If ParentUId",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_tipocoste",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    },
+    {
+      "adf_expression": "@not(empty(pipeline().parameters.parentUid))",
+      "category": "nested",
+      "vc_category": "pipeline_param_ref",
+      "expected_python": null,
+      "source": {
+        "pipeline": "cli0010_a_pl_LAAE_ingest_grupoclientes",
+        "activity_name": "If ParentUId y error",
+        "depth": 0
+      }
+    }
+  ]
+}

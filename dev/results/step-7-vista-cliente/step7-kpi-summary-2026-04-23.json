@@ -1,0 +1,44 @@
+{
+  "wkmigrate_sha": "cfb49e6",
+  "baseline_x1": 0.8317,
+  "crp0001_replay_x1": 1.0,
+  "vista_cliente_x1": 1.0,
+  "delta_crp_vs_baseline": 0.1683,
+  "delta_vc_vs_baseline": 0.1683,
+  "crp_within_5pct": false,
+  "x6_per_category": {
+    "collection": {
+      "crp_cov": 1.0,
+      "vc_cov": null
+    },
+    "datetime": {
+      "crp_cov": 1.0,
+      "vc_cov": null
+    },
+    "logical": {
+      "crp_cov": 1.0,
+      "vc_cov": 1.0
+    },
+    "math": {
+      "crp_cov": 1.0,
+      "vc_cov": null
+    },
+    "nested": {
+      "crp_cov": 1.0,
+      "vc_cov": 1.0
+    },
+    "string": {
+      "crp_cov": 1.0,
+      "vc_cov": null
+    }
+  },
+  "vc_all_contexts": {
+    "copy_query": 1.0,
+    "for_each": 0.0,
+    "if_condition": 1.0,
+    "lookup_query": 1.0,
+    "notebook_base_param": 1.0,
+    "set_variable": 1.0,
+    "web_body": 1.0
+  }
+}
