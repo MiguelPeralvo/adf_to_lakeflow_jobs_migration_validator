@@ -12,7 +12,7 @@
 
 Execute Step 7 of the wkmigrate coverage roadmap: add a second real-corpus X-1
 datapoint by sweeping the Vista Cliente (VC) ADF corpus (119 pipelines, 212
-IfCondition activities, under `/Users/miguel.peralvo/Downloads/DataFactory/pipeline/`)
+IfCondition activities, under `<CORPUS_DIR>/`)
 through wkmigrate at SHA `cfb49e6`. Build a stratified 200+ expression golden set,
 run `lmv sweep-activity-contexts` (primary `if_condition`, secondary all-contexts),
 replay CRP0001 baseline at the same SHA for cross-regression, and report X-1/X-2/X-6
@@ -172,10 +172,10 @@ Raw VC corpus (212 activities) contained no `nested_predicate`, `contains_inters
 ## Reproduction
 
 ```bash
-cd /Users/miguel.peralvo/Code/adf_to_lakeflow_jobs_migration_validator
+cd <REPO_ROOT>
 git checkout feature/step-7-vista-cliente-sweep
 python3 scripts/extract_vista_cliente_expressions.py \
-  --corpus ~/Downloads/DataFactory/pipeline \
+  --corpus <CORPUS_DIR> \
   --out golden_sets/vista_cliente_expressions.json \
   --hist dev/findings/vista-cliente-category-histogram-2026-04-23.json
 uv run lmv sweep-activity-contexts \

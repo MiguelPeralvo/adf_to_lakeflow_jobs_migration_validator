@@ -98,10 +98,10 @@ where VC expressions fail on 2 contexts that are not in-scope for X-1.
 ## Reproduction one-liner
 
 ```bash
-cd /Users/miguel.peralvo/Code/adf_to_lakeflow_jobs_migration_validator && \
+cd <REPO_ROOT> && \
 git checkout feature/step-7-vista-cliente-sweep && \
 python3 scripts/extract_vista_cliente_expressions.py \
-  --corpus ~/Downloads/DataFactory/pipeline \
+  --corpus <CORPUS_DIR> \
   --out golden_sets/vista_cliente_expressions.json \
   --hist dev/findings/vista-cliente-category-histogram-2026-04-23.json && \
 uv run lmv sweep-activity-contexts \

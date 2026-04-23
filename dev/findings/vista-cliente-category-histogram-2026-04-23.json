@@ -1,5 +1,5 @@
 {
-  "corpus_dir": "/Users/miguel.peralvo/Downloads/DataFactory/pipeline",
+  "corpus_dir": "<CORPUS_DIR>",
   "total_if_condition_expressions": 212,
   "per_vc_category": {
     "pipeline_param_ref": 161,

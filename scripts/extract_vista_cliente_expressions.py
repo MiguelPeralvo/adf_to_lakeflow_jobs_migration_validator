@@ -40,7 +40,7 @@ def _classify(expr: str, depth: int) -> str:
     has_or = "@or(" in low
     has_equals = "@equals(" in low
     has_contains = "@contains(" in low or "@intersection(" in low or "@empty(" in low
-    has_concat = "@concat(" in low or "touppers(" in low or "toupper(" in low or "replace(" in low
+    has_concat = "@concat(" in low or "toupper(" in low or "replace(" in low
     has_vars = "variables(" in low
     has_pipeline_param = "pipeline().parameters." in low
     bare_expr = e.strip().startswith("@{") is False and not e.strip().startswith("@")
@@ -65,8 +65,8 @@ def _classify(expr: str, depth: int) -> str:
         return "pipeline_param_ref"
     if bare_expr:
         return "bare_activity_output"
-    # fallback
-    return "bare_activity_output"
+    # fallback for unrecognized @function(...) expressions
+    return "nested_predicate"
 
 
 # --- recursive walk ---------------------------------------------------------
