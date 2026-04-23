@@ -99,6 +99,9 @@ def _walk_activities(activities, pipeline_name: str, out: list, depth: int = 0, 
         # also traverse ForEach / Switch / Until children
         tp = act.get("typeProperties") or {}
         for child_key in ("activities", "ifTrueActivities", "ifFalseActivities", "defaultActivities"):
+            # Skip ifTrueActivities/ifFalseActivities for IfCondition (already handled above at depth + 1)
+            if act_type == "IfCondition" and child_key in ("ifTrueActivities", "ifFalseActivities"):
+                continue
             if child_key in tp:
                 _walk_activities(tp.get(child_key) or [], pipeline_name, out, depth, path)
         for case in tp.get("cases") or []:
