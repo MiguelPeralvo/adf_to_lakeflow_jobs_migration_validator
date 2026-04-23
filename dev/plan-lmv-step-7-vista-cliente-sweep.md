@@ -1,13 +1,13 @@
 # Step 7 Plan — Vista Cliente Semantic Validation Sweep (lmv)
 
-_Source: Google Doc `1zNokeWpHl-yWfCJd0rDrTo0sShdqVcP4pBEH7Awaul4` was inaccessible at execution time (ADC quota project missing for `docs.googleapis.com`). This document therefore summarizes the agent-reviewed plan at `/Users/miguel.peralvo/.claude/plans/tomando-en-cuenta-este-memoized-simon-agent-aa7d52dbb9cccd251.md`._
+_Source: Google Doc `1zNokeWpHl-yWfCJd0rDrTo0sShdqVcP4pBEH7Awaul4` was inaccessible at execution time (ADC quota project missing for `docs.googleapis.com`). This document therefore summarizes the agent-reviewed plan at `<AGENT_PLANS_DIR>/tomando-en-cuenta-este-memoized-simon-agent-aa7d52dbb9cccd251.md`._
 
 ## Target state
-- **Repo:** `/Users/miguel.peralvo/Code/adf_to_lakeflow_jobs_migration_validator`
+- **Repo:** `<REPO_ROOT>`
 - **wkmigrate SHA pinned:** `cfb49e6` (`pr/27-4-integration-tests`)
 - **Branch:** `feature/step-7-vista-cliente-sweep` off `main` (`f616be3`)
 - **Date:** 2026-04-23
-- **VC corpus:** `/Users/miguel.peralvo/Downloads/DataFactory/pipeline/` — 327 pipelines
+- **VC corpus:** `<CORPUS_DIR>/` — 327 pipelines
 
 ## Motivation
 After Step 6 landed CRP0001 baseline X-1 = 0.8317, we need a second real-corpus datapoint to verify the resolution-rate KPI generalizes. Vista Cliente (VC) is the next ADF corpus in scope and has 212 IfCondition activities across 119 pipelines with complex compound predicates.

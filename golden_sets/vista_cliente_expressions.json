@@ -1,7 +1,7 @@
 {
   "count": 200,
   "origin": "vista_cliente_if_condition_sweep_2026_04_23",
-  "corpus": "/Users/miguel.peralvo/Downloads/DataFactory/pipeline",
+  "corpus": "<CORPUS_DIR>",
   "sampling": {
     "seed": 42,
     "floor_per_vc_category": 12,
