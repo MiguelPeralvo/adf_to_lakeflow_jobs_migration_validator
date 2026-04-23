@@ -1,0 +1,17 @@
+{
+  "corpus_dir": "/Users/miguel.peralvo/Downloads/DataFactory/pipeline",
+  "total_if_condition_expressions": 212,
+  "per_vc_category": {
+    "pipeline_param_ref": 161,
+    "compound_and": 14,
+    "variables_ref": 24,
+    "equals_binary": 6,
+    "compound_or": 5,
+    "bare_activity_output": 2
+  },
+  "per_canonical_category": {
+    "nested": 187,
+    "logical": 25
+  },
+  "pipelines_seen": 119
+}
